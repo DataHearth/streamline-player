@@ -2,7 +2,8 @@
 /target
 /src-tauri/gen/schemas
 node_modules
-/web/static/dist
+/build
+/.svelte-kit
 /.claude/settings.local.json
 /.claude/scheduled_tasks.lock
 /.playwright-mcp/

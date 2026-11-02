@@ -20,7 +20,7 @@ esac
 
 reason=""
 case "$rel" in
-web/static/dist/*) reason="esbuild bundle — re-run 'pnpm build' instead" ;;
+build/* | .svelte-kit/*) reason="SvelteKit output — re-run 'pnpm build' or 'pnpm check' instead" ;;
 src-tauri/gen/*) reason="tauri-generated — re-run 'cargo tauri dev' or 'cargo tauri <android|ios> init' instead" ;;
 Cargo.lock) reason="cargo lockfile — change Cargo.toml and let cargo update it" ;;
 pnpm-lock.yaml | package.json) reason="pnpm-managed — use 'pnpm add|remove' instead" ;;

@@ -1,9 +1,13 @@
 # Streamline Player
 
-Cross-platform client for Streamline's built-in player (`../streamline`).
+The player for Streamline (`../streamline`): a cross-platform client app and
+the streaming engine that serves it. Streamline keeps all metadata (users,
+sessions, watch state) and orchestrates; the engine only reads files and
+serves HLS.
 
-Docs are split by side. The client's design lives here
-(`docs/superpowers/specs/2026-11-02-player-client-design.md`). Server contracts
+Docs are split by side. The client and engine designs live here
+(`docs/superpowers/specs/2026-11-02-player-client-design.md`,
+`docs/superpowers/specs/2026-11-02-player-engine-design.md`). Server contracts
 live in `../streamline/docs/superpowers/specs/`: `2026-07-07-player-design.md`
 (playback) and `2026-11-02-device-pairing-design.md` (login), with their plans
 in `../streamline/docs/superpowers/plans/`. The server side is specified, not
@@ -14,8 +18,13 @@ change it there first.
 ## Stack
 
 - **Tauri 2** shell in `src-tauri/` (root `Cargo.toml` is the workspace).
-- **Svelte 5** UI in `web/`, bundled by esbuild into `web/static/dist`, the same
-  setup as `../streamline/web/app` so components and the design system port over.
+- **Engine** in `engine/` (planned): a Rust HTTP service driving external
+  ffmpeg, VAAPI or CPU. Streamline is its only control-plane caller.
+- **SvelteKit 3** (Svelte 5) UI in `src/`, as a static SPA: `adapter-static`
+  with an `index.html` fallback, `ssr = false`, built to `build/`. Config lives
+  in `vite.config.ts` (SvelteKit 3 has no `svelte.config.js`). No `load` from a
+  server and no `+server.ts`: data comes from Rust via `invoke`. Components port
+  from `../streamline/web/app` (plain Svelte + Routify); only routes differ.
 - **Shaka Player + Media Chrome** for playback, as in the server spec.
 - Targets: desktop (Linux/macOS/Windows), iOS/Android, Android TV.
 
@@ -23,8 +32,8 @@ change it there first.
 
 - **Every REST call goes through Rust**, never `fetch` from the webview.
   `/api/v1` sends no CORS headers, and the credential stays out of JavaScript.
-  The webview only fetches HLS: `/hls` has CORS and the playback token rides
-  the URL.
+  The webview only fetches HLS, from the engine: `/hls` has CORS and the
+  playback token Streamline minted rides the URL.
 - **Auth is device pairing**, the app's only login on every platform. The
   `device` API key lives in OS secure storage, never in plaintext. No password
   ever passes through the app.
@@ -40,7 +49,7 @@ change it there first.
 
 ## Commands
 
-- `cargo tauri dev` — run the app (starts esbuild in watch mode)
+- `cargo tauri dev` — run the app (starts the Vite dev server on :1420)
 - `pnpm build` / `pnpm check` — bundle / svelte-check
 - `lint` — clippy, `-D warnings`; `nix flake check` — rustfmt
 - Add JS deps with `pnpm add`, never by editing `package.json`. TypeScript stays

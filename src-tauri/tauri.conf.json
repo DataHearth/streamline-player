@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.datahearth.streamline-player",
   "build": {
-    "frontendDist": "../web/static",
+    "frontendDist": "../build",
+    "devUrl": "http://localhost:1420",
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build"
   },

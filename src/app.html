@@ -4,7 +4,9 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Streamline</title>
-		<script type="module" src="/dist/main.js"></script>
+		%sveltekit.head%
 	</head>
-	<body></body>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
 </html>
