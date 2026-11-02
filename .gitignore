@@ -1,0 +1,10 @@
+.direnv
+/target
+/src-tauri/gen/schemas
+node_modules
+/web/static/dist
+/.claude/settings.local.json
+/.claude/scheduled_tasks.lock
+/.playwright-mcp/
+/.superpowers/
+/docs/superpowers/

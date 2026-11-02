@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node web/esbuild.config.mjs --watch",
+    "build": "node web/esbuild.config.mjs",
+    "check": "svelte-check --tsconfig web/tsconfig.json"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "esbuild-svelte": "^0.9.5",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.7",
+    "typescript": "~6.0.3"
+  }
+}
