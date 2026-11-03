@@ -48,6 +48,8 @@
               typescript-language-server
               playwright-mcp
               jq
+              ffmpeg-full
+              dovi-tool
               (writeShellScriptBin "lint" "cargo clippy --all-targets -- -D warnings")
             ];
             PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers;
