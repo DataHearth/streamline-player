@@ -1,0 +1,12 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows controlling the native player and listening to its events"
+permissions = [
+  "allow-load",
+  "allow-play",
+  "allow-pause",
+  "allow-seek",
+  "allow-registerListener",
+  "allow-removeListener",
+]

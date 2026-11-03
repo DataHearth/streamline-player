@@ -1,0 +1,13 @@
+[package]
+name = "tauri-plugin-player"
+version = "0.1.0"
+edition = "2024"
+authors = ["Antoine Langlois <dev@antoine-langlois.net>"]
+description = "Native video player behind the webview (Media3 ExoPlayer on Android)"
+links = "tauri-plugin-player"
+
+[dependencies]
+tauri = { version = "2.12.5", features = [] }
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

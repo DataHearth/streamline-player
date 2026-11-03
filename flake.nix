@@ -22,11 +22,43 @@
             ];
             targets = [ "x86_64-pc-windows-gnu" ];
           };
+          rustAndroid = rust.override {
+            targets = [
+              "aarch64-linux-android"
+              "armv7-linux-androideabi"
+              "i686-linux-android"
+              "x86_64-linux-android"
+            ];
+          };
+          android = pkgs.androidenv.composeAndroidPackages {
+            # The system image is API 36; Tauri's Android template compiles against 37.
+            platformVersions = [
+              "36"
+              "37.0"
+            ];
+            buildToolsVersions = [
+              "36.0.0"
+              "37.0.0"
+            ];
+            includeNDK = true;
+            ndkVersions = [ "29.0.14206865" ];
+            includeCmake = false;
+            includeEmulator = true;
+            includeSystemImages = true;
+            systemImageTypes = [ "android-tv" ];
+            abiVersions = [ "x86_64" ];
+          };
+          androidSdk = android.androidsdk;
+          androidHome = "${androidSdk}/libexec/android-sdk";
         in
         {
           _module.args.pkgs = import inputs.nixpkgs {
             inherit system;
             overlays = [ (import inputs.rust-overlay) ];
+            config = {
+              android_sdk.accept_license = true;
+              allowUnfree = true;
+            };
           };
 
           checks.fmt = pkgs.runCommandLocal "check-rust-fmt" { nativeBuildInputs = [ rust ]; } ''
@@ -69,6 +101,27 @@
               gst_all_1.gst-plugins-bad
               gst_all_1.gst-libav
             ];
+          };
+
+          # Separate from the default shell so direnv does not pull the multi-GB SDK
+          # for desktop work.
+          devShells.android = pkgs.mkShell {
+            nativeBuildInputs = with pkgs; [
+              rustAndroid
+              cargo-tauri
+              nodejs_24
+              pnpm
+              jdk17
+              androidSdk
+              jq
+            ];
+            ANDROID_HOME = androidHome;
+            ANDROID_SDK_ROOT = androidHome;
+            NDK_HOME = "${androidHome}/ndk/29.0.14206865";
+            JAVA_HOME = pkgs.jdk17.home;
+            # AGP fetches aapt2 from Maven as a generic-linux binary; point it at the
+            # patched one from the SDK so the build does not depend on nix-ld.
+            GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidHome}/build-tools/36.0.0/aapt2";
           };
         };
     };
