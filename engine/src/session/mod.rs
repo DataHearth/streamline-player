@@ -140,7 +140,7 @@ fn is_transcode(mode: Mode) -> bool {
     matches!(mode, Mode::AudioTranscode | Mode::Transcode)
 }
 
-fn backend_name(b: Backend) -> &'static str {
+pub fn backend_name(b: Backend) -> &'static str {
     match b {
         Backend::Vaapi => "vaapi",
         Backend::Nvenc => "nvenc",
