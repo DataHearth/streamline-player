@@ -1,0 +1,619 @@
+{
+    "streams": [
+        {
+            "index": 0,
+            "codec_name": "h264",
+            "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+            "profile": "High",
+            "codec_type": "video",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "mime_codec_string": "avc1.640029",
+            "width": 1280,
+            "height": 720,
+            "coded_width": 1280,
+            "coded_height": 720,
+            "has_b_frames": 1,
+            "sample_aspect_ratio": "1:1",
+            "display_aspect_ratio": "16:9",
+            "pix_fmt": "yuv420p",
+            "level": 41,
+            "color_range": "tv",
+            "color_space": "bt709",
+            "color_transfer": "bt709",
+            "color_primaries": "bt709",
+            "chroma_location": "left",
+            "field_order": "progressive",
+            "is_avc": "true",
+            "nal_length_size": "4",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "25/1",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "bits_per_raw_sample": "8",
+            "extradata_size": 44,
+            "disposition": {
+                "default": 1,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "DURATION": "00:00:20.720000000"
+            }
+        },
+        {
+            "index": 1,
+            "codec_name": "ac3",
+            "codec_long_name": "ATSC A/52A (AC-3)",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "mime_codec_string": "ac-3",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 2,
+            "channel_layout": "stereo",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "dmix_mode": "0",
+            "ltrt_cmixlev": "0.000000",
+            "ltrt_surmixlev": "0.000000",
+            "loro_cmixlev": "0.000000",
+            "loro_surmixlev": "0.000000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 136,
+            "start_time": "0.136000",
+            "bit_rate": "384000",
+            "disposition": {
+                "default": 1,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fr",
+                "DURATION": "00:00:20.680000000"
+            }
+        },
+        {
+            "index": 2,
+            "codec_name": "ac3",
+            "codec_long_name": "ATSC A/52A (AC-3)",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "mime_codec_string": "ac-3",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 2,
+            "channel_layout": "stereo",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "dmix_mode": "0",
+            "ltrt_cmixlev": "0.000000",
+            "ltrt_surmixlev": "0.000000",
+            "loro_cmixlev": "0.000000",
+            "loro_surmixlev": "0.000000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 136,
+            "start_time": "0.136000",
+            "bit_rate": "384000",
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "en",
+                "DURATION": "00:00:20.680000000"
+            }
+        },
+        {
+            "index": 3,
+            "codec_name": "dvd_subtitle",
+            "codec_long_name": "DVD subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 1280,
+            "height": 720,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 20720,
+            "duration": "20.720000",
+            "extradata_size": 343,
+            "disposition": {
+                "default": 1,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "en",
+                "DURATION": "00:00:12.551000000"
+            }
+        },
+        {
+            "index": 4,
+            "codec_name": "dvd_subtitle",
+            "codec_long_name": "DVD subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 1280,
+            "height": 720,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 20720,
+            "duration": "20.720000",
+            "extradata_size": 343,
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fr",
+                "DURATION": "00:00:12.551000000"
+            }
+        },
+        {
+            "index": 5,
+            "codec_name": "dvd_subtitle",
+            "codec_long_name": "DVD subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 1280,
+            "height": 720,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 20720,
+            "duration": "20.720000",
+            "extradata_size": 343,
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "en",
+                "DURATION": "00:00:00.000000000"
+            }
+        },
+        {
+            "index": 6,
+            "codec_name": "dvd_subtitle",
+            "codec_long_name": "DVD subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 1280,
+            "height": 720,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 20720,
+            "duration": "20.720000",
+            "extradata_size": 343,
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fr",
+                "DURATION": "00:00:00.000000000"
+            }
+        }
+    ],
+    "chapters": [
+        {
+            "id": 2380722582,
+            "time_base": "1/1000000000",
+            "start": 0,
+            "start_time": "0.000000",
+            "end": 208240000000,
+            "end_time": "208.240000",
+            "tags": {
+                "title": "(01)00:00:00:000"
+            }
+        },
+        {
+            "id": 736805264,
+            "time_base": "1/1000000000",
+            "start": 208240000000,
+            "start_time": "208.240000",
+            "end": 417320000000,
+            "end_time": "417.320000",
+            "tags": {
+                "title": "(02)00:05:28:240"
+            }
+        },
+        {
+            "id": 3424677547,
+            "time_base": "1/1000000000",
+            "start": 417320000000,
+            "start_time": "417.320000",
+            "end": 561440000000,
+            "end_time": "561.440000",
+            "tags": {
+                "title": "(03)00:08:57:320"
+            }
+        },
+        {
+            "id": 2042540940,
+            "time_base": "1/1000000000",
+            "start": 561440000000,
+            "start_time": "561.440000",
+            "end": 828960000000,
+            "end_time": "828.960000",
+            "tags": {
+                "title": "(04)00:11:21:440"
+            }
+        },
+        {
+            "id": 4281910431,
+            "time_base": "1/1000000000",
+            "start": 828960000000,
+            "start_time": "828.960000",
+            "end": 1175480000000,
+            "end_time": "1175.480000",
+            "tags": {
+                "title": "(05)00:15:48:960"
+            }
+        },
+        {
+            "id": 2335403148,
+            "time_base": "1/1000000000",
+            "start": 1175480000000,
+            "start_time": "1175.480000",
+            "end": 1411440000000,
+            "end_time": "1411.440000",
+            "tags": {
+                "title": "(06)00:21:35:480"
+            }
+        },
+        {
+            "id": 1537205687,
+            "time_base": "1/1000000000",
+            "start": 1411440000000,
+            "start_time": "1411.440000",
+            "end": 1519280000000,
+            "end_time": "1519.280000",
+            "tags": {
+                "title": "(07)00:25:31:440"
+            }
+        },
+        {
+            "id": 2261069191,
+            "time_base": "1/1000000000",
+            "start": 1519280000000,
+            "start_time": "1519.280000",
+            "end": 1874640000000,
+            "end_time": "1874.640000",
+            "tags": {
+                "title": "(08)00:27:19:280"
+            }
+        },
+        {
+            "id": 2279540907,
+            "time_base": "1/1000000000",
+            "start": 1874640000000,
+            "start_time": "1874.640000",
+            "end": 2091200000000,
+            "end_time": "2091.200000",
+            "tags": {
+                "title": "(09)00:33:14:640"
+            }
+        },
+        {
+            "id": 2414249379,
+            "time_base": "1/1000000000",
+            "start": 2091200000000,
+            "start_time": "2091.200000",
+            "end": 2267160000000,
+            "end_time": "2267.160000",
+            "tags": {
+                "title": "(10)00:36:51:200"
+            }
+        },
+        {
+            "id": 4101254305,
+            "time_base": "1/1000000000",
+            "start": 2267160000000,
+            "start_time": "2267.160000",
+            "end": 2464720000000,
+            "end_time": "2464.720000",
+            "tags": {
+                "title": "(11)00:39:47:160"
+            }
+        },
+        {
+            "id": 2553856948,
+            "time_base": "1/1000000000",
+            "start": 2464720000000,
+            "start_time": "2464.720000",
+            "end": 2680800000000,
+            "end_time": "2680.800000",
+            "tags": {
+                "title": "(12)00:43:04:720"
+            }
+        },
+        {
+            "id": 2435372425,
+            "time_base": "1/1000000000",
+            "start": 2680800000000,
+            "start_time": "2680.800000",
+            "end": 2817680000000,
+            "end_time": "2817.680000",
+            "tags": {
+                "title": "(13)00:46:40:800"
+            }
+        },
+        {
+            "id": 2735132803,
+            "time_base": "1/1000000000",
+            "start": 2817680000000,
+            "start_time": "2817.680000",
+            "end": 3013840000000,
+            "end_time": "3013.840000",
+            "tags": {
+                "title": "(14)00:48:57:680"
+            }
+        },
+        {
+            "id": 2596478599,
+            "time_base": "1/1000000000",
+            "start": 3013840000000,
+            "start_time": "3013.840000",
+            "end": 3332920000000,
+            "end_time": "3332.920000",
+            "tags": {
+                "title": "(15)00:52:13:840"
+            }
+        },
+        {
+            "id": 75947430,
+            "time_base": "1/1000000000",
+            "start": 3332920000000,
+            "start_time": "3332.920000",
+            "end": 3597320000000,
+            "end_time": "3597.320000",
+            "tags": {
+                "title": "(16)00:57:32:920"
+            }
+        },
+        {
+            "id": 1553414788,
+            "time_base": "1/1000000000",
+            "start": 3597320000000,
+            "start_time": "3597.320000",
+            "end": 3785880000000,
+            "end_time": "3785.880000",
+            "tags": {
+                "title": "(17)01:01:57:320"
+            }
+        },
+        {
+            "id": 2603208876,
+            "time_base": "1/1000000000",
+            "start": 3785880000000,
+            "start_time": "3785.880000",
+            "end": 3917960000000,
+            "end_time": "3917.960000",
+            "tags": {
+                "title": "(18)01:05:05:880"
+            }
+        },
+        {
+            "id": 2298394245,
+            "time_base": "1/1000000000",
+            "start": 3917960000000,
+            "start_time": "3917.960000",
+            "end": 4120920000000,
+            "end_time": "4120.920000",
+            "tags": {
+                "title": "(19)01:07:17:960"
+            }
+        },
+        {
+            "id": 2384306049,
+            "time_base": "1/1000000000",
+            "start": 4120920000000,
+            "start_time": "4120.920000",
+            "end": 4500760000000,
+            "end_time": "4500.760000",
+            "tags": {
+                "title": "(20)01:10:40:920"
+            }
+        },
+        {
+            "id": 1016641471,
+            "time_base": "1/1000000000",
+            "start": 4500760000000,
+            "start_time": "4500.760000",
+            "end": 4876840000000,
+            "end_time": "4876.840000",
+            "tags": {
+                "title": "(21)01:17:00:760"
+            }
+        },
+        {
+            "id": 1418825878,
+            "time_base": "1/1000000000",
+            "start": 4876840000000,
+            "start_time": "4876.840000",
+            "end": 5231320000000,
+            "end_time": "5231.320000",
+            "tags": {
+                "title": "(22)01:23:16:840"
+            }
+        },
+        {
+            "id": 159990952,
+            "time_base": "1/1000000000",
+            "start": 5231320000000,
+            "start_time": "5231.320000",
+            "end": 5392640000000,
+            "end_time": "5392.640000",
+            "tags": {
+                "title": "(23)01:29:11:320"
+            }
+        },
+        {
+            "id": 133180089,
+            "time_base": "1/1000000000",
+            "start": 5392640000000,
+            "start_time": "5392.640000",
+            "end": 5467520000000,
+            "end_time": "5467.520000",
+            "tags": {
+                "title": "(24)01:31:52:640"
+            }
+        }
+    ],
+    "format": {
+        "filename": "corpus/16-h264-8bit.mkv",
+        "nb_streams": 7,
+        "nb_programs": 0,
+        "nb_stream_groups": 0,
+        "format_name": "matroska,webm",
+        "format_long_name": "Matroska / WebM",
+        "start_time": "0.000000",
+        "duration": "20.720000",
+        "size": "13911020",
+        "bit_rate": "5371050",
+        "probe_score": 100,
+        "tags": {
+            "title": "SG1_SEASON1_DISC1_SKU1.Title2",
+            "ENCODER": "Lavf63.1.102"
+        }
+    }
+}

@@ -1,0 +1,696 @@
+{
+    "streams": [
+        {
+            "index": 0,
+            "codec_name": "hevc",
+            "codec_long_name": "H.265 / HEVC (High Efficiency Video Coding)",
+            "profile": "Main 10",
+            "codec_type": "video",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 3840,
+            "height": 2160,
+            "coded_width": 3840,
+            "coded_height": 2160,
+            "has_b_frames": 3,
+            "sample_aspect_ratio": "1:1",
+            "display_aspect_ratio": "16:9",
+            "pix_fmt": "yuv420p10le",
+            "level": 153,
+            "color_range": "tv",
+            "color_space": "bt2020nc",
+            "color_transfer": "smpte2084",
+            "color_primaries": "bt2020",
+            "chroma_location": "topleft",
+            "view_ids_available": "",
+            "view_pos_available": "",
+            "r_frame_rate": "24000/1001",
+            "avg_frame_rate": "24000/1001",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "extradata_size": 186,
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "eng",
+                "BPS-eng": "49981899",
+                "DURATION-eng": "01:55:00.435208333",
+                "NUMBER_OF_FRAMES-eng": "165445",
+                "NUMBER_OF_BYTES-eng": "43112105701",
+                "_STATISTICS_WRITING_APP-eng": "MakeMKV v1.15.3 darwin(x64-release)",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-11-01 18:46:05",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
+                "DURATION": "00:00:10.844000000"
+            },
+            "side_data_list": [
+                {
+                    "side_data_type": "DOVI configuration record",
+                    "dv_version_major": 1,
+                    "dv_version_minor": 0,
+                    "dv_profile": 7,
+                    "dv_level": 6,
+                    "rpu_present_flag": 1,
+                    "el_present_flag": 1,
+                    "bl_present_flag": 1,
+                    "dv_bl_signal_compatibility_id": 6,
+                    "dv_md_compression": "none"
+                },
+                {
+                    "side_data_type": "HEVC enhancement-layer decoder configuration"
+                }
+            ]
+        },
+        {
+            "index": 1,
+            "codec_name": "ac3",
+            "codec_long_name": "ATSC A/52A (AC-3)",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "mime_codec_string": "ac-3",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 6,
+            "channel_layout": "5.1(side)",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "dmix_mode": "0",
+            "ltrt_cmixlev": "0.000000",
+            "ltrt_surmixlev": "0.000000",
+            "loro_cmixlev": "0.000000",
+            "loro_surmixlev": "0.000000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 14,
+            "start_time": "0.014000",
+            "bit_rate": "384000",
+            "disposition": {
+                "default": 1,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fre",
+                "title": "VFF",
+                "BPS-eng": "384000",
+                "DURATION-eng": "01:55:26.432000000",
+                "NUMBER_OF_FRAMES-eng": "216451",
+                "NUMBER_OF_BYTES-eng": "332468736",
+                "_STATISTICS_WRITING_APP-eng": "MakeMKV v1.15.3 darwin(x64-release)",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-11-01 18:46:05",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
+                "DURATION": "00:00:10.510000000"
+            }
+        },
+        {
+            "index": 2,
+            "codec_name": "truehd",
+            "codec_long_name": "TrueHD",
+            "profile": "Dolby TrueHD + Dolby Atmos",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "sample_fmt": "s32",
+            "sample_rate": "48000",
+            "channels": 8,
+            "channel_layout": "7.1",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 19,
+            "start_time": "0.019000",
+            "bits_per_raw_sample": "24",
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "eng",
+                "title": "Surround 7.1",
+                "BPS-eng": "4062494",
+                "DURATION-eng": "01:54:59.803333333",
+                "NUMBER_OF_FRAMES-eng": "8279764",
+                "NUMBER_OF_BYTES-eng": "3503801448",
+                "_STATISTICS_WRITING_APP-eng": "MakeMKV v1.15.3 darwin(x64-release)",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-11-01 18:46:05",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
+                "DURATION": "00:00:10.506000000"
+            }
+        },
+        {
+            "index": 3,
+            "codec_name": "hdmv_pgs_subtitle",
+            "codec_long_name": "HDMV Presentation Graphic Stream subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 10844,
+            "duration": "10.844000",
+            "disposition": {
+                "default": 1,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "eng",
+                "BPS-eng": "20793",
+                "DURATION-eng": "01:46:23.481270833",
+                "NUMBER_OF_FRAMES-eng": "2016",
+                "NUMBER_OF_BYTES-eng": "16591855",
+                "_STATISTICS_WRITING_APP-eng": "MakeMKV v1.15.3 darwin(x64-release)",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-11-01 18:46:05",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
+                "DURATION": "00:00:00.000000000"
+            }
+        },
+        {
+            "index": 4,
+            "codec_name": "hdmv_pgs_subtitle",
+            "codec_long_name": "HDMV Presentation Graphic Stream subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 10844,
+            "duration": "10.844000",
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "eng",
+                "BPS-eng": "23183",
+                "DURATION-eng": "01:46:32.406854166",
+                "NUMBER_OF_FRAMES-eng": "2226",
+                "NUMBER_OF_BYTES-eng": "18524541",
+                "_STATISTICS_WRITING_APP-eng": "MakeMKV v1.15.3 darwin(x64-release)",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-11-01 18:46:05",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
+                "DURATION": "00:00:00.000000000"
+            }
+        },
+        {
+            "index": 5,
+            "codec_name": "hdmv_pgs_subtitle",
+            "codec_long_name": "HDMV Presentation Graphic Stream subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 10844,
+            "duration": "10.844000",
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fre",
+                "BPS-eng": "19522",
+                "DURATION-eng": "01:46:23.648104166",
+                "NUMBER_OF_FRAMES-eng": "2034",
+                "NUMBER_OF_BYTES-eng": "15578387",
+                "_STATISTICS_WRITING_APP-eng": "MakeMKV v1.15.3 darwin(x64-release)",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-11-01 18:46:05",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
+                "DURATION": "00:00:00.000000000"
+            }
+        },
+        {
+            "index": 6,
+            "codec_name": "hdmv_pgs_subtitle",
+            "codec_long_name": "HDMV Presentation Graphic Stream subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 10844,
+            "duration": "10.844000",
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fre",
+                "BPS-eng": "38",
+                "DURATION-eng": "01:10:45.595520833",
+                "NUMBER_OF_FRAMES-eng": "6",
+                "NUMBER_OF_BYTES-eng": "20576",
+                "_STATISTICS_WRITING_APP-eng": "MakeMKV v1.15.3 darwin(x64-release)",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-11-01 18:46:05",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
+                "DURATION": "00:00:00.000000000"
+            }
+        },
+        {
+            "index": 7,
+            "codec_name": "hdmv_pgs_subtitle",
+            "codec_long_name": "HDMV Presentation Graphic Stream subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 10844,
+            "duration": "10.844000",
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "spa",
+                "BPS-eng": "18340",
+                "DURATION-eng": "01:46:23.397854166",
+                "NUMBER_OF_FRAMES-eng": "1878",
+                "NUMBER_OF_BYTES-eng": "14634483",
+                "_STATISTICS_WRITING_APP-eng": "MakeMKV v1.15.3 darwin(x64-release)",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-11-01 18:46:05",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
+                "DURATION": "00:00:00.000000000"
+            }
+        },
+        {
+            "index": 8,
+            "codec_name": "hdmv_pgs_subtitle",
+            "codec_long_name": "HDMV Presentation Graphic Stream subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 10844,
+            "duration": "10.844000",
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "spa",
+                "BPS-eng": "55",
+                "DURATION-eng": "01:19:43.341062500",
+                "NUMBER_OF_FRAMES-eng": "8",
+                "NUMBER_OF_BYTES-eng": "33111",
+                "_STATISTICS_WRITING_APP-eng": "MakeMKV v1.15.3 darwin(x64-release)",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-11-01 18:46:05",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
+                "DURATION": "00:00:00.000000000"
+            }
+        }
+    ],
+    "chapters": [
+        {
+            "id": 9187255897828200223,
+            "time_base": "1/1000000000",
+            "start": 0,
+            "start_time": "0.000000",
+            "end": 188975333333,
+            "end_time": "188.975333",
+            "tags": {
+                "title": "Chapter 01"
+            }
+        },
+        {
+            "id": -321305111243177516,
+            "time_base": "1/1000000000",
+            "start": 188975333333,
+            "start_time": "188.975333",
+            "end": 579156791666,
+            "end_time": "579.156792",
+            "tags": {
+                "title": "Chapter 02"
+            }
+        },
+        {
+            "id": 3380787257683403277,
+            "time_base": "1/1000000000",
+            "start": 579156791666,
+            "start_time": "579.156792",
+            "end": 906483791666,
+            "end_time": "906.483792",
+            "tags": {
+                "title": "Chapter 03"
+            }
+        },
+        {
+            "id": -3683666722879505910,
+            "time_base": "1/1000000000",
+            "start": 906483791666,
+            "start_time": "906.483792",
+            "end": 1328113333333,
+            "end_time": "1328.113333",
+            "tags": {
+                "title": "Chapter 04"
+            }
+        },
+        {
+            "id": -3963019043844378181,
+            "time_base": "1/1000000000",
+            "start": 1328113333333,
+            "start_time": "1328.113333",
+            "end": 1619446041666,
+            "end_time": "1619.446042",
+            "tags": {
+                "title": "Chapter 05"
+            }
+        },
+        {
+            "id": -2818433320114080768,
+            "time_base": "1/1000000000",
+            "start": 1619446041666,
+            "start_time": "1619.446042",
+            "end": 2124200291666,
+            "end_time": "2124.200292",
+            "tags": {
+                "title": "Chapter 06"
+            }
+        },
+        {
+            "id": 8204550305087234116,
+            "time_base": "1/1000000000",
+            "start": 2124200291666,
+            "start_time": "2124.200292",
+            "end": 2399475291666,
+            "end_time": "2399.475292",
+            "tags": {
+                "title": "Chapter 07"
+            }
+        },
+        {
+            "id": -5883610892395528964,
+            "time_base": "1/1000000000",
+            "start": 2399475291666,
+            "start_time": "2399.475292",
+            "end": 2830948000000,
+            "end_time": "2830.948000",
+            "tags": {
+                "title": "Chapter 08"
+            }
+        },
+        {
+            "id": -8512497167729123813,
+            "time_base": "1/1000000000",
+            "start": 2830948000000,
+            "start_time": "2830.948000",
+            "end": 3246404708333,
+            "end_time": "3246.404708",
+            "tags": {
+                "title": "Chapter 09"
+            }
+        },
+        {
+            "id": 5075641948198090025,
+            "time_base": "1/1000000000",
+            "start": 3246404708333,
+            "start_time": "3246.404708",
+            "end": 3681839708333,
+            "end_time": "3681.839708",
+            "tags": {
+                "title": "Chapter 10"
+            }
+        },
+        {
+            "id": 4100239568775783847,
+            "time_base": "1/1000000000",
+            "start": 3681839708333,
+            "start_time": "3681.839708",
+            "end": 4104470250000,
+            "end_time": "4104.470250",
+            "tags": {
+                "title": "Chapter 11"
+            }
+        },
+        {
+            "id": -7712450518504263079,
+            "time_base": "1/1000000000",
+            "start": 4104470250000,
+            "start_time": "4104.470250",
+            "end": 4521928958333,
+            "end_time": "4521.928958",
+            "tags": {
+                "title": "Chapter 12"
+            }
+        },
+        {
+            "id": -3035109741982710505,
+            "time_base": "1/1000000000",
+            "start": 4521928958333,
+            "start_time": "4521.928958",
+            "end": 4819935000000,
+            "end_time": "4819.935000",
+            "tags": {
+                "title": "Chapter 13"
+            }
+        },
+        {
+            "id": -2403201160885063252,
+            "time_base": "1/1000000000",
+            "start": 4819935000000,
+            "start_time": "4819.935000",
+            "end": 5305628541666,
+            "end_time": "5305.628542",
+            "tags": {
+                "title": "Chapter 14"
+            }
+        },
+        {
+            "id": -5381885639656059370,
+            "time_base": "1/1000000000",
+            "start": 5305628541666,
+            "start_time": "5305.628542",
+            "end": 5808589333333,
+            "end_time": "5808.589333",
+            "tags": {
+                "title": "Chapter 15"
+            }
+        },
+        {
+            "id": 5102247071376346428,
+            "time_base": "1/1000000000",
+            "start": 5808589333333,
+            "start_time": "5808.589333",
+            "end": 6118357125000,
+            "end_time": "6118.357125",
+            "tags": {
+                "title": "Chapter 16"
+            }
+        },
+        {
+            "id": 4683041983675050388,
+            "time_base": "1/1000000000",
+            "start": 6118357125000,
+            "start_time": "6118.357125",
+            "end": 6374279458333,
+            "end_time": "6374.279458",
+            "tags": {
+                "title": "Chapter 17"
+            }
+        },
+        {
+            "id": -8855501309989757840,
+            "time_base": "1/1000000000",
+            "start": 6374279458333,
+            "start_time": "6374.279458",
+            "end": 6806580000000,
+            "end_time": "6806.580000",
+            "tags": {
+                "title": "Chapter 18"
+            }
+        }
+    ],
+    "format": {
+        "filename": "corpus/02-dv-p7-fel.mkv",
+        "nb_streams": 9,
+        "nb_programs": 0,
+        "nb_stream_groups": 0,
+        "format_name": "matroska,webm",
+        "format_long_name": "Matroska / WebM",
+        "start_time": "0.000000",
+        "duration": "10.844000",
+        "size": "83003114",
+        "bit_rate": "61234315",
+        "probe_score": 100,
+        "tags": {
+            "title": "Annihilation",
+            "ENCODER": "Lavf63.1.102"
+        }
+    }
+}

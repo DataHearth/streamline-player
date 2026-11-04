@@ -1,0 +1,501 @@
+{
+    "streams": [
+        {
+            "index": 0,
+            "codec_name": "mpeg2video",
+            "codec_long_name": "MPEG-2 video",
+            "profile": "Main",
+            "codec_type": "video",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 720,
+            "height": 576,
+            "coded_width": 0,
+            "coded_height": 0,
+            "has_b_frames": 1,
+            "sample_aspect_ratio": "64:45",
+            "display_aspect_ratio": "16:9",
+            "pix_fmt": "yuv420p",
+            "level": 8,
+            "color_range": "tv",
+            "chroma_location": "left",
+            "field_order": "tt",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "25/1",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "extradata_size": 152,
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "eng",
+                "BPS-eng": "4469262",
+                "DURATION-eng": "00:41:48.840000000",
+                "NUMBER_OF_FRAMES-eng": "62721",
+                "NUMBER_OF_BYTES-eng": "1401583108",
+                "SOURCE_ID-eng": "0100E0",
+                "_STATISTICS_WRITING_APP-eng": "mkvmerge v49.0.0 ('Sick Of Losing Soulmates') 64-bit",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-10-01 09:38:00",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID",
+                "DURATION": "00:00:20.520000000"
+            },
+            "side_data_list": [
+                {
+                    "side_data_type": "CPB properties",
+                    "max_bitrate": 9800000,
+                    "min_bitrate": 0,
+                    "avg_bitrate": 0,
+                    "buffer_size": 1835008,
+                    "vbv_delay": -1
+                }
+            ]
+        },
+        {
+            "index": 1,
+            "codec_name": "ac3",
+            "codec_long_name": "ATSC A/52A (AC-3)",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "mime_codec_string": "ac-3",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 6,
+            "channel_layout": "5.1(side)",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "dmix_mode": "0",
+            "ltrt_cmixlev": "0.000000",
+            "ltrt_surmixlev": "0.000000",
+            "loro_cmixlev": "0.000000",
+            "loro_surmixlev": "0.000000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "bit_rate": "384000",
+            "disposition": {
+                "default": 1,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fre",
+                "title": "Surround 5.1",
+                "BPS-eng": "384000",
+                "DURATION-eng": "00:41:48.832000000",
+                "NUMBER_OF_FRAMES-eng": "78401",
+                "NUMBER_OF_BYTES-eng": "120423936",
+                "SOURCE_ID-eng": "0182BD",
+                "_STATISTICS_WRITING_APP-eng": "mkvmerge v49.0.0 ('Sick Of Losing Soulmates') 64-bit",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-10-01 09:38:00",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID",
+                "DURATION": "00:00:20.480000000"
+            }
+        },
+        {
+            "index": 2,
+            "codec_name": "ac3",
+            "codec_long_name": "ATSC A/52A (AC-3)",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "mime_codec_string": "ac-3",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 6,
+            "channel_layout": "5.1(side)",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "dmix_mode": "0",
+            "ltrt_cmixlev": "0.000000",
+            "ltrt_surmixlev": "0.000000",
+            "loro_cmixlev": "0.000000",
+            "loro_surmixlev": "0.000000",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "bit_rate": "384000",
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "eng",
+                "title": "Surround 5.1",
+                "BPS-eng": "384000",
+                "DURATION-eng": "00:41:48.832000000",
+                "NUMBER_OF_FRAMES-eng": "78401",
+                "NUMBER_OF_BYTES-eng": "120423936",
+                "SOURCE_ID-eng": "0180BD",
+                "_STATISTICS_WRITING_APP-eng": "mkvmerge v49.0.0 ('Sick Of Losing Soulmates') 64-bit",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-10-01 09:38:00",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID",
+                "DURATION": "00:00:20.480000000"
+            }
+        },
+        {
+            "index": 3,
+            "codec_name": "dvd_subtitle",
+            "codec_long_name": "DVD subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 720,
+            "height": 576,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 23440,
+            "duration": "23.440000",
+            "extradata_size": 509,
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fre",
+                "title": "sub fr complets",
+                "BPS-eng": "5308",
+                "DURATION-eng": "00:41:42.071000000",
+                "NUMBER_OF_FRAMES-eng": "561",
+                "NUMBER_OF_BYTES-eng": "1660396",
+                "SOURCE_ID-eng": "0124BD",
+                "_STATISTICS_WRITING_APP-eng": "mkvmerge v49.0.0 ('Sick Of Losing Soulmates') 64-bit",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-10-01 09:38:00",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID",
+                "DURATION": "00:00:23.440000000"
+            }
+        },
+        {
+            "index": 4,
+            "codec_name": "dvd_subtitle",
+            "codec_long_name": "DVD subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 720,
+            "height": 576,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 23440,
+            "duration": "23.440000",
+            "extradata_size": 509,
+            "disposition": {
+                "default": 1,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 1,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fre",
+                "title": "sub fr forced",
+                "BPS-eng": "16276",
+                "DURATION-eng": "00:00:01.274000000",
+                "NUMBER_OF_FRAMES-eng": "1",
+                "NUMBER_OF_BYTES-eng": "2592",
+                "SOURCE_ID-eng": "0125BD",
+                "_STATISTICS_WRITING_APP-eng": "mkvmerge v49.0.0 ('Sick Of Losing Soulmates') 64-bit",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-10-01 09:38:00",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID",
+                "DURATION": "00:00:00.000000000"
+            }
+        },
+        {
+            "index": 5,
+            "codec_name": "dvd_subtitle",
+            "codec_long_name": "DVD subtitles",
+            "codec_type": "subtitle",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 720,
+            "height": 576,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 23440,
+            "duration": "23.440000",
+            "extradata_size": 509,
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            },
+            "tags": {
+                "language": "fre",
+                "title": "sub fr commentary",
+                "BPS-eng": "7682",
+                "DURATION-eng": "00:41:42.071000000",
+                "NUMBER_OF_FRAMES-eng": "750",
+                "NUMBER_OF_BYTES-eng": "2402804",
+                "SOURCE_ID-eng": "0128BD",
+                "_STATISTICS_WRITING_APP-eng": "mkvmerge v49.0.0 ('Sick Of Losing Soulmates') 64-bit",
+                "_STATISTICS_WRITING_DATE_UTC-eng": "2020-10-01 09:38:00",
+                "_STATISTICS_TAGS-eng": "BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID",
+                "DURATION": "00:00:21.078000000"
+            }
+        }
+    ],
+    "chapters": [
+        {
+            "id": 3207518339848635756,
+            "time_base": "1/1000000000",
+            "start": 0,
+            "start_time": "0.000000",
+            "end": 127480000000,
+            "end_time": "127.480000",
+            "tags": {
+                "title": "Chapitre 01"
+            }
+        },
+        {
+            "id": -1060552565643042842,
+            "time_base": "1/1000000000",
+            "start": 127480000000,
+            "start_time": "127.480000",
+            "end": 344400000000,
+            "end_time": "344.400000",
+            "tags": {
+                "title": "Chapitre 02"
+            }
+        },
+        {
+            "id": -2360889409342992019,
+            "time_base": "1/1000000000",
+            "start": 344400000000,
+            "start_time": "344.400000",
+            "end": 489200000000,
+            "end_time": "489.200000",
+            "tags": {
+                "title": "Chapitre 03"
+            }
+        },
+        {
+            "id": -6388990737896150370,
+            "time_base": "1/1000000000",
+            "start": 489200000000,
+            "start_time": "489.200000",
+            "end": 607400000000,
+            "end_time": "607.400000",
+            "tags": {
+                "title": "Chapitre 04"
+            }
+        },
+        {
+            "id": 8431130151012331277,
+            "time_base": "1/1000000000",
+            "start": 607400000000,
+            "start_time": "607.400000",
+            "end": 947320000000,
+            "end_time": "947.320000",
+            "tags": {
+                "title": "Chapitre 05"
+            }
+        },
+        {
+            "id": -2301571867711450093,
+            "time_base": "1/1000000000",
+            "start": 947320000000,
+            "start_time": "947.320000",
+            "end": 1299800000000,
+            "end_time": "1299.800000",
+            "tags": {
+                "title": "Chapitre 06"
+            }
+        },
+        {
+            "id": 4402237324993350055,
+            "time_base": "1/1000000000",
+            "start": 1299800000000,
+            "start_time": "1299.800000",
+            "end": 1586000000000,
+            "end_time": "1586.000000",
+            "tags": {
+                "title": "Chapitre 07"
+            }
+        },
+        {
+            "id": -2512475663311669287,
+            "time_base": "1/1000000000",
+            "start": 1586000000000,
+            "start_time": "1586.000000",
+            "end": 1768040000000,
+            "end_time": "1768.040000",
+            "tags": {
+                "title": "Chapitre 08"
+            }
+        },
+        {
+            "id": -4314587638663925001,
+            "time_base": "1/1000000000",
+            "start": 1768040000000,
+            "start_time": "1768.040000",
+            "end": 1938520000000,
+            "end_time": "1938.520000",
+            "tags": {
+                "title": "Chapitre 09"
+            }
+        },
+        {
+            "id": 2382800606234815865,
+            "time_base": "1/1000000000",
+            "start": 1938520000000,
+            "start_time": "1938.520000",
+            "end": 2154880000000,
+            "end_time": "2154.880000",
+            "tags": {
+                "title": "Chapitre 10"
+            }
+        },
+        {
+            "id": 3423227048076278246,
+            "time_base": "1/1000000000",
+            "start": 2154880000000,
+            "start_time": "2154.880000",
+            "end": 2254760000000,
+            "end_time": "2254.760000",
+            "tags": {
+                "title": "Chapitre 11"
+            }
+        },
+        {
+            "id": 3651566269955929324,
+            "time_base": "1/1000000000",
+            "start": 2254760000000,
+            "start_time": "2254.760000",
+            "end": 2388840000000,
+            "end_time": "2388.840000",
+            "tags": {
+                "title": "Chapitre 12"
+            }
+        }
+    ],
+    "format": {
+        "filename": "corpus/14-mpeg2-interlaced.mkv",
+        "nb_streams": 6,
+        "nb_programs": 0,
+        "nb_stream_groups": 0,
+        "format_name": "matroska,webm",
+        "format_long_name": "Matroska / WebM",
+        "start_time": "0.000000",
+        "duration": "23.440000",
+        "size": "11577701",
+        "bit_rate": "3951433",
+        "probe_score": 100,
+        "tags": {
+            "title": "Stargate.Sg1.1997.S10E01.MULTi.VFi.DVD.REMUX.MV2.AC3-ROMKENT",
+            "ENCODER": "Lavf63.1.102"
+        }
+    }
+}
