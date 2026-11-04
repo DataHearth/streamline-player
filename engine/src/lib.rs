@@ -5,4 +5,5 @@ pub mod config;
 pub mod decision;
 pub mod error;
 pub mod hw;
+pub mod playlist;
 pub mod token;
