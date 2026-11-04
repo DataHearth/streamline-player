@@ -409,8 +409,10 @@ impl Session {
                 tail: convert_tail,
             });
         }
+        let args = live_args(&spec);
+        tracing::debug!(?args, "spawn ffmpeg");
         let mut child = Command::new(self.cfg.ffmpeg())
-            .args(live_args(&spec))
+            .args(args)
             .stdin(feed)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -514,6 +516,12 @@ impl Session {
         let message = upstream_failure
             .unwrap_or_else(|| exit_message("ffmpeg", &run.stderr_tail.lock().unwrap(), &status));
         if no_output && transcoding && st.hw.backend != Backend::Cpu {
+            let to = if st.hw.hw_decode && st.plan.burn_in_subtitle.is_none() {
+                "cpu decode"
+            } else {
+                "cpu encode"
+            };
+            tracing::warn!(dir = %self.dir.display(), %message, fallback = to, "gpu run failed");
             if st.hw.hw_decode && st.plan.burn_in_subtitle.is_none() {
                 st.hw.hw_decode = false;
             } else {

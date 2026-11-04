@@ -440,14 +440,18 @@ fn transcode_video(
     };
 
     let ladder = p.max_bitrate.map_or(u32::MAX, |b| ladder_height(b, codec));
-    let height = even_down(v.height.min(ladder).min(cap.max_height));
     let sar = if v.sar.0 == 0 || v.sar.1 == 0 {
         1.0
     } else {
         f64::from(v.sar.0) / f64::from(v.sar.1)
     };
-    let display_width = f64::from(v.width) * sar;
-    let width = even_down((display_width * f64::from(height) / f64::from(v.height.max(1))) as u32);
+    let aspect = f64::from(v.width) * sar / f64::from(v.height.max(1));
+    let mut height = even_down(v.height.min(ladder).min(cap.max_height));
+    let mut width = even_down((aspect * f64::from(height)).round() as u32);
+    if width > cap.max_width {
+        width = even_down(cap.max_width);
+        height = even_down((f64::from(width) / aspect).round() as u32);
+    }
 
     let bitrate = p
         .max_bitrate
@@ -797,6 +801,22 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn wide_source_fits_max_width() {
+        let mut a = fixture("hevc10_hdr10_truehd_pgs_ass_fonts");
+        a.video[0].width = 3840;
+        a.video[0].height = 1608;
+        a.video[0].sar = (1, 1);
+        let mut c = hevc_caps(&["mp4"], &[]);
+        c.video[0].max_width = 1920;
+        c.video[0].max_height = 1080;
+        let p = plan(&c, &a, &SessionParams::default());
+        let VideoAction::Transcode { width, height, .. } = p.video else {
+            panic!("expected a transcode, got {:?}", p.video)
+        };
+        assert_eq!((width, height), (1920, 804));
     }
 
     #[test]

@@ -103,11 +103,6 @@ fn pipeline(plan: &Plan, a: &Analysis, hw: &Hw) -> Pipeline {
     if b == Backend::Amf && !placebo {
         decode = drop_output_format(decode);
     }
-    let init = if burn.is_some() && has_upload(b) {
-        b.init_device_args(&hw.device)
-    } else {
-        Vec::new()
-    };
 
     let mut on_gpu = decode.iter().any(|d| d == "-hwaccel_output_format");
     let source_fmt = a
@@ -139,11 +134,15 @@ fn pipeline(plan: &Plan, a: &Analysis, hw: &Hw) -> Pipeline {
         ));
         on_gpu = true;
     } else if tonemap {
+        // Scale before the float tonemap: at 4K it is the slowest stage (0.48x
+        // vs 1.67x for 4K HDR10 to 1080p on a Radeon 780M).
         if on_gpu {
-            rest.push("hwdownload".to_owned());
+            rest.push(b.scale_filter(width, height));
+            rest.push(format!("hwdownload,format={source_fmt}"));
+        } else {
+            rest.push(format!("scale={width}:{height}"));
         }
         rest.push(CPU_TONEMAP.to_owned());
-        rest.push(format!("scale={width}:{height}"));
         on_gpu = false;
     } else if on_gpu {
         rest.push(b.scale_filter(width, height));
@@ -153,6 +152,12 @@ fn pipeline(plan: &Plan, a: &Analysis, hw: &Hw) -> Pipeline {
     if !on_gpu && has_upload(b) {
         rest.push(upload(b, out_fmt));
     }
+    let uploads = has_upload(b) && rest.iter().chain(&head).any(|f| f.contains("hwupload"));
+    let init = if uploads {
+        b.init_device_args(&hw.device)
+    } else {
+        Vec::new()
+    };
 
     let filter = match burn {
         Some(sub) => {
@@ -743,7 +748,7 @@ mod tests {
         let vf = value_of(&args, "-vf");
         assert_eq!(
             vf,
-            "format=p010le,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=nv12,scale=1920:1080"
+            "scale=1920:1080,format=p010le,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=nv12"
         );
         assert!(contains_seq(&args, &["-c:v", "libx264"]));
         assert!(contains_seq(&args, &["-x264-params", "scenecut=0"]));
@@ -757,8 +762,19 @@ mod tests {
         );
         let args = run(&p, &hw(Backend::Vaapi, false), 0, 0.0);
         let vf = value_of(&args, "-vf");
-        assert!(vf.starts_with("hwdownload,format=p010le,zscale="));
-        assert!(vf.ends_with("scale=1920:1080,format=nv12,hwupload"));
+        assert!(vf.starts_with(
+            "scale_vaapi=w=1920:h=1080,hwdownload,format=p010le,format=p010le,zscale="
+        ));
+        assert!(vf.ends_with("format=nv12,format=nv12,hwupload"));
+        assert!(contains_seq(
+            &args,
+            &[
+                "-init_hw_device",
+                "vaapi=hw:/dev/dri/renderD128",
+                "-filter_hw_device",
+                "hw"
+            ]
+        ));
     }
 
     #[test]
