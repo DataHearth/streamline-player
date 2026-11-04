@@ -18,7 +18,7 @@ use super::{
     hw_name, unix_now,
 };
 use crate::analysis::Analysis;
-use crate::args::{RunSpec, live_args};
+use crate::args::{DOVI_TOOL_ARGS, RunSpec, dv_source_args, has_dv_pipeline, live_args};
 use crate::caps::Capabilities;
 use crate::config::Config;
 use crate::decision::{Mode, Plan, VideoAction};
@@ -27,6 +27,7 @@ use crate::hw::{Backend, Hw};
 use crate::playlist;
 
 const POLL: Duration = Duration::from_millis(25);
+const UPSTREAM_EXIT_WAIT: Duration = Duration::from_secs(2);
 const MONITOR_INTERVAL: Duration = Duration::from_millis(50);
 
 pub(super) struct Live {
@@ -57,11 +58,18 @@ enum Status {
     Failed(String),
 }
 
+struct Upstream {
+    name: &'static str,
+    child: Child,
+    tail: Arc<Mutex<String>>,
+}
+
 pub(super) struct Run {
     id: u64,
     start: u32,
     edge: u32,
     child: Option<Child>,
+    upstream: Vec<Upstream>,
     status: Status,
     reported: bool,
     stderr_tail: Arc<Mutex<String>>,
@@ -149,13 +157,31 @@ fn parse_speed(line: &str) -> Option<f64> {
         .ok()
 }
 
-fn exit_message(tail: &str, status: &std::process::ExitStatus) -> String {
+fn exit_message(name: &str, tail: &str, status: &std::process::ExitStatus) -> String {
     let tail = tail.trim();
     if tail.is_empty() {
-        format!("ffmpeg exited with {status}")
+        format!("{name} exited with {status}")
     } else {
-        format!("ffmpeg exited with {status}: {tail}")
+        format!("{name} exited with {status}: {tail}")
     }
+}
+
+fn pipe_of(out: Option<tokio::process::ChildStdout>) -> Result<Stdio, ApiError> {
+    out.ok_or_else(|| ApiError::ffmpeg_unavailable("child stdout is not piped"))?
+        .try_into()
+        .map_err(|e| ApiError::ffmpeg_unavailable(format!("cannot pipe stages together: {e}")))
+}
+
+fn watch_stderr(err: tokio::process::ChildStderr) -> Arc<Mutex<String>> {
+    let tail = Arc::new(Mutex::new(String::new()));
+    let sink = tail.clone();
+    tokio::spawn(async move {
+        let mut lines = BufReader::new(err).lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            *sink.lock().unwrap() = line;
+        }
+    });
+    tail
 }
 
 impl Session {
@@ -236,6 +262,10 @@ impl Session {
             if let Some(mut child) = run.child.take() {
                 let _ = child.kill().await;
             }
+            for up in &mut run.upstream {
+                let _ = up.child.kill().await;
+            }
+            run.upstream.clear();
             run.status = Status::Stopped;
         }
         self.refresh(st).await;
@@ -295,9 +325,46 @@ impl Session {
             start_time: playlist::seek_time(&st.plan, &st.analysis, &st.bounds, start),
             out_dir: &self.dir,
         };
+        let mut upstream = Vec::new();
+        let mut feed = Stdio::null();
+        if has_dv_pipeline(spec.plan) {
+            let mut source = Command::new(self.cfg.ffmpeg())
+                .args(dv_source_args(&spec))
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .kill_on_drop(true)
+                .spawn()
+                .map_err(|e| ApiError::ffmpeg_unavailable(format!("cannot start ffmpeg: {e}")))?;
+            let source_out = pipe_of(source.stdout.take())?;
+            let source_tail = watch_stderr(source.stderr.take().expect("stderr piped"));
+            upstream.push(Upstream {
+                name: "ffmpeg",
+                child: source,
+                tail: source_tail,
+            });
+
+            let mut convert = Command::new(self.cfg.dovi_tool())
+                .args(DOVI_TOOL_ARGS)
+                .stdin(source_out)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .kill_on_drop(true)
+                .spawn()
+                .map_err(|e| {
+                    ApiError::ffmpeg_unavailable(format!("cannot start dovi_tool: {e}"))
+                })?;
+            feed = pipe_of(convert.stdout.take())?;
+            let convert_tail = watch_stderr(convert.stderr.take().expect("stderr piped"));
+            upstream.push(Upstream {
+                name: "dovi_tool",
+                child: convert,
+                tail: convert_tail,
+            });
+        }
         let mut child = Command::new(self.cfg.ffmpeg())
             .args(live_args(&spec))
-            .stdin(Stdio::null())
+            .stdin(feed)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
@@ -316,16 +383,7 @@ impl Session {
                 }
             });
         }
-        let stderr_tail = Arc::new(Mutex::new(String::new()));
-        if let Some(err) = child.stderr.take() {
-            let tail = stderr_tail.clone();
-            tokio::spawn(async move {
-                let mut lines = BufReader::new(err).lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    *tail.lock().unwrap() = line;
-                }
-            });
-        }
+        let stderr_tail = watch_stderr(child.stderr.take().expect("stderr piped"));
 
         let id = st.next_run_id;
         st.next_run_id += 1;
@@ -334,6 +392,7 @@ impl Session {
             start,
             edge: start,
             child: Some(child),
+            upstream,
             status: Status::Running,
             reported: false,
             stderr_tail,
@@ -381,13 +440,32 @@ impl Session {
         let transcoding = matches!(st.plan.video, VideoAction::Transcode { .. });
         let Some(run) = st.run.as_mut() else { return };
         run.child = None;
-        if status.success() {
+        let mut upstream_failure = None;
+        for up in &mut run.upstream {
+            let exit = if status.success() {
+                time::timeout(UPSTREAM_EXIT_WAIT, up.child.wait())
+                    .await
+                    .ok()
+                    .and_then(Result::ok)
+            } else {
+                up.child.try_wait().ok().flatten()
+            };
+            if let Some(exit) = exit
+                && !exit.success()
+            {
+                upstream_failure = Some(exit_message(up.name, &up.tail.lock().unwrap(), &exit));
+                break;
+            }
+        }
+        run.upstream.clear();
+        if status.success() && upstream_failure.is_none() {
             run.status = Status::Done;
             return;
         }
         let start = run.start;
         let no_output = run.edge == run.start;
-        let message = exit_message(&run.stderr_tail.lock().unwrap(), &status);
+        let message = upstream_failure
+            .unwrap_or_else(|| exit_message("ffmpeg", &run.stderr_tail.lock().unwrap(), &status));
         if no_output && transcoding && st.hw.backend != Backend::Cpu && !st.fell_back {
             st.fell_back = true;
             st.hw = Hw::new(Backend::Cpu, String::new(), st.hw.encoders, false);

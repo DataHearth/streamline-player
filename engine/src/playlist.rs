@@ -35,6 +35,31 @@ pub fn boundaries(plan: &Plan, a: &Analysis) -> Vec<f64> {
 
 const SEEK_MARGIN_SECS: f64 = 1.0;
 
+fn container_start(a: &Analysis) -> f64 {
+    let start = a
+        .video
+        .iter()
+        .map(|v| v.start_time)
+        .chain(a.audio.iter().map(|s| s.start_time))
+        .fold(f64::INFINITY, f64::min);
+    if start.is_finite() { start } else { 0.0 }
+}
+
+/// Output-timeline pts of the keyframe a copy run seeking to `seek` starts on: the last one at or before it.
+pub fn landing_pts(a: &Analysis, seek: f64) -> f64 {
+    let start = container_start(a);
+    let target = seek + start;
+    let key = a
+        .keyframes
+        .iter()
+        .copied()
+        .take_while(|k| *k <= target + 1e-6)
+        .last()
+        .or(a.keyframes.first().copied())
+        .unwrap_or(target);
+    round_micros(key - start)
+}
+
 /// The `-ss` for a run starting at segment `i`. Playlist bounds are relative to
 /// the video's first frame, but ffmpeg seeks on the container timeline, which
 /// starts at its earliest stream. A copy seek also lands one GOP early when it
@@ -43,17 +68,7 @@ const SEEK_MARGIN_SECS: f64 = 1.0;
 /// its keyframe, since a copy run starts at the nearest keyframe before `-ss`.
 pub fn seek_time(plan: &Plan, a: &Analysis, bounds: &[f64], i: u32) -> f64 {
     let start = bounds[i as usize];
-    let container_start = a
-        .video
-        .iter()
-        .map(|v| v.start_time)
-        .chain(a.audio.iter().map(|s| s.start_time))
-        .fold(f64::INFINITY, f64::min);
-    let container_start = if container_start.is_finite() {
-        container_start
-    } else {
-        0.0
-    };
+    let container_start = container_start(a);
     let video_start = match plan.video {
         VideoAction::Copy { .. } => a.keyframes.first().copied(),
         VideoAction::Transcode { .. } => a

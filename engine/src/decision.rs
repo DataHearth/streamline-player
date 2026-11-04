@@ -198,6 +198,11 @@ enum DvOutcome {
     Unsupported,
 }
 
+/// The conversion pipes the video through dovi_tool, which cannot write to stdout on Windows, and the muxer gets frame timing from a constant frame rate.
+fn p7_conversion_possible(v: &VideoStream) -> bool {
+    cfg!(unix) && !v.vfr && v.fps > 0.0
+}
+
 fn dv_rule(caps: &Capabilities, v: &VideoStream, profile: u8) -> DvOutcome {
     let av1 = v.codec == "av1";
     let dv_profiles = &caps.hdr.dv_profiles;
@@ -205,12 +210,12 @@ fn dv_rule(caps: &Capabilities, v: &VideoStream, profile: u8) -> DvOutcome {
         let tag = if av1 { CopyTag::Dav1 } else { CopyTag::Dvh1 };
         return DvOutcome::Fits(tag, DvHandling::Keep);
     }
-    if profile == 7 && dv_profiles.contains(&8) {
+    if profile == 7 && dv_profiles.contains(&8) && p7_conversion_possible(v) {
         return DvOutcome::Fits(CopyTag::Dvh1, DvHandling::P7ToP81);
     }
     let compat = v.dv.as_ref().map_or(0, |d| d.bl_compat_id);
     let base = match compat {
-        1 => Some(Hdr::Hdr10),
+        1 | 6 => Some(Hdr::Hdr10),
         4 => Some(Hdr::Hlg),
         2 => Some(Hdr::Sdr),
         _ => None,
@@ -767,6 +772,22 @@ mod tests {
             p.video,
             VideoAction::Copy {
                 dv: DvHandling::P7ToP81,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn dv_p7_variable_frame_rate_strips_to_base_layer() {
+        let mut a = fixture("dv_p7");
+        a.video[0].vfr = true;
+        let mut c = hevc_caps(&["mkv"], &["hdr10"]);
+        c.hdr.dv_profiles = vec![8];
+        let p = plan(&c, &a, &SessionParams::default());
+        assert!(matches!(
+            p.video,
+            VideoAction::Copy {
+                dv: DvHandling::Strip,
                 ..
             }
         ));

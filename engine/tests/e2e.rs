@@ -520,6 +520,211 @@ async fn remux_restart_on_corpus_flac_matches_in_order() {
     assert_restart_matches_in_order(&e, &src, caps, json!({}), 1, 30).await;
 }
 
+async fn joined_segment(e: &Env, sid: &str, init: &[u8], i: usize) -> PathBuf {
+    let mut media = init.to_vec();
+    media.extend(e.hls(sid, &format!("seg_{i}.m4s")).await);
+    let file = e.root.join(format!("{sid}-{i}-joined.mp4"));
+    std::fs::write(&file, media).unwrap();
+    file
+}
+
+fn min_pts(file: &Path, stream: &str) -> f64 {
+    let out = Command::new("ffprobe")
+        .args(["-v", "error", "-select_streams", stream])
+        .args(["-show_entries", "packet=pts_time", "-of", "csv=p=0"])
+        .arg(file)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| l.trim().parse::<f64>().ok())
+        .fold(f64::INFINITY, f64::min)
+}
+
+fn dovi_record(file: &Path) -> Value {
+    let out = Command::new("ffprobe")
+        .args(["-v", "error", "-select_streams", "v:0"])
+        .args(["-show_entries", "stream_side_data", "-of", "json"])
+        .arg(file)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    v["streams"][0]["side_data_list"]
+        .as_array()
+        .and_then(|l| {
+            l.iter()
+                .find(|d| d["side_data_type"] == "DOVI configuration record")
+        })
+        .cloned()
+        .unwrap_or(Value::Null)
+}
+
+struct DvRun {
+    bounds: Vec<f64>,
+    in_order: PathBuf,
+    restarted: PathBuf,
+}
+
+async fn dv_p7_run(e: &Env, src: &Path, dv_profile: u8, n: u8) -> DvRun {
+    let mut caps = caps_json("hevc", "mp4");
+    caps["video"][0]["profiles"] = json!(["main", "main_10"]);
+    caps["hdr"] = json!({"formats": ["hdr10", "dolby_vision"], "dv_profiles": [dv_profile]});
+    caps["audio"]["codecs"] = json!(["ac3"]);
+
+    let a = id(n);
+    e.start(&a, src, caps.clone(), json!({})).await;
+    let bounds = e.bounds(&a).await;
+    let init = e.hls(&a, "init.mp4").await;
+    let k = 2;
+    for i in 0..k {
+        e.hls(&a, &format!("seg_{i}.m4s")).await;
+    }
+    let in_order = joined_segment(e, &a, &init, k).await;
+    let (status, _) = e.api("DELETE", &format!("/v1/sessions/{a}"), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let b = id(n + 1);
+    e.start(&b, src, caps, json!({"position": bounds[k]})).await;
+    let init = e.hls(&b, "init.mp4").await;
+    let restarted = joined_segment(e, &b, &init, k).await;
+    DvRun {
+        bounds,
+        in_order,
+        restarted,
+    }
+}
+
+async fn dv_p7_converts_to_p81(clip: &str, n: u8) {
+    if !have_ffmpeg() {
+        return;
+    }
+    let src = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("corpus")
+        .join(clip);
+    if !src.exists() {
+        println!("skipped: {} not present", src.display());
+        return;
+    }
+    let dovi_tool = Command::new("dovi_tool")
+        .arg("--version")
+        .output()
+        .is_ok_and(|o| o.status.success());
+    if !dovi_tool {
+        println!("skipped: dovi_tool not on PATH");
+        return;
+    }
+    let _serial = DV_LOCK.lock().await;
+    let e = env().await;
+    let converted = dv_p7_run(&e, &src, 8, n).await;
+    let untouched = dv_p7_run(&e, &src, 7, n + 2).await;
+    let k = 2;
+
+    for file in [&converted.in_order, &converted.restarted] {
+        let record = dovi_record(file);
+        assert_eq!(record["dv_profile"], 8, "{record}");
+        assert_eq!(record["dv_bl_signal_compatibility_id"], 1, "{record}");
+    }
+
+    let video = |r: &DvRun| (min_pts(&r.in_order, "v:0"), min_pts(&r.restarted, "v:0"));
+    let audio = |r: &DvRun| (min_pts(&r.in_order, "a:0"), min_pts(&r.restarted, "a:0"));
+    let (v_in, v_re) = video(&converted);
+    assert!(
+        (v_re - converted.bounds[k]).abs() < RESTART_SLACK_SECS,
+        "restart video pts {v_re} != boundary {}",
+        converted.bounds[k]
+    );
+    let (plain_v_in, plain_v_re) = video(&untouched);
+    assert!(
+        (v_in - plain_v_in).abs() < RESTART_SLACK_SECS,
+        "in-order video pts {v_in}, plain remux {plain_v_in}"
+    );
+    assert!((v_re - plain_v_re).abs() < RESTART_SLACK_SECS);
+
+    // The converted run reads audio through a second input, which can land a
+    // frame or two off the plain remux's.
+    let (a_in, a_re) = audio(&converted);
+    let (plain_a_in, plain_a_re) = audio(&untouched);
+    assert!(
+        (a_in - plain_a_in).abs() < AUDIO_SLACK_SECS,
+        "audio {a_in} vs {plain_a_in}"
+    );
+    assert!(
+        (a_re - plain_a_re).abs() < AUDIO_SLACK_SECS,
+        "audio {a_re} vs {plain_a_re}"
+    );
+}
+
+const AUDIO_SLACK_SECS: f64 = 0.2;
+
+static DV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+#[cfg(target_os = "linux")]
+fn own_children(names: &[&str]) -> Vec<String> {
+    let me = std::process::id().to_string();
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir("/proc").unwrap().flatten() {
+        let Ok(stat) = std::fs::read_to_string(entry.path().join("stat")) else {
+            continue;
+        };
+        let Some((head, tail)) = stat.rsplit_once(") ") else {
+            continue;
+        };
+        let comm = head.split_once(" (").map_or("", |(_, c)| c);
+        let ppid = tail.split(' ').nth(1).unwrap_or("");
+        if ppid == me && names.contains(&comm) {
+            found.push(comm.to_owned());
+        }
+    }
+    found
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn dv_p7_stop_kills_the_whole_pipeline() {
+    if !have_ffmpeg() {
+        return;
+    }
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("corpus/02-dv-p7-fel.mkv");
+    if !src.exists() || Command::new("dovi_tool").arg("--version").output().is_err() {
+        println!("skipped: P7 clip or dovi_tool not present");
+        return;
+    }
+    let _serial = DV_LOCK.lock().await;
+    let e = env().await;
+    let mut caps = caps_json("hevc", "mp4");
+    caps["hdr"] = json!({"formats": ["hdr10", "dolby_vision"], "dv_profiles": [8]});
+    caps["audio"]["codecs"] = json!(["ac3"]);
+    let sid = id(70);
+    e.start(&sid, &src, caps, json!({})).await;
+    e.hls(&sid, "init.mp4").await;
+    assert!(
+        own_children(&["dovi_tool"]).len() <= 1,
+        "only this session may own a dovi_tool"
+    );
+
+    let (status, _) = e.api("DELETE", &format!("/v1/sessions/{sid}"), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    for _ in 0..50 {
+        if own_children(&["dovi_tool"]).is_empty() {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    panic!("dovi_tool outlived its session");
+}
+
+#[tokio::test]
+async fn dv_p7_fel_converts_to_p81() {
+    dv_p7_converts_to_p81("02-dv-p7-fel.mkv", 50).await;
+}
+
+#[tokio::test]
+async fn dv_p7_mel_converts_to_p81() {
+    dv_p7_converts_to_p81("19-dv-p7-mel.mkv", 60).await;
+}
+
 #[tokio::test]
 async fn transcode_cpu_h264() {
     if !have_ffmpeg() {

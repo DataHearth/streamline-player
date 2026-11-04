@@ -147,6 +147,10 @@ impl Config {
         self.binary("ffprobe")
     }
 
+    pub fn dovi_tool(&self) -> PathBuf {
+        self.binary("dovi_tool")
+    }
+
     fn binary(&self, name: &str) -> PathBuf {
         let file = if cfg!(windows) {
             format!("{name}.exe")

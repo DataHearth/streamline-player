@@ -3,6 +3,7 @@ use std::path::Path;
 use crate::analysis::{Analysis, Hdr};
 use crate::decision::{AudioAction, CopyTag, DvHandling, HdrOut, Plan, VideoAction, VideoCodec};
 use crate::hw::{Backend, Hw};
+use crate::playlist;
 
 pub const TRANSCODE_SEGMENT_SECS: f64 = 6.0;
 
@@ -196,7 +197,7 @@ fn push(args: &mut Vec<String>, items: &[&str]) {
     args.extend(items.iter().map(|i| (*i).to_owned()));
 }
 
-fn video_copy_args(args: &mut Vec<String>, tag: CopyTag, dv: DvHandling) {
+fn video_copy_args(args: &mut Vec<String>, tag: CopyTag, dv: DvHandling, s: &RunSpec) {
     push(args, &["-c:v", "copy"]);
     match tag {
         CopyTag::Hvc1 => push(args, &["-tag:v", "hvc1"]),
@@ -209,15 +210,15 @@ fn video_copy_args(args: &mut Vec<String>, tag: CopyTag, dv: DvHandling) {
     match dv {
         DvHandling::Keep => {}
         DvHandling::Strip => push(args, &["-bsf:v", "dovi_rpu=strip=1"]),
-        DvHandling::P7ToP81 => push(
-            args,
-            &[
-                "-bsf:v",
-                "filter_units=remove_types=63,dovi_rpu",
-                "-strict",
-                "unofficial",
-            ],
-        ),
+        DvHandling::P7ToP81 => {
+            let offset = p7_source_pts(s);
+            args.extend([
+                "-bsf:v".to_owned(),
+                format!("dts2pts,setts=dts=DTS+{offset}/TB:pts=PTS-STARTPTS+{offset}/TB,dovi_rpu"),
+                "-strict".to_owned(),
+                "unofficial".to_owned(),
+            ]);
+        }
     }
 }
 
@@ -335,6 +336,57 @@ fn audio_args(args: &mut Vec<String>, s: &RunSpec) {
     }
 }
 
+/// A P7 to 8.1 run is a pipeline: `dv_source_args` (ffmpeg) | `DOVI_TOOL_ARGS` | `live_args` (ffmpeg).
+pub fn has_dv_pipeline(plan: &Plan) -> bool {
+    matches!(
+        plan.video,
+        VideoAction::Copy {
+            dv: DvHandling::P7ToP81,
+            ..
+        }
+    )
+}
+
+pub const DOVI_TOOL_ARGS: [&str; 7] = ["-m", "2", "convert", "--discard", "-", "-o", "/dev/stdout"];
+
+/// Raw Annex B has no timestamps: the segmenting ffmpeg numbers the frames from 0 at the source's frame rate and `setts` shifts them to the keyframe this run lands on.
+pub fn dv_source_args(s: &RunSpec) -> Vec<String> {
+    let mut args = owned(&["-hide_banner", "-nostdin", "-v", "error"]);
+    args.extend([
+        "-ss".to_owned(),
+        s.start_time.to_string(),
+        "-i".to_owned(),
+        s.input.display().to_string(),
+        "-map".to_owned(),
+        format!("0:{}", s.plan.video_index),
+    ]);
+    push(
+        &mut args,
+        &[
+            "-c:v",
+            "copy",
+            "-bsf:v",
+            "hevc_mp4toannexb",
+            "-f",
+            "hevc",
+            "pipe:1",
+        ],
+    );
+    args
+}
+
+fn p7_source_pts(s: &RunSpec) -> f64 {
+    playlist::landing_pts(s.analysis, s.start_time)
+}
+
+fn p7_frame_rate(s: &RunSpec) -> f64 {
+    s.analysis
+        .video
+        .iter()
+        .find(|v| v.index == s.plan.video_index)
+        .map_or(0.0, |v| v.fps)
+}
+
 pub fn live_args(s: &RunSpec) -> Vec<String> {
     let plan = s.plan;
     let pipe = pipeline(plan, s.analysis, s.hw);
@@ -350,6 +402,17 @@ pub fn live_args(s: &RunSpec) -> Vec<String> {
     ]);
     args.extend(pipe.init.iter().cloned());
     args.extend(pipe.decode.iter().cloned());
+    let p7 = has_dv_pipeline(plan);
+    if p7 {
+        args.extend([
+            "-f".to_owned(),
+            "hevc".to_owned(),
+            "-framerate".to_owned(),
+            p7_frame_rate(s).to_string(),
+            "-i".to_owned(),
+            "pipe:0".to_owned(),
+        ]);
+    }
     args.extend([
         "-ss".to_owned(),
         s.start_time.to_string(),
@@ -361,11 +424,14 @@ pub fn live_args(s: &RunSpec) -> Vec<String> {
 
     if pipe.burn_in {
         push(&mut args, &["-map", "[v]"]);
+    } else if p7 {
+        push(&mut args, &["-map", "0:0"]);
     } else {
         args.extend(["-map".to_owned(), format!("0:{}", plan.video_index)]);
     }
     if let Some(audio) = plan.audio_index {
-        args.extend(["-map".to_owned(), format!("0:{audio}")]);
+        let input = u8::from(p7);
+        args.extend(["-map".to_owned(), format!("{input}:{audio}")]);
     }
     push(
         &mut args,
@@ -373,7 +439,7 @@ pub fn live_args(s: &RunSpec) -> Vec<String> {
     );
 
     match plan.video {
-        VideoAction::Copy { tag, dv } => video_copy_args(&mut args, tag, dv),
+        VideoAction::Copy { tag, dv } => video_copy_args(&mut args, tag, dv, s),
         VideoAction::Transcode { .. } => video_transcode_args(&mut args, plan, s, &pipe),
     }
     audio_args(&mut args, s);
@@ -425,6 +491,7 @@ mod tests {
                 height: 2160,
                 sar: (1, 1),
                 field_order: if interlaced { "tt" } else { "progressive" }.into(),
+                fps: 24.0,
                 ..Default::default()
             }],
             audio: vec![AudioStream {
@@ -434,6 +501,7 @@ mod tests {
                 layout: "5.1(side)".into(),
                 ..Default::default()
             }],
+            keyframes: vec![0.0, 2.0, 5.0],
             ..Default::default()
         }
     }
@@ -789,16 +857,62 @@ mod tests {
         let args = run(&strip, &hw(Backend::Cpu, false), 0, 0.0);
         assert!(contains_seq(&args, &["-bsf:v", "dovi_rpu=strip=1"]));
         let p7 = plan(copy(CopyTag::Dvh1, DvHandling::P7ToP81), AudioAction::Copy);
-        let args = run(&p7, &hw(Backend::Cpu, false), 0, 0.0);
+        let args = run(&p7, &hw(Backend::Cpu, false), 2, 5.5);
         assert!(contains_seq(&args, &["-tag:v", "dvh1"]));
         assert!(contains_seq(
             &args,
             &[
+                "-f",
+                "hevc",
+                "-framerate",
+                "24",
+                "-i",
+                "pipe:0",
+                "-ss",
+                "5.5",
+                "-copyts",
+                "-start_at_zero",
+                "-i",
+                "/media/in.mkv"
+            ]
+        ));
+        assert!(contains_seq(&args, &["-map", "0:0", "-map", "1:1"]));
+        assert!(contains_seq(
+            &args,
+            &[
                 "-bsf:v",
-                "filter_units=remove_types=63,dovi_rpu",
+                "dts2pts,setts=dts=DTS+5/TB:pts=PTS-STARTPTS+5/TB,dovi_rpu",
                 "-strict",
                 "unofficial"
             ]
         ));
+    }
+
+    #[test]
+    fn dv_p7_source_and_converter() {
+        let p7 = plan(copy(CopyTag::Dvh1, DvHandling::P7ToP81), AudioAction::Copy);
+        assert!(has_dv_pipeline(&p7));
+        let a = analysis(false);
+        let source = dv_source_args(&RunSpec {
+            input: Path::new("/media/in.mkv"),
+            plan: &p7,
+            analysis: &a,
+            hw: &hw(Backend::Cpu, false),
+            start_index: 2,
+            start_time: 5.5,
+            out_dir: &PathBuf::from("/tmp/s"),
+        });
+        assert!(contains_seq(
+            &source,
+            &["-ss", "5.5", "-i", "/media/in.mkv", "-map", "0:0"]
+        ));
+        assert!(contains_seq(
+            &source,
+            &["-bsf:v", "hevc_mp4toannexb", "-f", "hevc", "pipe:1"]
+        ));
+        assert!(!has_dv_pipeline(&plan(
+            copy(CopyTag::Hvc1, DvHandling::Strip),
+            AudioAction::Copy
+        )));
     }
 }
