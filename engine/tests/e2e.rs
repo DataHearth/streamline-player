@@ -28,15 +28,35 @@ impl Drop for Env {
     }
 }
 
+fn ffmpeg_gate(present: bool, ci: bool) -> bool {
+    assert!(
+        present || !ci,
+        "ffmpeg is not on PATH but CI is set: the e2e suite must not pass without it"
+    );
+    if !present {
+        println!("skipped: ffmpeg not on PATH");
+    }
+    present
+}
+
 fn have_ffmpeg() -> bool {
-    let ok = Command::new("ffmpeg")
+    let present = Command::new("ffmpeg")
         .arg("-version")
         .output()
         .is_ok_and(|o| o.status.success());
-    if !ok {
-        println!("skipped: ffmpeg not on PATH");
-    }
-    ok
+    ffmpeg_gate(present, std::env::var_os("CI").is_some())
+}
+
+#[test]
+#[should_panic(expected = "CI is set")]
+fn missing_ffmpeg_panics_in_ci() {
+    ffmpeg_gate(false, true);
+}
+
+#[test]
+fn missing_ffmpeg_skips_outside_ci() {
+    assert!(!ffmpeg_gate(false, false));
+    assert!(ffmpeg_gate(true, true));
 }
 
 fn ffmpeg(args: &[&str]) {
@@ -53,8 +73,12 @@ fn ffmpeg(args: &[&str]) {
 }
 
 fn ffprobe(file: &Path, entries: &str) -> Value {
+    ffprobe_stream(file, "v:0", entries)
+}
+
+fn ffprobe_stream(file: &Path, select: &str, entries: &str) -> Value {
     let out = Command::new("ffprobe")
-        .args(["-v", "error", "-select_streams", "v:0", "-show_entries"])
+        .args(["-v", "error", "-select_streams", select, "-show_entries"])
         .arg(entries)
         .args(["-of", "json"])
         .arg(file)
@@ -102,6 +126,36 @@ fn make_h264_mkv(path: &Path) {
         "aac",
         "-ac",
         "2",
+        path.to_str().unwrap(),
+    ]);
+}
+
+fn make_surround_flac_mkv(path: &Path) {
+    ffmpeg(&[
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=1280x720:rate=30:duration=20",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=48000:duration=20",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p",
+        "-g",
+        "60",
+        "-sc_threshold",
+        "0",
+        "-force_key_frames",
+        KEYFRAMES,
+        "-af",
+        "aformat=channel_layouts=7.1",
+        "-c:a",
+        "flac",
         path.to_str().unwrap(),
     ]);
 }
@@ -723,6 +777,32 @@ async fn dv_p7_fel_converts_to_p81() {
 #[tokio::test]
 async fn dv_p7_mel_converts_to_p81() {
     dv_p7_converts_to_p81("19-dv-p7-mel.mkv", 60).await;
+}
+
+#[tokio::test]
+async fn audio_transcode_eac3_keeps_video_copy() {
+    if !have_ffmpeg() {
+        return;
+    }
+    let e = env().await;
+    let src = e.root.join("surround.mkv");
+    make_surround_flac_mkv(&src);
+    let mut caps = caps_json("h264", "mp4");
+    caps["audio"]["codecs"] = json!(["eac3"]);
+    let sid = id(7);
+    let r = e.start(&sid, &src, caps, json!({})).await;
+    assert_eq!(r["mode"], "audio_transcode", "{r}");
+
+    let bounds = e.bounds(&sid).await;
+    let init = e.hls(&sid, "init.mp4").await;
+    assert_segment_matches(&e, &sid, &init, &bounds, 0).await;
+
+    let joined = joined_segment(&e, &sid, &init, 0).await;
+    let a = ffprobe_stream(&joined, "a:0", "stream=codec_name,channels");
+    assert_eq!(a["streams"][0]["codec_name"], "eac3", "{a}");
+    assert_eq!(a["streams"][0]["channels"], 6, "{a}");
+    let v = ffprobe(&joined, "stream=codec_name");
+    assert_eq!(v["streams"][0]["codec_name"], "h264", "{v}");
 }
 
 #[tokio::test]
