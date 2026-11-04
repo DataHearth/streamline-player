@@ -1,0 +1,8 @@
+/* Self-hosted webfonts. Preload Inter 400 + 600 and JetBrains Mono only.
+   Inter: the four static weights from DataHearth/streamline web/static/fonts.
+   JetBrains Mono: variable file (weights 100–800) from the "Streamline player UI build" project, so mono 500/600 render true, not synthesized. */
+@font-face { font-family: 'Inter'; src: url('/fonts/Inter-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('/fonts/Inter-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('/fonts/Inter-SemiBold.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('/fonts/Inter-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'JetBrains Mono'; src: url('/fonts/JetBrainsMono-var.woff2') format('woff2-variations'), url('/fonts/JetBrainsMono-var.woff2') format('woff2'); font-weight: 100 800; font-style: normal; font-display: swap; }

@@ -40,6 +40,11 @@ impl Api {
 }
 
 #[tauri::command]
+async fn playback_status(api: tauri::State<'_, Api>) -> Result<Value, String> {
+    api.call(reqwest::Method::GET, "/status", None).await
+}
+
+#[tauri::command]
 async fn start_session(
     api: tauri::State<'_, Api>,
     media_id: String,
@@ -95,6 +100,7 @@ pub fn run() {
         .plugin(tauri_plugin_player::init())
         .manage(Api(reqwest::Client::new()))
         .invoke_handler(tauri::generate_handler![
+            playback_status,
             start_session,
             patch_session,
             stop_session,

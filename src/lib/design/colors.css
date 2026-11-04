@@ -1,0 +1,228 @@
+/* Streamline color tokens. Dark is the shipped theme; light is a proposal (not in the codebase).
+   Player and hero tokens (player-*, hero-scrim, bg-player, bg-stage) are identical in both themes. */
+:root {
+  /* Surfaces */
+  --bg-deep: #0b0b10;
+  --bg-base: #111118;
+  --bg-elevated: #15151f;
+  --bg-card: #1c1c28;
+  --bg-hover: #232333;
+  --bg-selected: #2a2a3c;
+  --bg-overlay: rgba(11, 11, 16, 0.7);
+  --bg-player: #000000;
+  --bg-stage: #050507;
+  /* Tints & hairlines */
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  /* Accent (brand indigo) */
+  --accent: #7c8cff;
+  --accent-hover: #8b9aff;
+  --accent-pressed: #6573e6;
+  --accent-text: #b8c2ff;
+  --accent-soft: rgba(124, 140, 255, 0.14);
+  --accent-glow: rgba(124, 140, 255, 0.25);
+  --accent-ring: rgba(124, 140, 255, 0.4);
+  --accent-line: rgba(124, 140, 255, 0.4);
+  --fg-on-accent: #0b0b10;
+  /* Text */
+  --fg: #f5f5f7;
+  --fg-muted: #c8c8d2;
+  --fg-subtle: #8a8a99;
+  --fg-faint: #5a5a68;
+  --fg-on-status: var(--bg-deep);
+  /* Status (ops state) */
+  --status-downloading: #3b82f6;
+  --status-grabbing: #a78bfa;
+  --status-available: #22c55e;
+  --status-wanted: #f59e0b;
+  --status-missing: #64748b;
+  --status-failed: #ef4444;
+  --status-paused: #71717a;
+  --status-warning: #f59e0b;
+  --status-seeding: #2dd4bf;
+  --status-completed: #94a3b8;
+  --status-stalled: #f97316;
+  --status-fetching: #818cf8;
+  --status-importing: var(--status-grabbing);
+  --status-unaired: var(--status-missing);
+  --status-skipped: var(--status-paused);
+  --status-queued: var(--status-wanted);
+  --status-running: var(--status-downloading);
+  --status-succeeded: var(--status-available);
+  --status-canceled: var(--status-paused);
+  --status-rejected: var(--status-missing);
+  --status-held: var(--status-wanted);
+  /* Kind (calendar, never a status) */
+  --kind-movie: oklch(0.8 0.095 105);
+  --kind-episode: oklch(0.8 0.09 220);
+  --kind-album: oklch(0.78 0.09 290);
+  --kind-book: oklch(0.8 0.09 355);
+  /* Progress */
+  --progress-track: rgba(255, 255, 255, 0.08);
+  --progress-fill: var(--accent);
+  --progress-buffer: rgba(255, 255, 255, 0.16);
+  /* Player & hero (never flip with theme) */
+  --player-ink: #f5f5f7;
+  --player-ink-muted: #c8c8d2;
+  --player-accent: #7c8cff;
+  --player-accent-text: #b8c2ff;
+  --player-scrim: rgba(0, 0, 0, 0.78);
+  --player-glass: rgba(15, 15, 22, 0.66);
+  --player-glass-strong: rgba(15, 15, 22, 0.86);
+  --player-control-hover: rgba(255, 255, 255, 0.1);
+  --player-chip: rgba(255, 255, 255, 0.08);
+  --player-track: rgba(255, 255, 255, 0.2);
+  --player-buffer: rgba(255, 255, 255, 0.22);
+  --player-thumb-ring: rgba(124, 140, 255, 0.35);
+  --hero-scrim: rgba(11, 11, 16, 0.94);
+}
+[data-theme="dark"] {
+  --bg-deep: #0b0b10;
+  --bg-base: #111118;
+  --bg-elevated: #15151f;
+  --bg-card: #1c1c28;
+  --bg-hover: #232333;
+  --bg-selected: #2a2a3c;
+  --bg-overlay: rgba(11, 11, 16, 0.7);
+  --bg-player: #000000;
+  --bg-stage: #050507;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --accent: #7c8cff;
+  --accent-hover: #8b9aff;
+  --accent-pressed: #6573e6;
+  --accent-text: #b8c2ff;
+  --accent-soft: rgba(124, 140, 255, 0.14);
+  --accent-glow: rgba(124, 140, 255, 0.25);
+  --accent-ring: rgba(124, 140, 255, 0.4);
+  --accent-line: rgba(124, 140, 255, 0.4);
+  --fg-on-accent: #0b0b10;
+  --fg: #f5f5f7;
+  --fg-muted: #c8c8d2;
+  --fg-subtle: #8a8a99;
+  --fg-faint: #5a5a68;
+  --status-downloading: #3b82f6;
+  --status-grabbing: #a78bfa;
+  --status-available: #22c55e;
+  --status-wanted: #f59e0b;
+  --status-missing: #64748b;
+  --status-failed: #ef4444;
+  --status-paused: #71717a;
+  --status-warning: #f59e0b;
+  --status-seeding: #2dd4bf;
+  --status-completed: #94a3b8;
+  --status-stalled: #f97316;
+  --status-fetching: #818cf8;
+  --status-importing: var(--status-grabbing);
+  --status-unaired: var(--status-missing);
+  --status-skipped: var(--status-paused);
+  --status-queued: var(--status-wanted);
+  --status-running: var(--status-downloading);
+  --status-succeeded: var(--status-available);
+  --status-canceled: var(--status-paused);
+  --status-rejected: var(--status-missing);
+  --status-held: var(--status-wanted);
+  --fg-on-status: var(--bg-deep);
+  --kind-movie: oklch(0.8 0.095 105);
+  --kind-episode: oklch(0.8 0.09 220);
+  --kind-album: oklch(0.78 0.09 290);
+  --kind-book: oklch(0.8 0.09 355);
+  --progress-track: rgba(255, 255, 255, 0.08);
+  --progress-fill: var(--accent);
+  --progress-buffer: rgba(255, 255, 255, 0.16);
+  --player-ink: #f5f5f7;
+  --player-ink-muted: #c8c8d2;
+  --player-accent: #7c8cff;
+  --player-accent-text: #b8c2ff;
+  --player-scrim: rgba(0, 0, 0, 0.78);
+  --player-glass: rgba(15, 15, 22, 0.66);
+  --player-glass-strong: rgba(15, 15, 22, 0.86);
+  --player-control-hover: rgba(255, 255, 255, 0.1);
+  --player-chip: rgba(255, 255, 255, 0.08);
+  --player-track: rgba(255, 255, 255, 0.2);
+  --player-buffer: rgba(255, 255, 255, 0.22);
+  --player-thumb-ring: rgba(124, 140, 255, 0.35);
+  --hero-scrim: rgba(11, 11, 16, 0.94);
+}
+[data-theme="light"] {
+  /* Surfaces */
+  --bg-deep: #f2f2f6;
+  --bg-base: #f7f7fa;
+  --bg-elevated: #ffffff;
+  --bg-card: #ebebf1;
+  --bg-hover: #e2e2ea;
+  --bg-selected: #dcdce6;
+  --bg-overlay: rgba(17, 17, 24, 0.4);
+  --bg-player: #000000;
+  --bg-stage: #050507;
+  /* Tints & hairlines */
+  --surface: rgba(17, 17, 24, 0.04);
+  --surface-2: rgba(17, 17, 24, 0.07);
+  --border: rgba(17, 17, 24, 0.1);
+  --border-strong: rgba(17, 17, 24, 0.2);
+  /* Accent (brand indigo) */
+  --accent: #4f5fe0;
+  --accent-hover: #4352cf;
+  --accent-pressed: #3a47bb;
+  --accent-text: #3b48c4;
+  --accent-soft: rgba(79, 95, 224, 0.1);
+  --accent-glow: rgba(79, 95, 224, 0.22);
+  --accent-ring: rgba(79, 95, 224, 0.35);
+  --accent-line: rgba(79, 95, 224, 0.35);
+  --fg-on-accent: #ffffff;
+  /* Text */
+  --fg: #14141c;
+  --fg-muted: #474757;
+  --fg-subtle: #686878;
+  --fg-faint: #9393a3;
+  --fg-on-status: #ffffff;
+  /* Status (ops state) */
+  --status-downloading: #1d4ed8;
+  --status-grabbing: #6d28d9;
+  --status-available: #166534;
+  --status-wanted: #92400e;
+  --status-missing: #334155;
+  --status-failed: #b91c1c;
+  --status-paused: #52525b;
+  --status-warning: #92400e;
+  --status-seeding: #115e59;
+  --status-completed: #4b5563;
+  --status-stalled: #9a3412;
+  --status-fetching: #4338ca;
+  --status-importing: var(--status-grabbing);
+  --status-unaired: var(--status-missing);
+  --status-skipped: var(--status-paused);
+  --status-queued: var(--status-wanted);
+  --status-running: var(--status-downloading);
+  --status-succeeded: var(--status-available);
+  --status-canceled: var(--status-paused);
+  --status-rejected: var(--status-missing);
+  --status-held: var(--status-wanted);
+  /* Kind (calendar, never a status) */
+  --kind-movie: oklch(0.8 0.095 105);
+  --kind-episode: oklch(0.8 0.09 220);
+  --kind-album: oklch(0.78 0.09 290);
+  --kind-book: oklch(0.8 0.09 355);
+  /* Progress */
+  --progress-track: rgba(17, 17, 24, 0.1);
+  --progress-fill: var(--accent);
+  --progress-buffer: rgba(17, 17, 24, 0.18);
+  /* Player & hero (never flip with theme) */
+  --player-ink: #f5f5f7;
+  --player-ink-muted: #c8c8d2;
+  --player-accent: #7c8cff;
+  --player-accent-text: #b8c2ff;
+  --player-scrim: rgba(0, 0, 0, 0.78);
+  --player-glass: rgba(15, 15, 22, 0.66);
+  --player-glass-strong: rgba(15, 15, 22, 0.86);
+  --player-control-hover: rgba(255, 255, 255, 0.1);
+  --player-chip: rgba(255, 255, 255, 0.08);
+  --player-track: rgba(255, 255, 255, 0.2);
+  --player-buffer: rgba(255, 255, 255, 0.22);
+  --player-thumb-ring: rgba(124, 140, 255, 0.35);
+  --hero-scrim: rgba(11, 11, 16, 0.94);
+}

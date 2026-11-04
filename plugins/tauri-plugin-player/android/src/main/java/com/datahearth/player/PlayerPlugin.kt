@@ -9,6 +9,7 @@ import android.view.SurfaceView
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.FrameLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -94,6 +95,13 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         })
         p.addAnalyticsListener(droppedFramesLogger)
         player = p
+        // The remote's Back belongs to the player's own stack: menu, controls, then leave.
+        (activity as AppCompatActivity).onBackPressedDispatcher.addCallback(
+            activity,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() = trigger("back", JSObject())
+            },
+        )
         // Without this the first D-pad press only moves Android focus into the
         // WebView instead of reaching the page.
         webView.requestFocus()

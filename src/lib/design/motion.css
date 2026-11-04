@@ -1,0 +1,9 @@
+/* Animate transform, opacity and filter only. Exits take about 70% of the enter. */
+:root {
+  --dur-fast: 150ms; /* @kind other */
+  --dur-base: 200ms; /* @kind other */
+  --dur-slow: 300ms; /* @kind other */
+  --dur-exit: 200ms; /* @kind other */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1); /* @kind other */
+}

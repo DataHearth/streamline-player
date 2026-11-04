@@ -1,0 +1,19 @@
+/* Radii: 6 pills/chips/inputs · 10 buttons/small cards/posters · 12 player controls · 16 cards/modals · 20 hero panels/dock. */
+:root {
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-player-controls: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+  /* Card aspect ratios */
+  --card-aspect-poster: 2 / 3; /* @kind other */
+  --card-aspect-book: 2 / 3; /* @kind other */
+  --card-aspect-album: 1 / 1; /* @kind other */
+  --card-aspect-backdrop: 16 / 9; /* @kind other */
+  /* Icon sizes (Lucide) */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-xl: 32px;
+}
