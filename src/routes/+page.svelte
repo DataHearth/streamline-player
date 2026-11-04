@@ -2,10 +2,18 @@
 	import { addPluginListener, invoke } from "@tauri-apps/api/core";
 	import { onMount } from "svelte";
 
-	const SOURCES = {
-		hls: "http://10.0.2.2:8907/hls/index.m3u8",
-		mp4: "http://10.0.2.2:8907/test.mp4",
-		bad: "http://10.0.2.2:8907/missing.m3u8",
+	// Clip ids served by dev/mock-streamline.py.
+	const MEDIA = ["demo", "hdr", "anime", "dv"];
+	const HEARTBEAT_MS = 10_000;
+
+	type Session = {
+		session_id: string;
+		mode: string;
+		url: string;
+		video: Record<string, unknown>;
+		audio: Record<string, unknown>;
+		video_reasons: { code: string }[];
+		audio_reasons: { code: string }[];
 	};
 
 	let position = $state(0);
@@ -14,6 +22,8 @@
 	let error = $state("");
 	let log = $state<string[]>([]);
 	let panelHidden = $state(false);
+	let session = $state<Session | null>(null);
+	let capabilities: unknown = null;
 	let playButton: HTMLButtonElement;
 
 	const fmt = (s: number) =>
@@ -21,7 +31,7 @@
 
 	function note(line: string) {
 		log = [line, ...log].slice(0, 6);
-		console.log("[spike]", line);
+		console.log("[proto]", line);
 	}
 
 	async function call(cmd: string, args?: Record<string, unknown>) {
@@ -34,8 +44,28 @@
 		}
 	}
 
-	const load = (src: keyof typeof SOURCES) =>
-		call("load", { url: SOURCES[src] }).then(() => call("play"));
+	async function stop() {
+		if (!session) return;
+		const id = session.session_id;
+		session = null;
+		await invoke("stop_session", { id }).catch((e) => note(`stop failed: ${e}`));
+	}
+
+	async function load(media: string) {
+		error = "";
+		await stop();
+		try {
+			capabilities ??= await invoke("plugin:player|capabilities");
+			session = await invoke<Session>("start_session", { mediaId: media, capabilities, position: 0 });
+			note(`${media}: ${session.mode} ${[...session.video_reasons, ...session.audio_reasons].map((r) => r.code).join(",")}`);
+			await call("load", { url: session.url });
+			await call("play");
+		} catch (e) {
+			error = String(e);
+			note(`start failed: ${e}`);
+		}
+	}
+
 	const togglePlay = () => call(playerState === "playing" ? "pause" : "play");
 	const seekBy = (delta: number) =>
 		call("seek", { seconds: Math.max(0, position + delta) });
@@ -63,8 +93,19 @@
 					note(`error ${e.code}`);
 				},
 			);
-			await load("hls");
+			console.log("[proto] capabilities", JSON.stringify(await invoke("plugin:player|capabilities")));
+			await load("demo");
 		})();
+		const beat = setInterval(() => {
+			if (session)
+				invoke("heartbeat", { id: session.session_id, position, paused: playerState !== "playing" }).catch((e) =>
+					note(`heartbeat failed: ${e}`),
+				);
+		}, HEARTBEAT_MS);
+		return () => {
+			clearInterval(beat);
+			stop();
+		};
 	});
 </script>
 
@@ -88,6 +129,7 @@
 	<div>
 		<b data-testid="position">{fmt(position)}</b> / {fmt(duration)}
 	</div>
+	{#if session}<div class="mode">{session.mode} · {JSON.stringify(session.video)}</div>{/if}
 	{#if error}<div class="error">{error}</div>{/if}
 	<ul>
 		{#each log as line}<li>{line}</li>{/each}
@@ -102,9 +144,7 @@
 			{playerState === "playing" ? "Pause" : "Play"}
 		</button>
 		<button onclick={() => seekBy(10)}>+10 s</button>
-		<button onclick={() => load("hls")}>HLS</button>
-		<button onclick={() => load("mp4")}>MP4</button>
-		<button onclick={() => load("bad")}>Bad URL</button>
+		{#each MEDIA as m}<button onclick={() => load(m)}>{m}</button>{/each}
 		<button onclick={() => (panelHidden = !panelHidden)}>Fade panel</button>
 	</div>
 </div>
@@ -150,6 +190,11 @@
 		margin: 8px 0 0;
 		padding: 0;
 		list-style: none;
+		font-size: 14px;
+		opacity: 0.8;
+	}
+
+	.mode {
 		font-size: 14px;
 		opacity: 0.8;
 	}

@@ -1,0 +1,4 @@
+listen: 127.0.0.1:8097
+secret: dev-secret-0123456789abcdef
+tmp_dir: /tmp/streamline-player/live
+jobs_dir: /tmp/streamline-player/jobs

@@ -4,6 +4,7 @@ Allows controlling the native player and listening to its events
 
 #### This default permission set includes the following:
 
+- `allow-capabilities`
 - `allow-load`
 - `allow-play`
 - `allow-pause`
@@ -19,6 +20,32 @@ Allows controlling the native player and listening to its events
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`player:allow-capabilities`
+
+</td>
+<td>
+
+Enables the capabilities command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-capabilities`
+
+</td>
+<td>
+
+Denies the capabilities command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

@@ -166,6 +166,9 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun capabilities(invoke: Invoke) = invoke.resolve(Capabilities.build(activity))
+
+    @Command
     fun play(invoke: Invoke) = onPlayer(invoke) { it.play() }
 
     @Command

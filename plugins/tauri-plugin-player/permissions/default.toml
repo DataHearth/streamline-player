@@ -3,6 +3,7 @@
 [default]
 description = "Allows controlling the native player and listening to its events"
 permissions = [
+  "allow-capabilities",
   "allow-load",
   "allow-play",
   "allow-pause",
