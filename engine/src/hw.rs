@@ -245,6 +245,8 @@ async fn probe_backend(ffmpeg: &Path, backend: Backend, device: &str) -> Encoder
         h264,
         hevc,
         av1,
+        // av1_vaapi on AMD VCN 4 writes 1082 rows for a 1080 request, with no crop in the bitstream.
+        hevc_first: backend == Backend::Vaapi,
         dovi_tool: false,
     }
 }
@@ -308,6 +310,10 @@ async fn probe_encoders(cfg: &Config) -> Hw {
     for backend in order {
         let encoders = probe_backend(&ffmpeg, backend, &cfg.hw_device).await;
         if encoders.h264 || encoders.hevc || encoders.av1 {
+            // On AMD (RX 7900 XT, Mesa RADV) the reverse hwmap from Vulkan back to VAAPI fails with
+            // VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT, and parallel Vulkan video work
+            // hung the GPU and rebooted the host. VAAPI tonemaps on the CPU instead.
+            let libplacebo = libplacebo && backend != Backend::Vaapi;
             let mut hw = Hw::new(backend, cfg.hw_device.clone(), encoders, libplacebo);
             if backend != Backend::Cpu {
                 hw.cpu_encoders = probe_backend(&ffmpeg, Backend::Cpu, "").await;

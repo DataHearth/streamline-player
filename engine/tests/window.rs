@@ -23,6 +23,7 @@ const ALL: EncoderSet = EncoderSet {
     h264: true,
     hevc: true,
     av1: true,
+    hevc_first: false,
     dovi_tool: true,
 };
 
@@ -499,6 +500,7 @@ fn av1_gpu() -> Hw {
             h264: true,
             hevc: false,
             av1: true,
+            hevc_first: false,
             dovi_tool: true,
         },
         false,
@@ -507,6 +509,7 @@ fn av1_gpu() -> Hw {
         h264: true,
         hevc: false,
         av1: false,
+        hevc_first: false,
         dovi_tool: true,
     };
     hw

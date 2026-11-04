@@ -121,6 +121,8 @@ pub struct EncoderSet {
     pub h264: bool,
     pub hevc: bool,
     pub av1: bool,
+    /// Rank HEVC above AV1 when the client decodes both.
+    pub hevc_first: bool,
     /// dovi_tool ran at boot; without it profile 7 cannot become 8.1.
     pub dovi_tool: bool,
 }
@@ -130,6 +132,7 @@ impl EncoderSet {
         h264: true,
         hevc: true,
         av1: true,
+        hevc_first: false,
         dovi_tool: false,
     };
 
@@ -414,7 +417,12 @@ fn transcode_video(
     p: &SessionParams,
     enc: &EncoderSet,
 ) -> Result<VideoAction, ApiError> {
-    let (codec, cap) = [VideoCodec::Av1, VideoCodec::Hevc, VideoCodec::H264]
+    let order = if enc.hevc_first {
+        [VideoCodec::Hevc, VideoCodec::Av1, VideoCodec::H264]
+    } else {
+        [VideoCodec::Av1, VideoCodec::Hevc, VideoCodec::H264]
+    };
+    let (codec, cap) = order
         .into_iter()
         .filter(|c| enc.has(*c))
         .find_map(|c| {
@@ -598,6 +606,7 @@ mod tests {
         h264: true,
         hevc: true,
         av1: true,
+        hevc_first: false,
         dovi_tool: true,
     };
 
@@ -694,6 +703,18 @@ mod tests {
         };
         assert_eq!(codec(&ALL), VideoCodec::Av1);
         assert_eq!(codec(&EncoderSet { av1: false, ..ALL }), VideoCodec::Hevc);
+        let hevc_first = EncoderSet {
+            hevc_first: true,
+            ..ALL
+        };
+        assert_eq!(codec(&hevc_first), VideoCodec::Hevc);
+        assert_eq!(
+            codec(&EncoderSet {
+                hevc: false,
+                ..hevc_first
+            }),
+            VideoCodec::Av1
+        );
     }
 
     fn capped() -> SessionParams {

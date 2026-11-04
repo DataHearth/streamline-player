@@ -43,6 +43,7 @@ pub fn env() -> Env {
             h264: true,
             hevc: true,
             av1: true,
+            hevc_first: false,
             dovi_tool: true,
         },
         false,
