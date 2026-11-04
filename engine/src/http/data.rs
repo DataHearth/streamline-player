@@ -49,6 +49,28 @@ fn check_token(
     }
 }
 
+/// Players resolve a playlist's relative URIs against its URL and drop the query, so every URI
+/// carries the token itself. `query` was verified by `check_token`: digits and hex, no escaping.
+fn with_token(playlist: &str, query: &str) -> String {
+    playlist
+        .lines()
+        .map(|l| {
+            if l.is_empty() {
+                l.to_owned()
+            } else if !l.starts_with('#') {
+                format!("{l}?{query}")
+            } else if let Some((head, rest)) = l.split_once("URI=\"")
+                && let Some((uri, tail)) = rest.split_once('"')
+            {
+                format!("{head}URI=\"{uri}?{query}\"{tail}")
+            } else {
+                l.to_owned()
+            }
+        })
+        .map(|l| l + "\n")
+        .collect()
+}
+
 fn hls_file_ok(file: &str) -> bool {
     if matches!(file, "master.m3u8" | "media.m3u8" | "init.mp4") {
         return true;
@@ -126,6 +148,7 @@ pub async fn hls(
     }
     match s.sessions.fetch_hls(&id, &file).await? {
         Served::Text(text) => {
+            let text = with_token(&text, &format!("exp={}&sig={}", q["exp"], q["sig"]));
             s.sessions.add_bytes(&id, text.len() as u64);
             let mut res = Response::new(Body::from(text));
             res.headers_mut().insert(

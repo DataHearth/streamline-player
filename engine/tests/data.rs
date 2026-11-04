@@ -49,6 +49,35 @@ async fn hls_requires_token() {
 
 #[cfg(unix)]
 #[tokio::test]
+async fn playlists_carry_the_token_to_every_uri() {
+    let e = env();
+    let sid = remux_session(&e, 3).await;
+    let q = valid_query(&sid);
+    let text = |file: &'static str| {
+        let (e, sid, q) = (&e, &sid, &q);
+        async move {
+            let res = e.get(&format!("/hls/{sid}/{file}?{q}")).await;
+            String::from_utf8(body_bytes(res).await).unwrap()
+        }
+    };
+
+    let master = text("master.m3u8").await;
+    assert!(master.contains(&format!("\nmedia.m3u8?{q}\n")), "{master}");
+    let media = text("media.m3u8").await;
+    assert!(media.contains(&format!("URI=\"init.mp4?{q}\"")), "{media}");
+    let uris: Vec<_> = media
+        .lines()
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
+    assert!(!uris.is_empty());
+    assert!(
+        uris.iter().all(|l| l.ends_with(&format!(".m4s?{q}"))),
+        "{media}"
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
 async fn hls_path_traversal_404() {
     let e = env();
     let sid = remux_session(&e, 2).await;

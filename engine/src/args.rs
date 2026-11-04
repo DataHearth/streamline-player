@@ -144,10 +144,22 @@ fn pipeline(plan: &Plan, a: &Analysis, hw: &Hw) -> Pipeline {
         }
         rest.push(CPU_TONEMAP.to_owned());
         on_gpu = false;
-    } else if on_gpu {
-        rest.push(b.scale_filter(width, height));
     } else {
-        rest.push(format!("scale={width}:{height}"));
+        // Without a format the scaler keeps the source's: a 10-bit SDR source would come out as
+        // Main 10 while the playlist advertises 8-bit, and an 8-bit-only decoder fails on it.
+        let to_8_bit = source_fmt == "p010le" && out_fmt == "nv12";
+        let scale = if on_gpu {
+            b.scale_filter(width, height)
+        } else {
+            format!("scale={width}:{height}")
+        };
+        rest.push(match (to_8_bit, scale.starts_with("scale=")) {
+            (false, _) => scale,
+            (true, false) => format!("{scale}:format=nv12"),
+            // The upload below sets the format itself.
+            (true, true) if !on_gpu && has_upload(b) => scale,
+            (true, true) => format!("{scale},format=nv12"),
+        });
     }
     if !on_gpu && has_upload(b) {
         rest.push(upload(b, out_fmt));
@@ -813,7 +825,7 @@ mod tests {
         let args = run(&p, &hw(Backend::Amf, false), 0, 0.0);
         assert!(contains_seq(&args, &["-hwaccel", "d3d11va"]));
         assert!(!args.contains(&"-hwaccel_output_format".to_owned()));
-        assert_eq!(value_of(&args, "-vf"), "scale=1920:1080");
+        assert_eq!(value_of(&args, "-vf"), "scale=1920:1080,format=nv12");
     }
 
     #[test]
@@ -823,7 +835,20 @@ mod tests {
             AudioAction::Copy,
         );
         let args = run(&p, &hw(Backend::Vaapi, true), 0, 0.0);
-        assert_eq!(value_of(&args, "-vf"), "scale_vaapi=w=1920:h=1080");
+        assert_eq!(
+            value_of(&args, "-vf"),
+            "scale_vaapi=w=1920:h=1080:format=nv12"
+        );
+    }
+
+    #[test]
+    fn sdr_transcode_from_10_bit_outputs_8_bit_on_cpu() {
+        let p = plan(
+            transcode(VideoCodec::Hevc, HdrOut::Keep(Hdr::Sdr), false),
+            AudioAction::Copy,
+        );
+        let args = run(&p, &hw(Backend::Cpu, false), 0, 0.0);
+        assert_eq!(value_of(&args, "-vf"), "scale=1920:1080,format=nv12");
     }
 
     #[test]

@@ -176,7 +176,7 @@ pub async fn body_bytes(res: Response<Body>) -> Vec<u8> {
 
 pub fn analysis() -> Analysis {
     Analysis {
-        version: 1,
+        version: engine::analysis::ANALYSIS_VERSION,
         container: "mkv".into(),
         duration: 200.0,
         bit_rate: 8_000_000,

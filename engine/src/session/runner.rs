@@ -525,7 +525,12 @@ impl Session {
             if st.hw.hw_decode && st.plan.burn_in_subtitle.is_none() {
                 st.hw.hw_decode = false;
             } else {
-                let cpu = Hw::new(Backend::Cpu, String::new(), st.hw.cpu_encoders, false);
+                // The client has parsed the master: change codec only if the CPU cannot encode it.
+                let encoders = match st.plan.video {
+                    VideoAction::Transcode { codec, .. } => st.hw.cpu_encoders.prefer_only(codec),
+                    _ => st.hw.cpu_encoders,
+                };
+                let cpu = Hw::new(Backend::Cpu, String::new(), encoders, false);
                 match decide(&st.caps, &st.analysis, &st.params, &cpu.encoders) {
                     Ok(plan) => self.replan(st, plan, cpu).await,
                     Err(e) => {

@@ -134,7 +134,7 @@ fn id(n: u8) -> String {
 
 fn analysis() -> Analysis {
     Analysis {
-        version: 1,
+        version: engine::analysis::ANALYSIS_VERSION,
         container: "mkv".into(),
         duration: 200.0,
         bit_rate: 8_000_000,
@@ -552,6 +552,44 @@ async fn gpu_encode_failure_replans_for_cpu_encoders() {
     assert!(argv[2].contains("libx264"));
     assert!(!argv[2].contains("libsvtav1"));
     assert_eq!(e.info().hw, "cpu");
+    let master = file_text(&e, &sid, "master.m3u8");
+    assert!(master.contains("avc1"), "{master}");
+}
+
+#[tokio::test]
+async fn cpu_fallback_keeps_the_advertised_codec() {
+    let mut hw = Hw::new(
+        Backend::Vaapi,
+        String::new(),
+        EncoderSet {
+            h264: true,
+            hevc: false,
+            av1: false,
+            hevc_first: false,
+            dovi_tool: true,
+        },
+        false,
+    );
+    hw.cpu_encoders = EncoderSet {
+        h264: true,
+        hevc: false,
+        av1: true,
+        hevc_first: false,
+        dovi_tool: true,
+    };
+    let e = env(Setup {
+        fake_env: "FAKE_FAIL_RUNS=2",
+        hw,
+        ..Setup::default()
+    });
+    let sid = id(18);
+    let mut req = transcode_req(&e, &sid);
+    req.capabilities = hw_codecs(&["av1", "h264"]);
+    e.sessions.start(req).await.unwrap();
+    until("the cpu run", 5, || e.argv(&sid, 0).len() == 3).await;
+    let argv = e.argv(&sid, 0);
+    assert!(argv[1].contains("h264_vaapi"));
+    assert!(argv[2].contains("libx264"), "{}", argv[2]);
     let master = file_text(&e, &sid, "master.m3u8");
     assert!(master.contains("avc1"), "{master}");
 }

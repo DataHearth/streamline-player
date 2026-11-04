@@ -25,7 +25,7 @@ async fn health_requires_bearer() {
     let (status, v) = e.api("GET", "/v1/health", None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(v["api_version"], 1);
-    assert_eq!(v["analysis_version"], 1);
+    assert_eq!(v["analysis_version"], engine::analysis::ANALYSIS_VERSION);
     assert_eq!(v["backend"], "cpu");
     assert_eq!(v["vaapi"], false);
     assert_eq!(v["encoders"], json!(["h264", "hevc", "av1"]));
@@ -139,7 +139,7 @@ async fn job_lifecycle() {
 
     let v = wait_done(&e, 1).await;
     assert_eq!(v["state"], "done");
-    assert_eq!(v["result"]["version"], 1);
+    assert_eq!(v["result"]["version"], engine::analysis::ANALYSIS_VERSION);
 
     let (status, v) = e.api("GET", "/v1/jobs", None).await;
     assert_eq!(status, StatusCode::OK);

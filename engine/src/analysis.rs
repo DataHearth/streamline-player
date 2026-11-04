@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub const ANALYSIS_VERSION: u32 = 1;
+pub const ANALYSIS_VERSION: u32 = 2;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
@@ -290,6 +290,13 @@ fn keyframes(packets_csv: &str) -> Vec<f64> {
     kf
 }
 
+fn last_pts(packets_csv: &str) -> Option<f64> {
+    packets_csv
+        .lines()
+        .filter_map(|line| line.split(',').next()?.trim().parse::<f64>().ok())
+        .max_by(f64::total_cmp)
+}
+
 pub fn parse(
     probe: &Value,
     first_frame: &Value,
@@ -304,6 +311,16 @@ pub fn parse(
         keyframes: keyframes(packets_csv),
         ..Analysis::default()
     };
+    // Audio can outlast the video, and a segment past the last frame cannot be produced: ffmpeg
+    // fails with "received no packets". One frame short on purpose, so that every segment boundary
+    // below `duration` has a frame at or after it.
+    let start = num(&probe["format"]["start_time"]).unwrap_or(0.0);
+    if let Some(video_end) = last_pts(packets_csv)
+        .map(|t| t - start)
+        .filter(|t| *t > 0.0)
+    {
+        a.duration = a.duration.min(video_end);
+    }
     for s in streams {
         let index = int(&s["index"]).unwrap_or(0) as u32;
         let title = tag(s, "title");
@@ -452,10 +469,26 @@ mod tests {
 
     #[test]
     fn analysis_ignores_unknown_field() {
-        let a: Analysis = serde_json::from_str(r#"{"version": 1, "foo": 1, "video": []}"#).unwrap();
-        assert_eq!(a.version, 1);
+        let a: Analysis = serde_json::from_str(r#"{"version": 2, "foo": 1, "video": []}"#).unwrap();
+        assert_eq!(a.version, 2);
         assert!(is_current(&a));
         assert!(!is_current(&Analysis::default()));
+    }
+
+    #[test]
+    fn duration_ends_at_the_last_video_frame() {
+        let probe = |start: &str| {
+            serde_json::json!({
+                "format": { "duration": "25.04", "start_time": start, "format_name": "matroska,webm" },
+                "streams": []
+            })
+        };
+        let parsed = |start, csv| parse(&probe(start), &Value::Null, csv).unwrap().duration;
+        assert_eq!(parsed("0", "0.0,K__\n22.105,___\n10.0,K__\n"), 22.105);
+        assert_eq!(parsed("1.5", "1.5,K__\n11.5,___\n"), 10.0);
+        // Cover art: one packet, the audio is the content.
+        assert_eq!(parsed("0", "0.0,K__\n"), 25.04);
+        assert_eq!(parsed("0", ""), 25.04);
     }
 
     #[test]

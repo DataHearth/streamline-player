@@ -143,6 +143,19 @@ impl EncoderSet {
             VideoCodec::Av1 => self.av1,
         }
     }
+
+    /// Only `codec`, when this set has it; otherwise the set as it is.
+    pub fn prefer_only(self, codec: VideoCodec) -> Self {
+        if !self.has(codec) {
+            return self;
+        }
+        Self {
+            h264: codec == VideoCodec::H264,
+            hevc: codec == VideoCodec::Hevc,
+            av1: codec == VideoCodec::Av1,
+            ..self
+        }
+    }
 }
 
 pub fn ladder_height(max_bitrate: u64, codec: VideoCodec) -> u32 {
