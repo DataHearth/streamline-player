@@ -241,7 +241,12 @@ async fn probe_backend(ffmpeg: &Path, backend: Backend, device: &str) -> Encoder
         encoder_works(ffmpeg, backend, device, VideoCodec::Hevc),
         encoder_works(ffmpeg, backend, device, VideoCodec::Av1),
     );
-    EncoderSet { h264, hevc, av1 }
+    EncoderSet {
+        h264,
+        hevc,
+        av1,
+        dovi_tool: false,
+    }
 }
 
 async fn libplacebo_works(ffmpeg: &Path) -> bool {
@@ -273,7 +278,26 @@ fn named_backend(accel: HwAccel) -> Option<Backend> {
     }
 }
 
+async fn dovi_tool_works(dovi_tool: &Path) -> bool {
+    let mut cmd = Command::new(dovi_tool);
+    cmd.arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
+    matches!(
+        tokio::time::timeout(PROBE_TIMEOUT, cmd.status()).await,
+        Ok(Ok(status)) if status.success()
+    )
+}
+
 pub async fn probe(cfg: &Config) -> Hw {
+    let mut hw = probe_encoders(cfg).await;
+    hw.encoders.dovi_tool = dovi_tool_works(&cfg.dovi_tool()).await;
+    hw
+}
+
+async fn probe_encoders(cfg: &Config) -> Hw {
     let ffmpeg = cfg.ffmpeg();
     let order = match named_backend(cfg.hw_accel) {
         Some(Backend::Cpu) => vec![Backend::Cpu],

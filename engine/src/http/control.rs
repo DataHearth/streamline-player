@@ -30,6 +30,7 @@ pub struct Health {
     untested: bool,
     vaapi: bool,
     libplacebo: bool,
+    dovi_tool: bool,
     encoders: Vec<&'static str>,
     decoders: Vec<&'static str>,
 }
@@ -51,6 +52,7 @@ pub async fn health(State(s): State<AppState>) -> Json<Health> {
         untested: s.hw.untested,
         vaapi: s.hw.backend == crate::hw::Backend::Vaapi,
         libplacebo: s.hw.libplacebo,
+        dovi_tool: s.hw.encoders.dovi_tool,
         encoders: encoder_names(&s.hw.encoders),
         decoders: s.hw.decoders(),
     })

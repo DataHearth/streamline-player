@@ -121,6 +121,8 @@ pub struct EncoderSet {
     pub h264: bool,
     pub hevc: bool,
     pub av1: bool,
+    /// dovi_tool ran at boot; without it profile 7 cannot become 8.1.
+    pub dovi_tool: bool,
 }
 
 impl EncoderSet {
@@ -128,6 +130,7 @@ impl EncoderSet {
         h264: true,
         hevc: true,
         av1: true,
+        dovi_tool: false,
     };
 
     fn has(&self, codec: VideoCodec) -> bool {
@@ -205,18 +208,18 @@ enum DvOutcome {
 }
 
 /// The conversion pipes the video through dovi_tool, which cannot write to stdout on Windows, and the muxer gets frame timing from a constant frame rate.
-fn p7_conversion_possible(v: &VideoStream) -> bool {
-    cfg!(unix) && !v.vfr && v.fps > 0.0
+fn p7_conversion_possible(v: &VideoStream, enc: &EncoderSet) -> bool {
+    cfg!(unix) && enc.dovi_tool && !v.vfr && v.fps > 0.0
 }
 
-fn dv_rule(caps: &Capabilities, v: &VideoStream, profile: u8) -> DvOutcome {
+fn dv_rule(caps: &Capabilities, v: &VideoStream, profile: u8, enc: &EncoderSet) -> DvOutcome {
     let av1 = v.codec == "av1";
     let dv_profiles = &caps.hdr.dv_profiles;
     if dv_profiles.contains(&profile) {
         let tag = if av1 { CopyTag::Dav1 } else { CopyTag::Dvh1 };
         return DvOutcome::Fits(tag, DvHandling::Keep);
     }
-    if profile == 7 && dv_profiles.contains(&8) && p7_conversion_possible(v) {
+    if profile == 7 && dv_profiles.contains(&8) && p7_conversion_possible(v, enc) {
         return DvOutcome::Fits(CopyTag::Dvh1, DvHandling::P7ToP81);
     }
     let compat = v.dv.as_ref().map_or(0, |d| d.bl_compat_id);
@@ -261,6 +264,7 @@ fn video_fit(
     a: &Analysis,
     v: &VideoStream,
     p: &SessionParams,
+    enc: &EncoderSet,
 ) -> (Vec<Reason>, Option<(CopyTag, DvHandling)>) {
     let mut reasons = Vec::new();
     let mut tag = (plain_tag(&v.codec), DvHandling::Keep);
@@ -311,7 +315,7 @@ fn video_fit(
     }
 
     match is_dv_stream(v) {
-        Some(profile) => match dv_rule(caps, v, profile) {
+        Some(profile) => match dv_rule(caps, v, profile, enc) {
             DvOutcome::Fits(t, dv) => tag = (t, dv),
             DvOutcome::Unsupported => reasons.push(Reason::new(
                 "dv_profile_unsupported",
@@ -479,7 +483,7 @@ pub fn decide(
     }
     let audio = pick_audio(a, p)?;
 
-    let (mut video_reasons, fit) = video_fit(caps, a, v, p);
+    let (mut video_reasons, fit) = video_fit(caps, a, v, p, enc);
     let (mut audio_reasons, audio_copy) = match audio {
         Some(s) => {
             let r = audio_copy_reasons(caps, s);
@@ -590,6 +594,7 @@ mod tests {
         h264: true,
         hevc: true,
         av1: true,
+        dovi_tool: true,
     };
 
     fn plan(c: &Capabilities, a: &Analysis, p: &SessionParams) -> Plan {
@@ -790,6 +795,25 @@ mod tests {
             VideoAction::Copy {
                 dv: DvHandling::P7ToP81,
                 ..
+            }
+        ));
+    }
+
+    #[test]
+    fn dv_p7_without_dovi_tool_strips_to_base_layer() {
+        let a = fixture("dv_p7");
+        let mut c = hevc_caps(&["mkv"], &["hdr10"]);
+        c.hdr.dv_profiles = vec![8];
+        let enc = EncoderSet {
+            dovi_tool: false,
+            ..ALL
+        };
+        let p = decide(&c, &a, &SessionParams::default(), &enc).unwrap();
+        assert!(matches!(
+            p.video,
+            VideoAction::Copy {
+                tag: CopyTag::Hvc1,
+                dv: DvHandling::Strip,
             }
         ));
     }

@@ -23,6 +23,7 @@ const ALL: EncoderSet = EncoderSet {
     h264: true,
     hevc: true,
     av1: true,
+    dovi_tool: true,
 };
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -498,6 +499,7 @@ fn av1_gpu() -> Hw {
             h264: true,
             hevc: false,
             av1: true,
+            dovi_tool: true,
         },
         false,
     );
@@ -505,6 +507,7 @@ fn av1_gpu() -> Hw {
         h264: true,
         hevc: false,
         av1: false,
+        dovi_tool: true,
     };
     hw
 }
