@@ -23,11 +23,18 @@ pub fn router(state: AppState) -> Router {
             "/sessions/{id}",
             patch(control::patch_session).delete(control::delete_session),
         )
+        .route("/jobs", get(control::list_jobs).post(control::submit_job))
+        .route(
+            "/jobs/{id}",
+            get(control::job_status).delete(control::cancel_job),
+        )
+        .route("/jobs/{id}/files/{*name}", get(control::job_file))
         .layer(middleware::from_fn_with_state(state.clone(), bearer));
 
     let data = Router::new()
         .route("/hls/{id}/{file}", get(data::hls))
         .route("/file/{id}", get(data::file))
+        .route("/dl/{id}", get(data::download))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)

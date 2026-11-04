@@ -1,13 +1,17 @@
 use axum::Json;
 use axum::body::Bytes;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Request, State};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use tower::ServiceExt;
+use tower_http::services::ServeFile;
 
 use crate::AppState;
 use crate::decision::EncoderSet;
 use crate::error::ApiError;
+use crate::jobs::{JobRequest, JobState, JobStatus, Priority};
 use crate::session::{PatchRequest, SessionInfo, SessionResponse, StartRequest};
 
 const ANALYSIS_VERSION: u32 = 1;
@@ -84,5 +88,74 @@ pub struct SessionList {
 pub async fn list_sessions(State(s): State<AppState>) -> Json<SessionList> {
     Json(SessionList {
         sessions: s.sessions.list(),
+    })
+}
+
+const JOB_TYPES: [&str; 2] = ["analyze", "subtitles"];
+
+pub async fn submit_job(State(s): State<AppState>, body: Bytes) -> Result<StatusCode, ApiError> {
+    let v: serde_json::Value = parse(&body)?;
+    if let Some(t) = v.get("type").and_then(|t| t.as_str())
+        && !JOB_TYPES.contains(&t)
+    {
+        return Err(ApiError::invalid_request(
+            "job type not supported in this version",
+        ));
+    }
+    let req: JobRequest =
+        serde_json::from_value(v).map_err(|e| ApiError::invalid_request(e.to_string()))?;
+    s.jobs.submit(req)?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+pub async fn job_status(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<JobStatus>, ApiError> {
+    Ok(Json(s.jobs.status(&id)?))
+}
+
+pub async fn job_file(
+    State(s): State<AppState>,
+    Path((id, name)): Path<(String, String)>,
+    req: Request,
+) -> Result<Response, ApiError> {
+    let path = s.jobs.file(&id, &name)?;
+    let Ok(res) = ServeFile::new(path).oneshot(req).await;
+    Ok(res.into_response())
+}
+
+pub async fn cancel_job(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    s.jobs.cancel(&id)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Serialize)]
+struct JobEntry {
+    job_id: String,
+    state: JobState,
+    priority: Priority,
+}
+
+#[derive(Serialize)]
+pub struct JobList {
+    jobs: Vec<JobEntry>,
+}
+
+pub async fn list_jobs(State(s): State<AppState>) -> Json<JobList> {
+    Json(JobList {
+        jobs: s
+            .jobs
+            .list()
+            .into_iter()
+            .map(|(job_id, state, priority)| JobEntry {
+                job_id,
+                state,
+                priority,
+            })
+            .collect(),
     })
 }

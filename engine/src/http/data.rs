@@ -15,14 +15,19 @@ use crate::token::{Scope, verify};
 
 const PLAYLIST_TYPE: &str = "application/vnd.apple.mpegurl";
 
-fn check_token(s: &AppState, id: &str, q: &HashMap<String, String>) -> Result<(), ApiError> {
+fn check_token(
+    s: &AppState,
+    scope: Scope,
+    id: &str,
+    q: &HashMap<String, String>,
+) -> Result<(), ApiError> {
     let exp = q.get("exp").and_then(|e| e.parse::<u64>().ok());
     let sig = q.get("sig");
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
     match (exp, sig) {
-        (Some(exp), Some(sig)) if verify(&s.secret, Scope::Hls, id, exp, sig, now) => Ok(()),
+        (Some(exp), Some(sig)) if verify(&s.secret, scope, id, exp, sig, now) => Ok(()),
         _ => Err(ApiError::forbidden()),
     }
 }
@@ -71,7 +76,7 @@ pub async fn hls(
     Query(q): Query<HashMap<String, String>>,
     req: Request,
 ) -> Result<Response, ApiError> {
-    check_token(&s, &id, &q)?;
+    check_token(&s, Scope::Hls, &id, &q)?;
     if !hls_file_ok(&file) {
         return Err(ApiError::not_found("no such file"));
     }
@@ -95,7 +100,22 @@ pub async fn file(
     Query(q): Query<HashMap<String, String>>,
     req: Request,
 ) -> Result<Response, ApiError> {
-    check_token(&s, &id, &q)?;
+    check_token(&s, Scope::Hls, &id, &q)?;
     let path = s.sessions.direct_path(&id).await?;
     Ok(serve_file(&s, &id, path, req, None).await)
+}
+
+pub async fn download(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Query(q): Query<HashMap<String, String>>,
+    req: Request,
+) -> Result<Response, ApiError> {
+    check_token(&s, Scope::Dl, &id, &q)?;
+    let path = s.jobs.download_path(&id)?;
+    if !path.is_file() {
+        return Err(ApiError::not_found("no such file"));
+    }
+    let Ok(res) = ServeFile::new(path).oneshot(req).await;
+    Ok(res.into_response())
 }

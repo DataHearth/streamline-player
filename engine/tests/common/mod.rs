@@ -12,6 +12,7 @@ use engine::caps::{AudioCaps, Capabilities, HdrCaps, VideoCap};
 use engine::config::Config;
 use engine::decision::EncoderSet;
 use engine::hw::{Backend, Hw};
+use engine::jobs::Jobs;
 use engine::session::Sessions;
 use engine::token::{Scope, sign};
 use engine::{AppState, app};
@@ -52,11 +53,20 @@ pub fn env() -> Env {
             bin.join("ffmpeg"),
         )
         .unwrap();
+        std::os::unix::fs::symlink(
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/fake-ffprobe/ffprobe"
+            ),
+            bin.join("ffprobe"),
+        )
+        .unwrap();
         std::fs::write(bin.join("fake.env"), "").unwrap();
     }
     let cfg = Arc::new(Config {
         secret: Some(SECRET.into()),
         tmp_dir: root.join("live"),
+        jobs_dir: root.join("jobs"),
         ffmpeg_dir: bin,
         ..Config::default()
     });
@@ -71,12 +81,14 @@ pub fn env() -> Env {
         false,
     ));
     let sessions = Sessions::new(cfg.clone(), hw.clone());
+    let jobs = Jobs::new(cfg.clone());
     let router = app(AppState {
         cfg,
         secret: Arc::new(SECRET.as_bytes().to_vec()),
         hw,
         ffmpeg_version: Some("test".into()),
         sessions: sessions.clone(),
+        jobs,
     });
     Env {
         root,
@@ -115,6 +127,16 @@ impl Env {
     pub async fn get(&self, uri: &str) -> Response<Body> {
         self.send(Request::get(uri).body(Body::empty()).unwrap())
             .await
+    }
+
+    pub async fn get_authed(&self, uri: &str) -> Response<Body> {
+        self.send(
+            Request::get(uri)
+                .header("authorization", format!("Bearer {SECRET}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
     }
 
     pub async fn api(&self, method: &str, uri: &str, body: Option<Value>) -> (StatusCode, Value) {

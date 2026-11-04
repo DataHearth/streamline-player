@@ -1,0 +1,24 @@
+#!/bin/sh
+dir="$(dirname "$0")"
+mode=csv
+for a in "$@"; do
+  last=$a
+  case "$a" in
+    -show_format) mode=probe ;;
+    -show_frames) mode=frames ;;
+  esac
+done
+
+case "$last" in
+  *bad) echo "no such file" >&2; exit 1 ;;
+esac
+
+if [ "$mode" = probe ]; then
+  echo "$last" >> "$dir/order.txt"
+  case "$last" in
+    *blocker) while [ ! -e "$dir/release" ]; do sleep 0.05; done ;;
+  esac
+  echo '{"format":{"duration":"1"},"streams":[],"chapters":[]}'
+elif [ "$mode" = frames ]; then
+  echo '{"frames":[]}'
+fi

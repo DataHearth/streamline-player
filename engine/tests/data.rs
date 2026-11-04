@@ -145,3 +145,44 @@ async fn cors_on_data_only() {
             .contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN)
     );
 }
+
+fn dl_query(id: &str) -> String {
+    let exp = now() + 3600;
+    format!(
+        "exp={exp}&sig={}",
+        engine::token::sign(SECRET.as_bytes(), engine::token::Scope::Dl, id, exp)
+    )
+}
+
+#[tokio::test]
+async fn dl_serves_finished_job_with_dl_scope_only() {
+    let e = env();
+    let jid = id(5);
+    let dir = e.root.join("jobs").join(&jid);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("done.json"), r#"{"state":"done"}"#).unwrap();
+    std::fs::write(dir.join("output.mp4"), b"0123456789").unwrap();
+
+    let res = e.get(&format!("/dl/{jid}")).await;
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+    let res = e.get(&format!("/dl/{jid}?{}", valid_query(&jid))).await;
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+    let res = e.get(&format!("/dl/{jid}?{}", dl_query(&jid))).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(body_bytes(res).await, b"0123456789");
+
+    let res = e
+        .send(
+            Request::get(format!("/dl/{jid}?{}", dl_query(&jid)))
+                .header("range", "bytes=2-4")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+    assert_eq!(res.status(), StatusCode::PARTIAL_CONTENT);
+    assert_eq!(body_bytes(res).await, b"234");
+
+    let res = e.get(&format!("/dl/{}?{}", id(6), dl_query(&id(6)))).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}

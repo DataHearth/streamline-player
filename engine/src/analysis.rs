@@ -348,11 +348,18 @@ pub fn parse(
     Ok(a)
 }
 
-async fn ffprobe(ffprobe: &Path, args: &[&str], path: &Path) -> Result<String, AnalysisError> {
-    let out = tokio::process::Command::new(ffprobe)
-        .args(["-v", "error"])
-        .args(args)
-        .arg(path)
+type Prepare<'a> = &'a (dyn Fn(&mut tokio::process::Command) + Sync);
+
+async fn ffprobe(
+    ffprobe: &Path,
+    args: &[&str],
+    path: &Path,
+    prepare: Prepare<'_>,
+) -> Result<String, AnalysisError> {
+    let mut cmd = tokio::process::Command::new(ffprobe);
+    cmd.args(["-v", "error"]).args(args).arg(path);
+    prepare(&mut cmd);
+    let out = cmd
         .kill_on_drop(true)
         .output()
         .await
@@ -366,6 +373,15 @@ async fn ffprobe(ffprobe: &Path, args: &[&str], path: &Path) -> Result<String, A
 }
 
 pub async fn run_analyze(ffprobe_bin: &Path, path: &Path) -> Result<Analysis, AnalysisError> {
+    run_analyze_with(ffprobe_bin, path, &|_| {}).await
+}
+
+/// `prepare` runs on each ffprobe command after its program and arguments are set and before stdio is configured.
+pub async fn run_analyze_with(
+    ffprobe_bin: &Path,
+    path: &Path,
+    prepare: Prepare<'_>,
+) -> Result<Analysis, AnalysisError> {
     let probe = ffprobe(
         ffprobe_bin,
         &[
@@ -376,6 +392,7 @@ pub async fn run_analyze(ffprobe_bin: &Path, path: &Path) -> Result<Analysis, An
             "-show_chapters",
         ],
         path,
+        prepare,
     )
     .await?;
     let frame = ffprobe(
@@ -392,6 +409,7 @@ pub async fn run_analyze(ffprobe_bin: &Path, path: &Path) -> Result<Analysis, An
             "json",
         ],
         path,
+        prepare,
     )
     .await?;
     let packets = ffprobe(
@@ -405,6 +423,7 @@ pub async fn run_analyze(ffprobe_bin: &Path, path: &Path) -> Result<Analysis, An
             "csv=p=0",
         ],
         path,
+        prepare,
     )
     .await?;
     parse(

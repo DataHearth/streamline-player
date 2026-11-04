@@ -106,3 +106,121 @@ async fn session_lifecycle() {
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(v["code"], "not_found");
 }
+
+fn job_body(n: u8, kind: &str) -> serde_json::Value {
+    json!({"job_id": id(n), "type": kind, "priority": "background", "path": "/m/a"})
+}
+
+#[cfg(unix)]
+async fn wait_done(e: &Env, n: u8) -> serde_json::Value {
+    for _ in 0..200 {
+        let (status, v) = e.api("GET", &format!("/v1/jobs/{}", id(n)), None).await;
+        if status == StatusCode::OK && (v["state"] == "done" || v["state"] == "failed") {
+            return v;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+    panic!("job did not finish");
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn job_lifecycle() {
+    let e = env();
+    let (status, _) = e
+        .api("POST", "/v1/jobs", Some(job_body(1, "analyze")))
+        .await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    let (status, v) = e
+        .api("POST", "/v1/jobs", Some(job_body(1, "analyze")))
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(v["code"], "job_exists");
+
+    let v = wait_done(&e, 1).await;
+    assert_eq!(v["state"], "done");
+    assert_eq!(v["result"]["version"], 1);
+
+    let (status, v) = e.api("GET", "/v1/jobs", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["jobs"], json!([]));
+
+    let (status, _) = e.api("DELETE", &format!("/v1/jobs/{}", id(1)), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, v) = e.api("GET", &format!("/v1/jobs/{}", id(1)), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(v["code"], "not_found");
+}
+
+#[tokio::test]
+async fn unsupported_type_400() {
+    let e = env();
+    let (status, v) = e
+        .api("POST", "/v1/jobs", Some(json!({"type": "trickplay"})))
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(v["code"], "invalid_request");
+    assert_eq!(v["message"], "job type not supported in this version");
+
+    let (status, v) = e
+        .api("POST", "/v1/jobs", Some(json!({"job_id": "nope"})))
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(v["code"], "invalid_request");
+}
+
+#[tokio::test]
+async fn bad_job_id_is_400() {
+    let e = env();
+    let mut body = job_body(1, "analyze");
+    body["job_id"] = json!("xyz");
+    let (status, _) = e.api("POST", "/v1/jobs", Some(body)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = e.api("GET", "/v1/jobs/xyz", None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn job_file_traversal_404() {
+    let e = env();
+    let jid = id(7);
+    let dir = e.root.join("jobs").join(&jid);
+    std::fs::create_dir_all(dir.join("fonts")).unwrap();
+    std::fs::write(
+        dir.join("done.json"),
+        r#"{"state":"done","result":{},"error":null}"#,
+    )
+    .unwrap();
+    std::fs::write(dir.join("fonts/A.ttf"), b"font").unwrap();
+    std::fs::write(e.root.join("secret.txt"), b"secret").unwrap();
+
+    let res = e
+        .get_authed(&format!("/v1/jobs/{jid}/files/fonts/A.ttf"))
+        .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(body_bytes(res).await, b"font");
+
+    for name in [
+        "../done.json",
+        "%2e%2e/done.json",
+        "..%2Fdone.json",
+        "../../secret.txt",
+        "..%2F..%2Fsecret.txt",
+        "%2Fetc%2Fpasswd",
+        "/etc/passwd",
+        "fonts%5C..%5Cx",
+        "fonts/../done.json",
+        "done.json",
+        "",
+    ] {
+        let res = e.get_authed(&format!("/v1/jobs/{jid}/files/{name}")).await;
+        assert_eq!(res.status(), StatusCode::NOT_FOUND, "{name:?}");
+    }
+}
+
+#[tokio::test]
+async fn jobs_require_bearer() {
+    let e = env();
+    let res = e.get(&format!("/v1/jobs/{}", id(1))).await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
