@@ -132,7 +132,7 @@ impl Backend {
         }
     }
 
-    fn init_device_args(&self, device: &str) -> Vec<String> {
+    pub(crate) fn init_device_args(&self, device: &str) -> Vec<String> {
         match self {
             Self::Vaapi => owned(&[
                 "-init_hw_device",
