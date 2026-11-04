@@ -418,7 +418,10 @@ impl Sessions {
             Some(a) => a,
             None => analysis::run_analyze(&cfg.ffprobe(), &input)
                 .await
-                .map_err(|e| ApiError::ffmpeg_unavailable(e.to_string()))?,
+                .map_err(|e| match e {
+                    analysis::AnalysisError::Spawn(m) => ApiError::ffmpeg_unavailable(m),
+                    e => ApiError::unreadable_file(e.to_string()),
+                })?,
         };
         let params = SessionParams {
             audio_index: r.audio_index,

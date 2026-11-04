@@ -36,6 +36,19 @@ pub enum JobSpec {
     Subtitles { path: String },
 }
 
+impl JobSpec {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Analyze { .. } => "analyze",
+            Self::Subtitles { .. } => "subtitles",
+        }
+    }
+
+    pub fn knows(kind: &str) -> bool {
+        serde_json::from_value::<Self>(serde_json::json!({"type": kind, "path": ""})).is_ok()
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct JobRequest {
     pub job_id: String,
@@ -180,10 +193,7 @@ impl Shared {
     async fn run(&self, id: String, spec: JobSpec) {
         let cfg = self.cfg.clone();
         let dir = self.dir(&id);
-        let kind = match &spec {
-            JobSpec::Analyze { .. } => "analyze",
-            JobSpec::Subtitles { .. } => "subtitles",
-        };
+        let kind = spec.kind();
         let span = tracing::info_span!("engine.job", job = %id, r#type = kind);
         let started = std::time::Instant::now();
         let task: JoinHandle<Result<Value, JobError>> =
@@ -474,6 +484,22 @@ impl Jobs {
                 shared.sweep_ttl();
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod kind_tests {
+    use super::*;
+
+    #[test]
+    fn job_kinds_come_from_the_enum() {
+        assert!(JobSpec::knows("analyze"));
+        assert!(JobSpec::knows("subtitles"));
+        assert!(!JobSpec::knows("trickplay"));
+        let spec = JobSpec::Analyze {
+            path: String::new(),
+        };
+        assert_eq!(spec.kind(), "analyze");
     }
 }
 

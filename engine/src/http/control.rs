@@ -1,6 +1,6 @@
 use axum::Json;
 use axum::body::Bytes;
-use axum::extract::{Path, Request, State};
+use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
@@ -9,12 +9,12 @@ use tower::ServiceExt;
 use tower_http::services::ServeFile;
 
 use crate::AppState;
+use crate::analysis::ANALYSIS_VERSION;
 use crate::decision::EncoderSet;
 use crate::error::ApiError;
-use crate::jobs::{JobRequest, JobState, JobStatus, Priority};
+use crate::http::Params;
+use crate::jobs::{JobRequest, JobSpec, JobState, JobStatus, Priority};
 use crate::session::{PatchRequest, SessionInfo, SessionResponse, StartRequest};
-
-const ANALYSIS_VERSION: u32 = 1;
 
 fn parse<T: DeserializeOwned>(body: &Bytes) -> Result<T, ApiError> {
     serde_json::from_slice(body).map_err(|e| ApiError::invalid_request(e.to_string()))
@@ -52,7 +52,7 @@ pub async fn health(State(s): State<AppState>) -> Json<Health> {
         vaapi: s.hw.backend == crate::hw::Backend::Vaapi,
         libplacebo: s.hw.libplacebo,
         encoders: encoder_names(&s.hw.encoders),
-        decoders: vec![],
+        decoders: s.hw.decoders(),
     })
 }
 
@@ -65,7 +65,7 @@ pub async fn start_session(
 
 pub async fn patch_session(
     State(s): State<AppState>,
-    Path(id): Path<String>,
+    Params(id): Params<String>,
     body: Bytes,
 ) -> Result<Json<SessionResponse>, ApiError> {
     let req: PatchRequest = parse(&body)?;
@@ -74,7 +74,7 @@ pub async fn patch_session(
 
 pub async fn delete_session(
     State(s): State<AppState>,
-    Path(id): Path<String>,
+    Params(id): Params<String>,
 ) -> Result<StatusCode, ApiError> {
     s.sessions.delete(&id).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -91,12 +91,10 @@ pub async fn list_sessions(State(s): State<AppState>) -> Json<SessionList> {
     })
 }
 
-const JOB_TYPES: [&str; 2] = ["analyze", "subtitles"];
-
 pub async fn submit_job(State(s): State<AppState>, body: Bytes) -> Result<StatusCode, ApiError> {
     let v: serde_json::Value = parse(&body)?;
     if let Some(t) = v.get("type").and_then(|t| t.as_str())
-        && !JOB_TYPES.contains(&t)
+        && !JobSpec::knows(t)
     {
         return Err(ApiError::invalid_request(
             "job type not supported in this version",
@@ -110,14 +108,14 @@ pub async fn submit_job(State(s): State<AppState>, body: Bytes) -> Result<Status
 
 pub async fn job_status(
     State(s): State<AppState>,
-    Path(id): Path<String>,
+    Params(id): Params<String>,
 ) -> Result<Json<JobStatus>, ApiError> {
     Ok(Json(s.jobs.status(&id)?))
 }
 
 pub async fn job_file(
     State(s): State<AppState>,
-    Path((id, name)): Path<(String, String)>,
+    Params((id, name)): Params<(String, String)>,
     req: Request,
 ) -> Result<Response, ApiError> {
     let path = s.jobs.file(&id, &name)?;
@@ -127,7 +125,7 @@ pub async fn job_file(
 
 pub async fn cancel_job(
     State(s): State<AppState>,
-    Path(id): Path<String>,
+    Params(id): Params<String>,
 ) -> Result<StatusCode, ApiError> {
     s.jobs.cancel(&id)?;
     Ok(StatusCode::NO_CONTENT)

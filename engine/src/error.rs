@@ -57,6 +57,18 @@ impl ApiError {
         )
     }
 
+    pub fn unreadable_file(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::UNPROCESSABLE_ENTITY, "unreadable_file", message)
+    }
+
+    pub fn method_not_allowed() -> Self {
+        Self::new(
+            StatusCode::METHOD_NOT_ALLOWED,
+            "method_not_allowed",
+            "method not allowed on this route",
+        )
+    }
+
     pub fn transcode_limit(retry_after: u64) -> Self {
         Self {
             retry_after: Some(retry_after),

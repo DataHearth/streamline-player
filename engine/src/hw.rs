@@ -49,6 +49,15 @@ impl Hw {
     }
 }
 
+impl Hw {
+    pub fn decoders(&self) -> Vec<&'static str> {
+        match self.backend.hwaccel() {
+            Some(name) if self.hw_decode => vec![name],
+            _ => Vec::new(),
+        }
+    }
+}
+
 fn or_default<'a>(device: &'a str, default: &'a str) -> &'a str {
     if device.is_empty() { default } else { device }
 }
@@ -94,6 +103,17 @@ impl Backend {
             ]),
             Self::Videotoolbox => owned(&["-hwaccel", "videotoolbox"]),
             Self::Cpu => Vec::new(),
+        }
+    }
+
+    pub fn hwaccel(&self) -> Option<&'static str> {
+        match self {
+            Self::Vaapi => Some("vaapi"),
+            Self::Nvenc => Some("cuda"),
+            Self::Qsv => Some("qsv"),
+            Self::Amf => Some("d3d11va"),
+            Self::Videotoolbox => Some("videotoolbox"),
+            Self::Cpu => None,
         }
     }
 
@@ -289,15 +309,45 @@ pub async fn ffmpeg_version(ffmpeg: &Path) -> Option<String> {
         .ok()?;
     let text = String::from_utf8_lossy(&out.stdout);
     let line = text.lines().next()?;
-    Some(
-        line.strip_prefix("ffmpeg version ")
-            .unwrap_or(line)
-            .to_owned(),
-    )
+    version_token(line)
+}
+
+fn version_token(banner: &str) -> Option<String> {
+    let rest = banner.strip_prefix("ffmpeg version ")?;
+    rest.split_whitespace().next().map(str::to_owned)
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn version_is_the_token_only() {
+        assert_eq!(
+            super::version_token(
+                "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers"
+            ),
+            Some("9.0.2".into())
+        );
+        assert_eq!(
+            super::version_token("ffmpeg version n7.1-3-gabc Copyright (c) x"),
+            Some("n7.1-3-gabc".into())
+        );
+        assert_eq!(super::version_token("not ffmpeg"), None);
+    }
+
+    #[test]
+    fn decoders_follow_the_gpu_backend() {
+        let sw = EncoderSet::SOFTWARE;
+        let mut hw = Hw::new(Backend::Vaapi, String::new(), sw, false);
+        assert_eq!(hw.decoders(), vec!["vaapi"]);
+        hw.hw_decode = false;
+        assert!(hw.decoders().is_empty());
+        assert!(
+            Hw::new(Backend::Cpu, String::new(), sw, false)
+                .decoders()
+                .is_empty()
+        );
+    }
+
     use super::*;
     use crate::config::{Config, HwAccel};
 

@@ -19,7 +19,7 @@ use engine::{AppState, app};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-pub const SECRET: &str = "test-secret";
+pub const SECRET: &str = "test-secret-0123456789";
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -36,6 +36,19 @@ impl Drop for Env {
 }
 
 pub fn env() -> Env {
+    env_with_hw(Hw::new(
+        Backend::Cpu,
+        String::new(),
+        EncoderSet {
+            h264: true,
+            hevc: true,
+            av1: true,
+        },
+        false,
+    ))
+}
+
+pub fn env_with_hw(hw: Hw) -> Env {
     let root = std::env::temp_dir().join(format!(
         "engine-http-{}-{}",
         std::process::id(),
@@ -70,16 +83,7 @@ pub fn env() -> Env {
         ffmpeg_dir: bin,
         ..Config::default()
     });
-    let hw = Arc::new(Hw::new(
-        Backend::Cpu,
-        String::new(),
-        EncoderSet {
-            h264: true,
-            hevc: true,
-            av1: true,
-        },
-        false,
-    ));
+    let hw = Arc::new(hw);
     let sessions = Sessions::new(cfg.clone(), hw.clone());
     let jobs = Jobs::new(cfg.clone());
     let router = app(AppState {

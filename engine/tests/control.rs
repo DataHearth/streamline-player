@@ -237,7 +237,7 @@ async fn boots_and_answers_health() {
     std::fs::write(
         &cfg,
         format!(
-            "listen: 127.0.0.1:{port}\nsecret: boot-secret\ntmp_dir: {0}/live\njobs_dir: {0}/jobs\nhw_accel: none\n",
+            "listen: 127.0.0.1:{port}\nsecret: boot-secret-boot-secret\ntmp_dir: {0}/live\njobs_dir: {0}/jobs\nhw_accel: none\n",
             dir.display()
         ),
     )
@@ -253,7 +253,7 @@ async fn boots_and_answers_health() {
         if let Ok(mut s) = tokio::net::TcpStream::connect(("127.0.0.1", port)).await {
             use tokio::io::{AsyncReadExt, AsyncWriteExt};
             s.write_all(
-                b"GET /v1/health HTTP/1.1\r\nhost: x\r\nauthorization: Bearer boot-secret\r\nconnection: close\r\n\r\n",
+                b"GET /v1/health HTTP/1.1\r\nhost: x\r\nauthorization: Bearer boot-secret-boot-secret\r\nconnection: close\r\n\r\n",
             )
             .await
             .unwrap();
@@ -267,4 +267,104 @@ async fn boots_and_answers_health() {
     let _ = child.kill().await;
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(status.as_deref(), Some("HTTP/1.1 200 OK"));
+}
+
+#[tokio::test]
+async fn health_reports_gpu_decoders_and_version_token() {
+    let e = env_with_hw(engine::hw::Hw::new(
+        engine::hw::Backend::Vaapi,
+        String::new(),
+        engine::decision::EncoderSet::SOFTWARE,
+        true,
+    ));
+    let (_, v) = e.api("GET", "/v1/health", None).await;
+    assert_eq!(v["decoders"], json!(["vaapi"]));
+    assert_eq!(v["vaapi"], true);
+    assert_eq!(v["analysis_version"], engine::analysis::ANALYSIS_VERSION);
+}
+
+async fn envelope(res: axum::http::Response<Body>) -> (StatusCode, serde_json::Value) {
+    let status = res.status();
+    let v = serde_json::from_slice(&body_bytes(res).await).expect("body is a json envelope");
+    (status, v)
+}
+
+#[tokio::test]
+async fn unknown_route_is_enveloped_404() {
+    let e = env();
+    let (status, v) = envelope(e.get("/nope").await).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(v["code"], "not_found");
+    let (status, v) = envelope(e.get_authed("/v1/nope").await).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(v["code"], "not_found");
+}
+
+#[tokio::test]
+async fn wrong_method_is_enveloped_405() {
+    let e = env();
+    let (status, v) = e.api("PUT", "/v1/health", None).await;
+    assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(v["code"], "method_not_allowed");
+    let res = e
+        .send(
+            Request::post(format!("/hls/{}/master.m3u8", id(1)))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+    let (status, v) = envelope(res).await;
+    assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(v["code"], "method_not_allowed");
+}
+
+#[tokio::test]
+async fn undecodable_query_is_enveloped_403() {
+    let e = env();
+    for uri in [
+        format!("/hls/{}/master.m3u8?exp=%FF", id(1)),
+        format!("/file/{}?sig=%FF", id(1)),
+        format!("/dl/{}?x=%FF", id(1)),
+    ] {
+        let (status, v) = envelope(e.get(&uri).await).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{uri}");
+        assert_eq!(v["code"], "forbidden", "{uri}");
+    }
+}
+
+#[tokio::test]
+async fn undecodable_path_is_enveloped() {
+    let e = env();
+    let (status, v) = envelope(e.get("/hls/%FF/master.m3u8").await).await;
+    assert!(status.is_client_error());
+    assert!(v["code"].is_string());
+    let (status, v) = envelope(e.get_authed("/v1/jobs/%FF").await).await;
+    assert!(status.is_client_error());
+    assert!(v["code"].is_string());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn corrupt_file_is_422_unreadable_file() {
+    let e = env();
+    let path = e.root.join("clip.bad");
+    std::fs::write(&path, b"x").unwrap();
+    let mut body = start_body(&id(9), &path, "hevc", "mp4");
+    body.as_object_mut().unwrap().remove("analysis");
+    let (status, v) = e.api("POST", "/v1/sessions", Some(body)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(v["code"], "unreadable_file");
+}
+
+#[tokio::test]
+async fn missing_ffprobe_is_503_ffmpeg_unavailable() {
+    let e = env();
+    std::fs::remove_file(e.root.join("bin/ffprobe")).ok();
+    let path = e.root.join("clip.mkv");
+    std::fs::write(&path, b"x").unwrap();
+    let mut body = start_body(&id(9), &path, "hevc", "mp4");
+    body.as_object_mut().unwrap().remove("analysis");
+    let (status, v) = e.api("POST", "/v1/sessions", Some(body)).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(v["code"], "ffmpeg_unavailable");
 }

@@ -7,8 +7,10 @@ pub const ANALYSIS_VERSION: u32 = 1;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
-    #[error("ffprobe failed: {0}")]
-    Probe(String),
+    #[error("cannot run ffprobe: {0}")]
+    Spawn(String),
+    #[error("ffprobe cannot read the file: {0}")]
+    Unreadable(String),
     #[error("ffprobe output is not valid json: {0}")]
     Json(#[from] serde_json::Error),
 }
@@ -363,9 +365,9 @@ async fn ffprobe(
         .kill_on_drop(true)
         .output()
         .await
-        .map_err(|e| AnalysisError::Probe(format!("{}: {e}", ffprobe.display())))?;
+        .map_err(|e| AnalysisError::Spawn(format!("{}: {e}", ffprobe.display())))?;
     if !out.status.success() {
-        return Err(AnalysisError::Probe(
+        return Err(AnalysisError::Unreadable(
             String::from_utf8_lossy(&out.stderr).trim().to_owned(),
         ));
     }

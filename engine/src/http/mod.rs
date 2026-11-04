@@ -2,11 +2,14 @@ mod control;
 mod data;
 
 use axum::Router;
-use axum::extract::{Request, State};
+use axum::extract::rejection::PathRejection;
+use axum::extract::{FromRequestParts, Path, Request, State};
+use axum::http::request::Parts;
 use axum::http::{Method, header};
 use axum::middleware::{self, Next};
 use axum::response::Response;
 use axum::routing::{get, patch};
+use serde::de::DeserializeOwned;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::AppState;
@@ -29,12 +32,14 @@ pub fn router(state: AppState) -> Router {
             get(control::job_status).delete(control::cancel_job),
         )
         .route("/jobs/{id}/files/{*name}", get(control::job_file))
+        .method_not_allowed_fallback(method_not_allowed)
         .layer(middleware::from_fn_with_state(state.clone(), bearer));
 
     let data = Router::new()
         .route("/hls/{id}/{file}", get(data::hls))
         .route("/file/{id}", get(data::file))
         .route("/dl/{id}", get(data::download))
+        .method_not_allowed_fallback(method_not_allowed)
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
@@ -50,7 +55,12 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .nest("/v1", control)
         .merge(data)
+        .fallback(|| async { ApiError::not_found("no such route") })
         .with_state(state)
+}
+
+async fn method_not_allowed() -> ApiError {
+    ApiError::method_not_allowed()
 }
 
 async fn bearer(
@@ -76,4 +86,21 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
         diff |= usize::from(a.get(i).copied().unwrap_or(0) ^ b.get(i).copied().unwrap_or(0));
     }
     diff == 0
+}
+
+pub struct Params<T>(pub T);
+
+impl<T, S> FromRequestParts<S> for Params<T>
+where
+    T: DeserializeOwned + Send,
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, ApiError> {
+        Path::<T>::from_request_parts(parts, state)
+            .await
+            .map(|Path(v)| Self(v))
+            .map_err(|e: PathRejection| ApiError::invalid_request(e.body_text()))
+    }
 }

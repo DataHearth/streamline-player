@@ -103,11 +103,16 @@ impl Default for Config {
     }
 }
 
+const MIN_SECRET_LEN: usize = 16;
+
 impl Config {
     pub fn load(path: &Path) -> anyhow::Result<Config> {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("reading config {}", path.display()))?;
-        Self::parse(&text).with_context(|| format!("parsing config {}", path.display()))
+        let cfg =
+            Self::parse(&text).with_context(|| format!("parsing config {}", path.display()))?;
+        cfg.secret_bytes()?;
+        Ok(cfg)
     }
 
     fn parse(text: &str) -> anyhow::Result<Config> {
@@ -128,15 +133,19 @@ impl Config {
     }
 
     pub fn secret_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        match (&self.secret, &self.secret_file) {
-            (Some(s), None) => Ok(s.as_bytes().to_vec()),
+        let bytes = match (&self.secret, &self.secret_file) {
+            (Some(s), None) => s.as_bytes().to_vec(),
             (None, Some(f)) => {
                 let text = std::fs::read_to_string(f)
                     .with_context(|| format!("reading secret_file {}", f.display()))?;
-                Ok(text.trim_end_matches(['\n', '\r']).as_bytes().to_vec())
+                text.trim_end_matches(['\n', '\r']).as_bytes().to_vec()
             }
             _ => bail!("set exactly one of `secret` and `secret_file`"),
+        };
+        if bytes.len() < MIN_SECRET_LEN {
+            bail!("the secret must be at least {MIN_SECRET_LEN} bytes");
         }
+        Ok(bytes)
     }
 
     pub fn ffmpeg(&self) -> PathBuf {
@@ -219,13 +228,41 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("engine-cfg-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("secret");
-        std::fs::write(&f, "hunter2\n").unwrap();
+        std::fs::write(&f, "hunter2-hunter2-hunter2\n").unwrap();
         let c = Config {
             secret_file: Some(f),
             ..Config::default()
         };
-        assert_eq!(c.secret_bytes().unwrap(), b"hunter2");
+        assert_eq!(c.secret_bytes().unwrap(), b"hunter2-hunter2-hunter2");
         std::fs::remove_dir_all(dir).ok();
+    }
+
+    fn load_text(name: &str, text: &str) -> anyhow::Result<Config> {
+        let dir = std::env::temp_dir().join(format!("engine-cfg-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("config.yaml");
+        std::fs::write(&f, text).unwrap();
+        let r = Config::load(&f);
+        std::fs::remove_dir_all(dir).ok();
+        r
+    }
+
+    #[test]
+    fn load_rejects_empty_and_short_secrets() {
+        assert!(load_text("empty", "secret: \"\"").is_err());
+        assert!(load_text("short", "secret: fifteen-bytes!!").is_err());
+        assert!(load_text("ok", "secret: sixteen-bytes-ok").is_ok());
+    }
+
+    #[test]
+    fn load_rejects_empty_secret_file() {
+        let dir = std::env::temp_dir().join(format!("engine-cfg-sf-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("secret");
+        std::fs::write(&f, "\n").unwrap();
+        let r = load_text("sf", &format!("secret_file: {}", f.display()));
+        std::fs::remove_dir_all(dir).ok();
+        assert!(r.is_err());
     }
 
     #[test]

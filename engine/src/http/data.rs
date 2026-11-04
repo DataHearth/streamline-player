@@ -4,7 +4,8 @@ use std::task::{Context, Poll};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
-use axum::extract::{Path, Query, Request, State};
+use axum::extract::{FromRequestParts, Query, Request, State};
+use axum::http::request::Parts;
 use axum::http::{HeaderValue, Method, header};
 use axum::response::{IntoResponse, Response};
 use http_body::{Frame, SizeHint};
@@ -13,10 +14,23 @@ use tower_http::services::ServeFile;
 
 use crate::AppState;
 use crate::error::ApiError;
+use crate::http::Params;
 use crate::session::{OpenStream, Served};
 use crate::token::{Scope, verify};
 
 const PLAYLIST_TYPE: &str = "application/vnd.apple.mpegurl";
+
+pub struct TokenQuery(HashMap<String, String>);
+
+impl<S: Send + Sync> FromRequestParts<S> for TokenQuery {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, ApiError> {
+        Query::<HashMap<String, String>>::try_from_uri(&parts.uri)
+            .map(|Query(q)| Self(q))
+            .map_err(|_| ApiError::forbidden())
+    }
+}
 
 fn check_token(
     s: &AppState,
@@ -102,8 +116,8 @@ async fn serve_file(
 
 pub async fn hls(
     State(s): State<AppState>,
-    Path((id, file)): Path<(String, String)>,
-    Query(q): Query<HashMap<String, String>>,
+    Params((id, file)): Params<(String, String)>,
+    TokenQuery(q): TokenQuery,
     req: Request,
 ) -> Result<Response, ApiError> {
     check_token(&s, Scope::Hls, &id, &q)?;
@@ -126,8 +140,8 @@ pub async fn hls(
 
 pub async fn file(
     State(s): State<AppState>,
-    Path(id): Path<String>,
-    Query(q): Query<HashMap<String, String>>,
+    Params(id): Params<String>,
+    TokenQuery(q): TokenQuery,
     req: Request,
 ) -> Result<Response, ApiError> {
     check_token(&s, Scope::Hls, &id, &q)?;
@@ -137,8 +151,8 @@ pub async fn file(
 
 pub async fn download(
     State(s): State<AppState>,
-    Path(id): Path<String>,
-    Query(q): Query<HashMap<String, String>>,
+    Params(id): Params<String>,
+    TokenQuery(q): TokenQuery,
     req: Request,
 ) -> Result<Response, ApiError> {
     check_token(&s, Scope::Dl, &id, &q)?;
