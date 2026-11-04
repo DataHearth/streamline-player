@@ -23,6 +23,7 @@ use crate::error::ApiError;
 use crate::hw::{Backend, Hw};
 use crate::playlist;
 
+pub(crate) use runner::OpenStream;
 use runner::{Live, Session, State};
 
 pub const RUN_AHEAD_SECS: f64 = 180.0;
@@ -50,17 +51,26 @@ pub struct StartRequest {
     pub max_bitrate: Option<u64>,
 }
 
-/// The three track and quality fields replace the session's current ones: an
-/// absent field means none (original quality, no burn-in, default audio).
-#[derive(Debug, Clone, Deserialize)]
+/// An absent field keeps the session's current value, an explicit `null`
+/// clears it (default audio, no burn-in, original quality).
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct PatchRequest {
+    #[serde(default, deserialize_with = "set_or_clear")]
+    pub audio_index: Option<Option<u32>>,
+    #[serde(default, deserialize_with = "set_or_clear")]
+    pub burn_in_subtitle: Option<Option<u32>>,
+    #[serde(default, deserialize_with = "set_or_clear")]
+    pub max_bitrate: Option<Option<u64>>,
     #[serde(default)]
-    pub audio_index: Option<u32>,
-    #[serde(default)]
-    pub burn_in_subtitle: Option<u32>,
-    #[serde(default)]
-    pub max_bitrate: Option<u64>,
-    pub position: f64,
+    pub position: Option<f64>,
+}
+
+fn set_or_clear<'de, D, T>(d: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(d).map(Some)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -470,10 +480,11 @@ impl Sessions {
             return Err(ApiError::not_found("unknown session"));
         }
         let params = SessionParams {
-            audio_index: r.audio_index,
-            burn_in_subtitle: r.burn_in_subtitle,
-            max_bitrate: r.max_bitrate,
+            audio_index: r.audio_index.unwrap_or(st.params.audio_index),
+            burn_in_subtitle: r.burn_in_subtitle.unwrap_or(st.params.burn_in_subtitle),
+            max_bitrate: r.max_bitrate.unwrap_or(st.params.max_bitrate),
         };
+        let position = r.position.unwrap_or(st.fetched_t);
         let analysis = st.analysis.clone();
         let plan = decide(&st.caps, &analysis, &params, &self.inner.hw.encoders)?;
         let permit = match (is_transcode(plan.mode), st.permit.is_some()) {
@@ -494,10 +505,10 @@ impl Sessions {
             hw,
             params,
             permit,
-            r.position,
+            position,
         );
         let hls = fresh.plan.mode != Mode::Direct;
-        let start_index = playlist::segment_for(&fresh.bounds, r.position);
+        let start_index = playlist::segment_for(&fresh.bounds, position);
         let next_run_id = st.next_run_id;
         *st = State {
             next_run_id,
@@ -511,19 +522,29 @@ impl Sessions {
         Ok(reply)
     }
 
+    /// The teardown runs detached: a handler dropped mid-delete (the client
+    /// hung up) must not leave ffmpeg, the transcode permit or the tmp dir behind.
     pub async fn delete(&self, id: &str) -> Result<(), ApiError> {
         let s = self.get(id)?;
         self.inner.map.lock().unwrap().remove(id);
-        let mut st = s.state.lock().await;
-        st.closed = true;
-        s.stop_run(&mut st).await;
-        st.permit = None;
-        drop(st);
-        crate::telemetry::metrics()
-            .session_duration
-            .record(s.started.elapsed().as_secs_f64(), &[]);
-        let _ = tokio::fs::remove_dir_all(&s.dir).await;
-        Ok(())
+        let teardown = tokio::spawn(async move {
+            let mut st = s.state.lock().await;
+            st.closed = true;
+            s.stop_run(&mut st).await;
+            st.permit = None;
+            drop(st);
+            crate::telemetry::metrics()
+                .session_duration
+                .record(s.started.elapsed().as_secs_f64(), &[]);
+            let _ = tokio::fs::remove_dir_all(&s.dir).await;
+        });
+        teardown
+            .await
+            .map_err(|e| ApiError::ffmpeg_failed(format!("session teardown failed: {e}")))
+    }
+
+    pub(crate) fn open_stream(&self, id: &str) -> Option<OpenStream> {
+        self.get(id).ok().map(|s| s.open_stream())
     }
 
     pub fn list(&self) -> Vec<SessionInfo> {
@@ -609,6 +630,9 @@ impl Sessions {
             return;
         };
         for entry in entries.flatten() {
+            if !entry.file_name().to_str().is_some_and(valid_id) {
+                continue;
+            }
             let path = entry.path();
             let _ = if path.is_dir() {
                 std::fs::remove_dir_all(path)
@@ -616,5 +640,36 @@ impl Sessions {
                 std::fs::remove_file(path)
             };
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PatchRequest;
+
+    #[test]
+    fn patch_distinguishes_absent_null_and_value() {
+        let r: PatchRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(r.audio_index, None);
+        assert_eq!(r.burn_in_subtitle, None);
+        assert_eq!(r.max_bitrate, None);
+        assert_eq!(r.position, None);
+
+        let r: PatchRequest = serde_json::from_str(
+            r#"{"audio_index":null,"burn_in_subtitle":null,"max_bitrate":null}"#,
+        )
+        .unwrap();
+        assert_eq!(r.audio_index, Some(None));
+        assert_eq!(r.burn_in_subtitle, Some(None));
+        assert_eq!(r.max_bitrate, Some(None));
+
+        let r: PatchRequest = serde_json::from_str(
+            r#"{"audio_index":2,"burn_in_subtitle":3,"max_bitrate":4,"position":5.5}"#,
+        )
+        .unwrap();
+        assert_eq!(r.audio_index, Some(Some(2)));
+        assert_eq!(r.burn_in_subtitle, Some(Some(3)));
+        assert_eq!(r.max_bitrate, Some(Some(4)));
+        assert_eq!(r.position, Some(5.5));
     }
 }

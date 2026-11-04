@@ -186,3 +186,59 @@ async fn dl_serves_finished_job_with_dl_scope_only() {
     let res = e.get(&format!("/dl/{}?{}", id(6), dl_query(&id(6)))).await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
+
+#[cfg(unix)]
+async fn direct_session(e: &Env, n: u8, len: usize) -> String {
+    std::fs::write(e.root.join("big.mkv"), vec![7u8; len]).unwrap();
+    let sid = id(n);
+    let body = start_body(&sid, &e.root.join("big.mkv"), "hevc", "mkv");
+    let (status, v) = e.api("POST", "/v1/sessions", Some(body)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["mode"], "direct");
+    sid
+}
+
+#[cfg(unix)]
+async fn settle() {
+    for _ in 0..70 {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test(start_paused = true)]
+async fn open_file_response_is_not_reaped() {
+    let e = env();
+    let sid = direct_session(&e, 5, 64 * 1024).await;
+    let q = valid_query(&sid);
+    let res = e.get(&format!("/file/{sid}?{q}")).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let reaper = e.sessions.spawn_reaper();
+
+    let past_timeout = std::time::Duration::from_secs(31 * 60);
+    tokio::time::advance(past_timeout).await;
+    settle().await;
+    assert_eq!(e.sessions.list().len(), 1, "reaped mid-stream");
+
+    drop(res);
+    tokio::time::advance(past_timeout).await;
+    settle().await;
+    assert!(
+        e.sessions.list().is_empty(),
+        "not reaped after the body closed"
+    );
+    reaper.abort();
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn bytes_are_counted_as_sent() {
+    let e = env();
+    let sid = direct_session(&e, 6, 64 * 1024).await;
+    let q = valid_query(&sid);
+    let res = e.get(&format!("/file/{sid}?{q}")).await;
+    assert_eq!(e.sessions.list()[0].bytes_served, 0);
+    let body = body_bytes(res).await;
+    assert_eq!(body.len(), 64 * 1024);
+    assert_eq!(e.sessions.list()[0].bytes_served, 64 * 1024);
+}

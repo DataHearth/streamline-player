@@ -1,5 +1,6 @@
 #![cfg(unix)]
 
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -62,6 +63,16 @@ impl Env {
                     .count()
             })
             .unwrap_or(0)
+    }
+
+    fn ffmpeg_alive(&self, id: &str) -> bool {
+        let dir = self.session_dir(id).display().to_string();
+        std::fs::read_dir("/proc")
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|p| std::fs::read(p.path().join("cmdline")).ok())
+            .any(|cmd| String::from_utf8_lossy(&cmd).contains(&dir))
     }
 
     fn info(&self) -> SessionInfo {
@@ -301,7 +312,10 @@ async fn resume_near_edge() {
         e.playlist_len(&sid, 0) > 180
     })
     .await;
-    until("ffmpeg to stop", 5, || e.info().speed.is_none()).await;
+    until("ffmpeg to stop", 5, || {
+        e.info().speed.is_none() && !e.ffmpeg_alive(&sid)
+    })
+    .await;
     let edge = e.playlist_len(&sid, 0) as u32;
 
     for n in 1..edge - 59 {
@@ -369,8 +383,10 @@ async fn reaper_deletes_orphans() {
     let sid = id(7);
     e.sessions.start(remux_req(&e, &sid)).await.unwrap();
     let reaper = e.sessions.spawn_reaper();
-    until("the reaper", 6, || e.sessions.list().is_empty()).await;
-    assert!(!e.session_dir(&sid).exists());
+    until("the reaper", 6, || {
+        e.sessions.list().is_empty() && !e.session_dir(&sid).exists()
+    })
+    .await;
     reaper.abort();
 }
 
@@ -422,10 +438,9 @@ async fn patch_never_serves_old_segments() {
         .patch(
             &sid,
             PatchRequest {
-                audio_index: Some(2),
-                burn_in_subtitle: None,
-                max_bitrate: None,
-                position: 50.0,
+                audio_index: Some(Some(2)),
+                position: Some(50.0),
+                ..Default::default()
             },
         )
         .await
@@ -547,4 +562,201 @@ async fn failure_nobody_waited_on_restarts_silently() {
     tokio::time::sleep(Duration::from_millis(400)).await;
     file(e.fetch(&sid, 0).await.unwrap());
     assert_eq!(e.argv(&sid, 0).len(), 2);
+}
+
+#[tokio::test]
+async fn dropped_stop_leaves_run_stopped() {
+    let e = env(Setup {
+        fake_env: "FAKE_SEGMENTS=400\nFAKE_SEG_MS=999",
+        ..Setup::default()
+    });
+    let sid = id(20);
+    e.sessions.start(remux_req(&e, &sid)).await.unwrap();
+    e.fetch(&sid, 0).await.unwrap();
+
+    let mut patch = Box::pin(e.sessions.patch(
+        &sid,
+        PatchRequest {
+            position: Some(0.0),
+            ..Default::default()
+        },
+    ));
+    while e.ffmpeg_alive(&sid) {
+        let polled = std::future::poll_fn(|cx| std::task::Poll::Ready(patch.as_mut().poll(cx)));
+        assert!(polled.await.is_pending(), "the patch finished unprompted");
+        tokio::task::yield_now().await;
+    }
+    drop(patch);
+    until("ffmpeg to die", 5, || !e.ffmpeg_alive(&sid)).await;
+
+    let next = tokio::time::timeout(Duration::from_secs(10), e.fetch(&sid, 5))
+        .await
+        .expect("fetch waited on a run nobody owns");
+    assert!(file(next.unwrap()).exists());
+}
+
+#[tokio::test]
+async fn dropped_delete_still_tears_down() {
+    let e = env(Setup {
+        max_transcodes: 1,
+        ..Setup::default()
+    });
+    let sid = id(21);
+    e.sessions.start(transcode_req(&e, &sid)).await.unwrap();
+    e.fetch(&sid, 0).await.unwrap();
+
+    let mut delete = Box::pin(e.sessions.delete(&sid));
+    let _ = std::future::poll_fn(|cx| std::task::Poll::Ready(delete.as_mut().poll(cx))).await;
+    drop(delete);
+    until("the teardown", 5, || {
+        !e.ffmpeg_alive(&sid) && !e.session_dir(&sid).exists()
+    })
+    .await;
+    assert!(e.sessions.list().is_empty());
+    e.sessions
+        .start(transcode_req(&e, &id(22)))
+        .await
+        .expect("the transcode permit leaked");
+}
+
+#[tokio::test]
+async fn delete_wakes_waiting_fetch() {
+    let e = env(Setup {
+        fake_env: "FAKE_SEGMENTS=400\nFAKE_SEG_MS=999",
+        ..Setup::default()
+    });
+    let sid = id(23);
+    e.sessions.start(remux_req(&e, &sid)).await.unwrap();
+    let sessions = e.sessions.clone();
+    let waiting = sid.clone();
+    let waiter = tokio::spawn(async move { sessions.fetch_hls(&waiting, "seg_30.m4s").await });
+    until("the fetch to wait", 5, || e.ffmpeg_alive(&sid)).await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    e.sessions.delete(&sid).await.unwrap();
+    let err = tokio::time::timeout(Duration::from_secs(5), waiter)
+        .await
+        .expect("the waiting fetch outlived the delete")
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(err.status, StatusCode::NOT_FOUND);
+    assert!(!e.ffmpeg_alive(&sid));
+}
+
+#[tokio::test]
+async fn patch_keeps_absent_fields() {
+    let e = env(Setup {
+        fake_env: "FAKE_SEG_MS=10",
+        ..Setup::default()
+    });
+    let sid = id(24);
+    let mut req = remux_req(&e, &sid);
+    req.audio_index = Some(2);
+    e.sessions.start(req).await.unwrap();
+    assert!(e.argv(&sid, 0).is_empty() || e.argv(&sid, 0)[0].contains("-map 0:2"));
+
+    e.sessions
+        .patch(
+            &sid,
+            PatchRequest {
+                position: Some(50.0),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    until("the run at 50", 5, || e.argv(&sid, 50).len() == 1).await;
+    assert!(e.argv(&sid, 50)[0].contains("-map 0:2"));
+
+    e.sessions
+        .patch(
+            &sid,
+            PatchRequest {
+                audio_index: Some(None),
+                position: Some(60.0),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    until("the run at 60", 5, || e.argv(&sid, 60).len() == 1).await;
+    assert!(e.argv(&sid, 60)[0].contains("-map 0:1"));
+}
+
+#[tokio::test]
+async fn patch_without_position_keeps_current() {
+    let e = env(Setup {
+        fake_env: "FAKE_SEG_MS=10",
+        ..Setup::default()
+    });
+    let sid = id(25);
+    e.sessions.start(remux_req(&e, &sid)).await.unwrap();
+    e.fetch(&sid, 70).await.unwrap();
+
+    e.sessions
+        .patch(
+            &sid,
+            PatchRequest {
+                audio_index: Some(Some(2)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    until("the run at 70", 5, || e.argv(&sid, 70).len() == 1).await;
+    assert!(e.argv(&sid, 70)[0].contains("-map 0:2"));
+    assert!(e.argv(&sid, 0).is_empty());
+}
+
+#[tokio::test]
+async fn patch_keeps_and_clears_max_bitrate() {
+    let e = env(Setup::default());
+    let sid = id(26);
+    let mut req = transcode_req(&e, &sid);
+    req.max_bitrate = Some(1_000_000);
+    e.sessions.start(req).await.unwrap();
+    let capped = e.info().bitrate.unwrap();
+
+    e.sessions
+        .patch(
+            &sid,
+            PatchRequest {
+                position: Some(10.0),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(e.info().bitrate, Some(capped));
+
+    e.sessions
+        .patch(
+            &sid,
+            PatchRequest {
+                max_bitrate: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert!(e.info().bitrate.unwrap() > capped);
+}
+
+#[tokio::test]
+async fn boot_sweep_spares_foreign_entries() {
+    let e = env(Setup::default());
+    let live = e.root.join("live");
+    let ours = live.join(id(30));
+    let foreign_dir = live.join("somebody-elses");
+    let foreign_file = live.join("notes.txt");
+    let upper = live.join(id(30).to_uppercase());
+    for d in [&ours, &foreign_dir, &upper] {
+        std::fs::create_dir_all(d).unwrap();
+    }
+    std::fs::write(&foreign_file, b"x").unwrap();
+    e.sessions.sweep_tmp();
+    assert!(!ours.exists());
+    assert!(foreign_dir.exists());
+    assert!(foreign_file.exists());
+    assert!(upper.exists());
 }

@@ -3,14 +3,14 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{Mutex as AsyncMutex, OwnedSemaphorePermit};
-use tokio::time;
+use tokio::time::{self, Instant};
 use tracing::Instrument;
 
 use super::{
@@ -119,8 +119,27 @@ pub(super) struct Session {
     pub live: Mutex<Live>,
     pub last_fetch: AtomicU64,
     pub bytes: AtomicU64,
+    open: AtomicUsize,
     activity: Mutex<Instant>,
     pub started: Instant,
+}
+
+/// Keeps a session out of the orphan reaper while a data-plane response body is
+/// still being sent.
+pub(crate) struct OpenStream(Arc<Session>);
+
+impl OpenStream {
+    pub fn add_bytes(&self, n: u64) {
+        self.0.bytes.fetch_add(n, Ordering::Relaxed);
+        self.0.touch();
+    }
+}
+
+impl Drop for OpenStream {
+    fn drop(&mut self) {
+        self.0.touch();
+        self.0.open.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
 enum Need {
@@ -203,6 +222,7 @@ impl Session {
             live: Mutex::new(live),
             last_fetch: AtomicU64::new(0),
             bytes: AtomicU64::new(0),
+            open: AtomicUsize::new(0),
             activity: Mutex::new(Instant::now()),
             started: Instant::now(),
         }
@@ -213,7 +233,15 @@ impl Session {
     }
 
     pub fn idle(&self) -> Duration {
+        if self.open.load(Ordering::SeqCst) > 0 {
+            return Duration::ZERO;
+        }
         self.activity.lock().unwrap().elapsed()
+    }
+
+    pub fn open_stream(self: &Arc<Self>) -> OpenStream {
+        self.open.fetch_add(1, Ordering::SeqCst);
+        OpenStream(self.clone())
     }
 
     pub fn stamp_fetch(&self) {
@@ -256,17 +284,22 @@ impl Session {
     }
 
     pub async fn stop_run(&self, st: &mut State) {
+        // Cancel-safe: the state change and the kill signals come before any
+        // await, so a dropped caller leaves a Stopped run and dead children
+        // (kill_on_drop covers the ones still being reaped).
+        let mut dying = Vec::new();
         if let Some(run) = st.run.as_mut()
             && run.status == Status::Running
         {
-            if let Some(mut child) = run.child.take() {
-                let _ = child.kill().await;
+            dying.extend(run.child.take());
+            dying.extend(run.upstream.drain(..).map(|up| up.child));
+            for child in &mut dying {
+                let _ = child.start_kill();
             }
-            for up in &mut run.upstream {
-                let _ = up.child.kill().await;
-            }
-            run.upstream.clear();
             run.status = Status::Stopped;
+        }
+        for mut child in dying {
+            let _ = child.wait().await;
         }
         self.refresh(st).await;
         self.clear_speed();
@@ -578,7 +611,7 @@ impl Session {
             segment,
             waited_ms = tracing::field::Empty
         );
-        let started = time::Instant::now();
+        let started = Instant::now();
         let result = self.wait_for(need).instrument(span.clone()).await;
         let waited_ms = started.elapsed().as_secs_f64() * 1000.0;
         span.record("waited_ms", waited_ms);
@@ -590,7 +623,7 @@ impl Session {
 
     async fn wait_for(self: &Arc<Self>, need: Need) -> Result<Served, ApiError> {
         let epoch = self.epoch.load(Ordering::SeqCst);
-        let deadline = time::Instant::now() + SEGMENT_WAIT;
+        let deadline = Instant::now() + SEGMENT_WAIT;
         let mut waited_on = None;
         loop {
             {
@@ -625,7 +658,7 @@ impl Session {
                     Next::Wait => waited_on = st.run.as_ref().map(|r| r.id),
                 }
             }
-            if time::Instant::now() >= deadline {
+            if Instant::now() >= deadline {
                 return Err(ApiError::ffmpeg_failed("timed out waiting for ffmpeg"));
             }
             time::sleep(POLL).await;

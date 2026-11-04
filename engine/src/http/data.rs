@@ -1,16 +1,19 @@
 use std::collections::HashMap;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
 use axum::extract::{Path, Query, Request, State};
 use axum::http::{HeaderValue, Method, header};
 use axum::response::{IntoResponse, Response};
+use http_body::{Frame, SizeHint};
 use tower::ServiceExt;
 use tower_http::services::ServeFile;
 
 use crate::AppState;
 use crate::error::ApiError;
-use crate::session::Served;
+use crate::session::{OpenStream, Served};
 use crate::token::{Scope, verify};
 
 const PLAYLIST_TYPE: &str = "application/vnd.apple.mpegurl";
@@ -41,6 +44,37 @@ fn hls_file_ok(file: &str) -> bool {
         .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 }
 
+struct Counted {
+    inner: Body,
+    stream: OpenStream,
+}
+
+impl http_body::Body for Counted {
+    type Data = <Body as http_body::Body>::Data;
+    type Error = <Body as http_body::Body>::Error;
+
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+        let polled = Pin::new(&mut self.inner).poll_frame(cx);
+        if let Poll::Ready(Some(Ok(frame))) = &polled
+            && let Some(data) = frame.data_ref()
+        {
+            self.stream.add_bytes(data.len() as u64);
+        }
+        polled
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.inner.is_end_stream()
+    }
+
+    fn size_hint(&self) -> SizeHint {
+        self.inner.size_hint()
+    }
+}
+
 async fn serve_file(
     s: &AppState,
     id: &str,
@@ -59,13 +93,9 @@ async fn serve_file(
     }
     if !head
         && res.status().is_success()
-        && let Some(n) = res
-            .headers()
-            .get(header::CONTENT_LENGTH)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok())
+        && let Some(stream) = s.sessions.open_stream(id)
     {
-        s.sessions.add_bytes(id, n);
+        res = res.map(|inner| Body::new(Counted { inner, stream }));
     }
     res
 }

@@ -440,7 +440,10 @@ impl Jobs {
         };
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() && !path.join(DONE_FILE).exists() {
+            if entry.file_name().to_str().is_some_and(valid_id)
+                && path.is_dir()
+                && !path.join(DONE_FILE).exists()
+            {
                 let _ = std::fs::remove_dir_all(path);
             }
         }
@@ -665,6 +668,21 @@ mod tests {
         f.jobs().sweep_boot();
         assert!(!unfinished.exists());
         assert!(finished.exists());
+    }
+
+    #[tokio::test]
+    async fn boot_sweep_spares_foreign_entries() {
+        let f = Fixture::new(|_| {});
+        let foreign = f.cfg.jobs_dir.join("photos");
+        let upper = f.cfg.jobs_dir.join(id(10).to_uppercase());
+        let ours = f.cfg.jobs_dir.join(id(10));
+        for dir in [&foreign, &upper, &ours] {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        f.jobs().sweep_boot();
+        assert!(foreign.exists());
+        assert!(upper.exists());
+        assert!(!ours.exists());
     }
 
     #[tokio::test]
