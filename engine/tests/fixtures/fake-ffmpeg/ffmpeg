@@ -1,0 +1,45 @@
+#!/bin/sh
+conf="$(dirname "$0")/fake.env"
+[ -f "$conf" ] && . "$conf"
+
+start=0
+prev=""
+for a in "$@"; do
+  case "$prev" in
+    -start_number) start=$a ;;
+    -hls_segment_filename) pattern=$a ;;
+  esac
+  prev=$a
+  last=$a
+done
+
+dir=$(dirname "$pattern")
+echo "$*" >> "$dir/argv_$start.txt"
+
+if [ "$FAKE_FAIL_FIRST" = 1 ] && [ ! -e "$dir/failed_once" ]; then
+  : > "$dir/failed_once"
+  exit 1
+fi
+
+: > "$dir/init_$start.mp4"
+nap=$(printf '0.%03d' "${FAKE_SEG_MS:-50}")
+limit=${FAKE_SEGMENTS:-100}
+k=$start
+count=0
+body=""
+while [ "$count" -lt "$limit" ]; do
+  sleep "$nap"
+  echo data > "$dir/seg_$k.m4s"
+  body="$body#EXTINF:1.0,
+seg_$k.m4s
+"
+  printf '#EXTM3U\n%s' "$body" > "$last.tmp"
+  mv "$last.tmp" "$last"
+  echo "speed=1.5x"
+  if [ "$FAKE_FAIL_AFTER" = 1 ]; then
+    exit 1
+  fi
+  k=$((k + 1))
+  count=$((count + 1))
+done
+exit 0
