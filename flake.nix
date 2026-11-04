@@ -20,6 +20,7 @@
               "rust-src"
               "rust-analyzer"
             ];
+            targets = [ "x86_64-pc-windows-gnu" ];
           };
         in
         {

@@ -1,7 +1,6 @@
 pub mod subtitles;
 
 use std::collections::{HashMap, VecDeque};
-use std::ffi::OsString;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime};
@@ -92,7 +91,7 @@ pub fn lower_priority(cmd: &mut Command) {
     {
         let std = cmd.as_std();
         let program = std.get_program().to_owned();
-        let args: Vec<OsString> = std.get_args().map(ToOwned::to_owned).collect();
+        let args: Vec<std::ffi::OsString> = std.get_args().map(ToOwned::to_owned).collect();
         let mut nice = Command::new("nice");
         nice.args(["-n", "10"]).arg(program).args(args);
         if let Some(dir) = std.get_current_dir() {
