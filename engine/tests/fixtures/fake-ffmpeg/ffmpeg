@@ -37,8 +37,9 @@ while [ "$count" -lt "$limit" ]; do
   body="$body#EXTINF:1.0,
 seg_$k.m4s
 "
-  printf '#EXTM3U\n%s' "$body" > "$last.tmp"
-  mv "$last.tmp" "$last"
+  # Builtin write, not tmp + mv: a killed sh would leave mv running, adding
+  # an entry after the engine's final read of the playlist.
+  printf '#EXTM3U\n%s' "$body" > "$last"
   echo "speed=1.5x"
   if [ "$FAKE_FAIL_AFTER" = 1 ]; then
     exit 1

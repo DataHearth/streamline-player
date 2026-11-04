@@ -768,7 +768,7 @@ mod tests {
         let jobs = f.jobs();
         jobs.submit(analyze_req(1, "/m/blocker", Priority::Background))
             .unwrap();
-        until(|| jobs.status(&id(1)).unwrap().state == JobState::Running).await;
+        until(|| f.started() == ["/m/blocker"]).await;
         jobs.submit(analyze_req(2, "/m/q", Priority::Background))
             .unwrap();
         jobs.shutdown();
