@@ -15,13 +15,13 @@ use tracing::Instrument;
 
 use super::{
     AudioOut, KEEP_BEHIND_SECS, RESUME_MARGIN_SECS, RUN_AHEAD_SECS, SEGMENT_WAIT, Served, VideoOut,
-    hw_name, unix_now,
+    bandwidth, hw_name, live_for, unix_now,
 };
 use crate::analysis::Analysis;
 use crate::args::{DOVI_TOOL_ARGS, RunSpec, dv_source_args, has_dv_pipeline, live_args};
 use crate::caps::Capabilities;
 use crate::config::Config;
-use crate::decision::{Mode, Plan, VideoAction};
+use crate::decision::{Mode, Plan, SessionParams, VideoAction, decide};
 use crate::error::ApiError;
 use crate::hw::{Backend, Hw};
 use crate::playlist;
@@ -82,7 +82,7 @@ pub(super) struct State {
     pub analysis: Arc<Analysis>,
     pub plan: Plan,
     pub hw: Hw,
-    pub fell_back: bool,
+    pub params: SessionParams,
     pub bounds: Vec<f64>,
     pub master: String,
     pub media: String,
@@ -289,6 +289,20 @@ impl Session {
         }
     }
 
+    async fn replan(&self, st: &mut State, plan: Plan, hw: Hw) {
+        st.master = playlist::master_playlist(&plan, &st.analysis, bandwidth(&plan, &st.analysis));
+        let _ = tokio::fs::write(self.dir.join("master.m3u8"), &st.master).await;
+        let fresh = live_for(&plan, &st.analysis, &hw, None);
+        {
+            let mut live = self.live.lock().unwrap();
+            live.video = fresh.video;
+            live.audio = fresh.audio;
+            live.bitrate = fresh.bitrate;
+        }
+        st.plan = plan;
+        st.hw = hw;
+    }
+
     fn publish(&self, st: &State) {
         let mut live = self.live.lock().unwrap();
         live.hw = hw_name(&st.plan, &st.hw);
@@ -466,9 +480,21 @@ impl Session {
         let no_output = run.edge == run.start;
         let message = upstream_failure
             .unwrap_or_else(|| exit_message("ffmpeg", &run.stderr_tail.lock().unwrap(), &status));
-        if no_output && transcoding && st.hw.backend != Backend::Cpu && !st.fell_back {
-            st.fell_back = true;
-            st.hw = Hw::new(Backend::Cpu, String::new(), st.hw.encoders, false);
+        if no_output && transcoding && st.hw.backend != Backend::Cpu {
+            if st.hw.hw_decode && st.plan.burn_in_subtitle.is_none() {
+                st.hw.hw_decode = false;
+            } else {
+                let cpu = Hw::new(Backend::Cpu, String::new(), st.hw.cpu_encoders, false);
+                match decide(&st.caps, &st.analysis, &st.params, &cpu.encoders) {
+                    Ok(plan) => self.replan(st, plan, cpu).await,
+                    Err(e) => {
+                        if let Some(run) = st.run.as_mut() {
+                            run.status = Status::Failed(e.message);
+                        }
+                        return;
+                    }
+                }
+            }
             if let Err(e) = self.spawn_run(st, start).await
                 && let Some(run) = st.run.as_mut()
             {
@@ -479,7 +505,7 @@ impl Session {
         run.status = Status::Failed(message);
     }
 
-    fn decide_next(&self, st: &mut State, need: &Need) -> Next {
+    fn decide_next(&self, st: &mut State, need: &Need, waited_on: Option<u64>) -> Next {
         let restart_at = match need {
             Need::Init => st.run.as_ref().map_or(0, |r| r.start),
             Need::Segment(n) => *n,
@@ -504,6 +530,7 @@ impl Session {
         };
         if let Status::Failed(msg) = &run.status
             && !run.reported
+            && waited_on == Some(run.id)
         {
             run.reported = true;
             return Next::Fail(ApiError::ffmpeg_failed(msg.clone()));
@@ -564,6 +591,7 @@ impl Session {
     async fn wait_for(self: &Arc<Self>, need: Need) -> Result<Served, ApiError> {
         let epoch = self.epoch.load(Ordering::SeqCst);
         let deadline = time::Instant::now() + SEGMENT_WAIT;
+        let mut waited_on = None;
         loop {
             {
                 let mut st = self.state.lock().await;
@@ -579,7 +607,7 @@ impl Session {
                     return Err(ApiError::not_found("segment is past the end"));
                 }
                 self.tick(&mut st).await;
-                match self.decide_next(&mut st, &need) {
+                match self.decide_next(&mut st, &need, waited_on) {
                     Next::Ready(path) => {
                         if let Need::Segment(n) = need {
                             self.after_fetch(&mut st, n).await;
@@ -591,9 +619,10 @@ impl Session {
                         if matches!(need, Need::Segment(_)) {
                             st.fetched_t = st.bounds[at as usize];
                         }
-                        self.spawn_run(&mut st, at).await?
+                        self.spawn_run(&mut st, at).await?;
+                        waited_on = st.run.as_ref().map(|r| r.id);
                     }
-                    Next::Wait => {}
+                    Next::Wait => waited_on = st.run.as_ref().map(|r| r.id),
                 }
             }
             if time::Instant::now() >= deadline {

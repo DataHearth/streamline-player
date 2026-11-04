@@ -124,6 +124,12 @@ pub struct EncoderSet {
 }
 
 impl EncoderSet {
+    pub const SOFTWARE: Self = Self {
+        h264: true,
+        hevc: true,
+        av1: true,
+    };
+
     fn has(&self, codec: VideoCodec) -> bool {
         match codec {
             VideoCodec::H264 => self.h264,
@@ -238,6 +244,18 @@ fn is_dv_stream(v: &VideoStream) -> Option<u8> {
     known.then_some(d.profile)
 }
 
+fn profile_key(s: &str) -> String {
+    s.chars()
+        .filter(|c| !matches!(c, ' ' | '_'))
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn has_profile(profiles: &[String], wanted: &str) -> bool {
+    let wanted = profile_key(wanted);
+    profiles.iter().any(|p| profile_key(p) == wanted)
+}
+
 fn video_fit(
     caps: &Capabilities,
     a: &Analysis,
@@ -253,8 +271,7 @@ fn video_fit(
             format!("client does not decode {}", v.codec),
         )),
         Some(cap) => {
-            let profile = v.profile.to_lowercase().replace(' ', "_");
-            if !cap.profiles.is_empty() && !cap.profiles.contains(&profile) {
+            if !cap.profiles.is_empty() && !has_profile(&cap.profiles, &v.profile) {
                 reasons.push(Reason::new(
                     "profile_unsupported",
                     format!("profile {} is not supported", v.profile),
@@ -408,8 +425,8 @@ fn transcode_video(
 
     let source_hdr = v.hdr != Hdr::Sdr || v.dv.is_some();
     let depth_ok = cap.profiles.is_empty()
-        || cap.profiles.iter().any(|x| x == "main10" || x == "main_10")
-        || (codec == VideoCodec::Av1 && cap.profiles.iter().any(|x| x == "main"));
+        || has_profile(&cap.profiles, "main10")
+        || (codec == VideoCodec::Av1 && has_profile(&cap.profiles, "main"));
     let hdr_out = if !source_hdr {
         HdrOut::Keep(Hdr::Sdr)
     } else if hdr_listed(caps, "hdr10") && codec != VideoCodec::H264 && depth_ok {
@@ -791,6 +808,50 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    const SPEC_CAPS: &str = r#"{
+      "video": [
+        { "codec": "hevc", "profiles": ["main", "main10"], "max_level": 153,
+          "max_width": 3840, "max_height": 2160, "max_fps": 60 }
+      ],
+      "hdr": { "formats": ["hdr10", "hdr10plus", "hlg", "dolby_vision"], "dv_profiles": [5, 8] },
+      "audio": { "codecs": ["aac", "ac3", "eac3", "flac", "opus", "truehd"], "max_channels": 6, "passthrough": ["eac3"] },
+      "containers": ["mkv", "mp4"],
+      "subtitles": ["webvtt", "srt", "ass", "pgs"],
+      "hls_keyframe_exact": false
+    }"#;
+
+    #[test]
+    fn spec_example_caps_accept_hevc_main10() {
+        let a = fixture("dv_p81");
+        assert_eq!(a.video[0].profile, "Main 10");
+        let c: Capabilities = serde_json::from_str(SPEC_CAPS).unwrap();
+        let p = plan(&c, &a, &SessionParams::default());
+        assert!(!codes(&p.video_reasons).contains(&"profile_unsupported"));
+    }
+
+    #[test]
+    fn spec_example_caps_accept_av1_main() {
+        let a = fixture("av1_dv_p10");
+        assert_eq!(a.video[0].profile, "Main");
+        let mut c: Capabilities = serde_json::from_str(SPEC_CAPS).unwrap();
+        c.video[0].codec = "av1".into();
+        let p = plan(&c, &a, &SessionParams::default());
+        assert!(!codes(&p.video_reasons).contains(&"profile_unsupported"));
+    }
+
+    #[test]
+    fn profile_spelling_does_not_matter() {
+        let a = fixture("dv_p81");
+        for spelling in ["main10", "main_10", "Main 10", "MAIN10"] {
+            let c = caps(vec![vcap("hevc", &[spelling])], &[], &["ac3"], &["mkv"]);
+            let p = plan(&c, &a, &SessionParams::default());
+            assert!(
+                !codes(&p.video_reasons).contains(&"profile_unsupported"),
+                "{spelling}"
+            );
+        }
     }
 
     #[test]

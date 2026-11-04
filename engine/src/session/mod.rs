@@ -287,6 +287,7 @@ fn build_state(
     analysis: Arc<Analysis>,
     plan: Plan,
     hw: &Hw,
+    params: SessionParams,
     permit: Option<OwnedSemaphorePermit>,
     position: f64,
 ) -> State {
@@ -316,7 +317,7 @@ fn build_state(
         analysis,
         plan,
         hw: hw.clone(),
-        fell_back: false,
+        params,
         bounds,
         master,
         media,
@@ -422,7 +423,15 @@ impl Sessions {
         let analysis = Arc::new(analysis);
         let live = live_for(&plan, &analysis, hw, None);
         let hls = plan.mode != Mode::Direct;
-        let state = build_state(r.capabilities, analysis, plan, hw, permit, r.position);
+        let state = build_state(
+            r.capabilities,
+            analysis,
+            plan,
+            hw,
+            params,
+            permit,
+            r.position,
+        );
         let start_index = playlist::segment_for(&state.bounds, r.position);
 
         let session = Arc::new(Session::new(
@@ -478,7 +487,15 @@ impl Sessions {
         let hw = &self.inner.hw;
         let reply = response(&plan, &analysis, hw);
         let live = live_for(&plan, &analysis, hw, None);
-        let fresh = build_state(st.caps.clone(), analysis, plan, hw, permit, r.position);
+        let fresh = build_state(
+            st.caps.clone(),
+            analysis,
+            plan,
+            hw,
+            params,
+            permit,
+            r.position,
+        );
         let hls = fresh.plan.mode != Mode::Direct;
         let start_index = playlist::segment_for(&fresh.bounds, r.position);
         let next_run_id = st.next_run_id;

@@ -95,7 +95,7 @@ fn pipeline(plan: &Plan, a: &Analysis, hw: &Hw) -> Pipeline {
         && (tonemap || keeps_hdr(hdr_out))
         && (!software_stage || has_upload(b));
 
-    let mut decode = if burn.is_some() || b == Backend::Cpu {
+    let mut decode = if burn.is_some() || b == Backend::Cpu || !hw.hw_decode {
         Vec::new()
     } else {
         b.decode_args(&hw.device)

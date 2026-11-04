@@ -27,6 +27,8 @@ pub struct Hw {
     pub encoders: EncoderSet,
     pub libplacebo: bool,
     pub untested: bool,
+    pub hw_decode: bool,
+    pub cpu_encoders: EncoderSet,
 }
 
 impl Hw {
@@ -37,6 +39,12 @@ impl Hw {
             encoders,
             libplacebo,
             untested: !matches!(backend, Backend::Vaapi | Backend::Cpu),
+            hw_decode: true,
+            cpu_encoders: if backend == Backend::Cpu {
+                encoders
+            } else {
+                EncoderSet::SOFTWARE
+            },
         }
     }
 }
@@ -256,7 +264,11 @@ pub async fn probe(cfg: &Config) -> Hw {
     for backend in order {
         let encoders = probe_backend(&ffmpeg, backend, &cfg.hw_device).await;
         if encoders.h264 || encoders.hevc || encoders.av1 {
-            return Hw::new(backend, cfg.hw_device.clone(), encoders, libplacebo);
+            let mut hw = Hw::new(backend, cfg.hw_device.clone(), encoders, libplacebo);
+            if backend != Backend::Cpu {
+                hw.cpu_encoders = probe_backend(&ffmpeg, Backend::Cpu, "").await;
+            }
+            return hw;
         }
     }
     Hw::new(

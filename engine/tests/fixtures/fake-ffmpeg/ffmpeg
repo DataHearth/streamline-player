@@ -16,6 +16,10 @@ done
 dir=$(dirname "$pattern")
 echo "$*" >> "$dir/argv_$start.txt"
 
+if [ -n "$FAKE_FAIL_RUNS" ] && [ "$(wc -l < "$dir/argv_$start.txt")" -le "$FAKE_FAIL_RUNS" ]; then
+  exit 1
+fi
+
 if [ "$FAKE_FAIL_FIRST" = 1 ] && [ ! -e "$dir/failed_once" ]; then
   : > "$dir/failed_once"
   exit 1

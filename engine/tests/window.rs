@@ -215,6 +215,10 @@ async fn until(what: &str, secs: u64, mut f: impl FnMut() -> bool) {
     }
 }
 
+fn file_text(e: &Env, id: &str, name: &str) -> String {
+    std::fs::read_to_string(e.session_dir(id).join(name)).unwrap()
+}
+
 fn file(s: Served) -> PathBuf {
     match s {
         Served::File(p) => p,
@@ -465,19 +469,82 @@ async fn past_end_is_404() {
     assert!(e.argv(&sid, 9999).is_empty());
 }
 
+fn hw_codecs(codecs: &[&str]) -> Capabilities {
+    let mut c = caps(codecs[0]);
+    c.video = codecs.iter().map(|k| caps(k).video.remove(0)).collect();
+    c
+}
+
+fn av1_gpu() -> Hw {
+    let mut hw = Hw::new(
+        Backend::Vaapi,
+        String::new(),
+        EncoderSet {
+            h264: true,
+            hevc: false,
+            av1: true,
+        },
+        false,
+    );
+    hw.cpu_encoders = EncoderSet {
+        h264: true,
+        hevc: false,
+        av1: false,
+    };
+    hw
+}
+
 #[tokio::test]
-async fn gpu_died_falls_back_to_cpu() {
+async fn gpu_decode_failure_keeps_gpu_encoder() {
     let e = env(Setup {
-        fake_env: "FAKE_FAIL_FIRST=1",
-        hw: Hw::new(Backend::Vaapi, String::new(), ALL, false),
+        fake_env: "FAKE_FAIL_RUNS=1",
+        hw: av1_gpu(),
         ..Setup::default()
     });
     let sid = id(15);
-    let r = e.sessions.start(transcode_req(&e, &sid)).await.unwrap();
+    let mut req = transcode_req(&e, &sid);
+    req.capabilities = hw_codecs(&["av1", "h264"]);
+    let r = e.sessions.start(req).await.unwrap();
     assert_eq!(r.hw, "vaapi");
     until("the retry", 5, || e.argv(&sid, 0).len() == 2).await;
     let argv = e.argv(&sid, 0);
     assert!(argv[0].contains("-hwaccel"));
     assert!(!argv[1].contains("-hwaccel"));
+    assert!(argv[1].contains("av1_vaapi"));
+    assert_eq!(e.info().hw, "vaapi");
+}
+
+#[tokio::test]
+async fn gpu_encode_failure_replans_for_cpu_encoders() {
+    let e = env(Setup {
+        fake_env: "FAKE_FAIL_RUNS=2",
+        hw: av1_gpu(),
+        ..Setup::default()
+    });
+    let sid = id(16);
+    let mut req = transcode_req(&e, &sid);
+    req.capabilities = hw_codecs(&["av1", "h264"]);
+    e.sessions.start(req).await.unwrap();
+    until("the cpu run", 5, || e.argv(&sid, 0).len() == 3).await;
+    let argv = e.argv(&sid, 0);
+    assert!(argv[1].contains("av1_vaapi"));
+    assert!(argv[2].contains("libx264"));
+    assert!(!argv[2].contains("libsvtav1"));
     assert_eq!(e.info().hw, "cpu");
+    let master = file_text(&e, &sid, "master.m3u8");
+    assert!(master.contains("avc1"), "{master}");
+}
+
+#[tokio::test]
+async fn failure_nobody_waited_on_restarts_silently() {
+    let e = env(Setup {
+        fake_env: "FAKE_FAIL_RUNS=1",
+        ..Setup::default()
+    });
+    let sid = id(17);
+    e.sessions.start(remux_req(&e, &sid)).await.unwrap();
+    until("the first run", 5, || e.argv(&sid, 0).len() == 1).await;
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    file(e.fetch(&sid, 0).await.unwrap());
+    assert_eq!(e.argv(&sid, 0).len(), 2);
 }
