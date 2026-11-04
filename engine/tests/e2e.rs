@@ -400,6 +400,126 @@ async fn remux_after_seek_matches_playlist() {
     assert_segment_matches(&e, &sid, &init, &bounds, last - 2).await;
 }
 
+fn make_late_video_mkv(path: &Path) {
+    ffmpeg(&[
+        "-itsoffset",
+        "0.5",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=640x360:rate=30:duration=20",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=48000:duration=20",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p",
+        "-g",
+        "60",
+        "-sc_threshold",
+        "0",
+        "-force_key_frames",
+        KEYFRAMES,
+        "-c:a",
+        "aac",
+        "-ac",
+        "2",
+        path.to_str().unwrap(),
+    ]);
+}
+
+async fn first_video_pts(e: &Env, sid: &str, init: &[u8], i: usize) -> f64 {
+    let mut media = init.to_vec();
+    media.extend(e.hls(sid, &format!("seg_{i}.m4s")).await);
+    let file = e.root.join(format!("{sid}-{i}.mp4"));
+    std::fs::write(&file, media).unwrap();
+    let probe = ffprobe(&file, "packet=pts_time");
+    probe["packets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["pts_time"].as_str().unwrap().parse::<f64>().unwrap())
+        .fold(f64::INFINITY, f64::min)
+}
+
+// A restart may drop one leading B-frame; landing a GOP early is far more off.
+const RESTART_SLACK_SECS: f64 = 0.05;
+
+async fn assert_restart_matches_in_order(
+    e: &Env,
+    src: &Path,
+    caps: Value,
+    extra: Value,
+    k: usize,
+    n: u8,
+) {
+    let a = id(n);
+    e.start(&a, src, caps.clone(), extra.clone()).await;
+    let bounds = e.bounds(&a).await;
+    let init = e.hls(&a, "init.mp4").await;
+    for i in 0..k {
+        e.hls(&a, &format!("seg_{i}.m4s")).await;
+    }
+    let in_order = first_video_pts(e, &a, &init, k).await;
+    let (status, _) = e.api("DELETE", &format!("/v1/sessions/{a}"), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let b = id(n + 1);
+    let mut extra = extra;
+    extra["position"] = json!(bounds[k]);
+    e.start(&b, src, caps, extra).await;
+    let init = e.hls(&b, "init.mp4").await;
+    let restarted = first_video_pts(e, &b, &init, k).await;
+    assert!(
+        (in_order - restarted).abs() < RESTART_SLACK_SECS,
+        "seg_{k}: restart's earliest video pts is {restarted}, in order at {in_order}"
+    );
+}
+
+#[tokio::test]
+async fn remux_restart_with_late_video_matches_in_order() {
+    if !have_ffmpeg() {
+        return;
+    }
+    let e = env().await;
+    let src = e.root.join("late.mkv");
+    make_late_video_mkv(&src);
+    assert_restart_matches_in_order(&e, &src, caps_json("h264", "mp4"), json!({}), 3, 20).await;
+}
+
+#[tokio::test]
+async fn transcode_restart_with_late_video_matches_in_order() {
+    if !have_ffmpeg() {
+        return;
+    }
+    let e = env().await;
+    let src = e.root.join("late.mkv");
+    make_late_video_mkv(&src);
+    let extra = json!({"max_bitrate": 2_000_000});
+    assert_restart_matches_in_order(&e, &src, caps_json("h264", "mp4"), extra, 2, 40).await;
+}
+
+#[tokio::test]
+async fn remux_restart_on_corpus_flac_matches_in_order() {
+    if !have_ffmpeg() {
+        return;
+    }
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("corpus/10-flac-51.mkv");
+    if !src.exists() {
+        println!("skipped: {} not present", src.display());
+        return;
+    }
+    let e = env().await;
+    let mut caps = caps_json("hevc", "mp4");
+    caps["video"][0]["profiles"] = json!(["main"]);
+    caps["audio"]["codecs"] = json!(["flac"]);
+    assert_restart_matches_in_order(&e, &src, caps, json!({}), 1, 30).await;
+}
+
 #[tokio::test]
 async fn transcode_cpu_h264() {
     if !have_ffmpeg() {

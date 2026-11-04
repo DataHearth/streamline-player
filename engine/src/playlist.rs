@@ -33,6 +33,48 @@ pub fn boundaries(plan: &Plan, a: &Analysis) -> Vec<f64> {
     }
 }
 
+const SEEK_MARGIN_SECS: f64 = 1.0;
+
+/// The `-ss` for a run starting at segment `i`. Playlist bounds are relative to
+/// the video's first frame, but ffmpeg seeks on the container timeline, which
+/// starts at its earliest stream. A copy seek also lands one GOP early when it
+/// targets the keyframe's own pts: the demuxer indexes B-frame streams by a
+/// later time (seen on HEVC mkv, 0.125 s late). Aiming into the GOP lands on
+/// its keyframe, since a copy run starts at the nearest keyframe before `-ss`.
+pub fn seek_time(plan: &Plan, a: &Analysis, bounds: &[f64], i: u32) -> f64 {
+    let start = bounds[i as usize];
+    let container_start = a
+        .video
+        .iter()
+        .map(|v| v.start_time)
+        .chain(a.audio.iter().map(|s| s.start_time))
+        .fold(f64::INFINITY, f64::min);
+    let container_start = if container_start.is_finite() {
+        container_start
+    } else {
+        0.0
+    };
+    let video_start = match plan.video {
+        VideoAction::Copy { .. } => a.keyframes.first().copied(),
+        VideoAction::Transcode { .. } => a
+            .video
+            .iter()
+            .find(|v| v.index == plan.video_index)
+            .map(|v| v.start_time),
+    };
+    let Some(video_start) = video_start else {
+        return start;
+    };
+    let margin = match plan.video {
+        VideoAction::Copy { .. } => {
+            let end = bounds.get(i as usize + 1).copied().unwrap_or(a.duration);
+            ((end - start) / 2.0).clamp(0.0, SEEK_MARGIN_SECS)
+        }
+        VideoAction::Transcode { .. } => 0.0,
+    };
+    round_micros(start + margin + video_start - container_start)
+}
+
 pub fn segment_for(bounds: &[f64], t: f64) -> u32 {
     bounds.partition_point(|b| *b <= t).saturating_sub(1) as u32
 }
@@ -310,6 +352,25 @@ mod tests {
         };
         let b = boundaries(&copy(CopyTag::Hvc1, DvHandling::Keep), &a);
         assert_close(&b, &[0.0, 2.002, 2.961, 8.958]);
+    }
+
+    #[test]
+    fn copy_seek_is_absolute_and_inside_the_gop() {
+        let mut a = analysis(stream("hevc", "Main", 120, 1920, 1080, 8), "flac");
+        a.video[0].start_time = 0.102;
+        a.keyframes = vec![0.102, 10.529, 20.956];
+        let plan = copy(CopyTag::Hvc1, DvHandling::Keep);
+        let b = boundaries(&plan, &a);
+        assert_close(&[seek_time(&plan, &a, &b, 1)], &[11.529]);
+    }
+
+    #[test]
+    fn transcode_seek_follows_video_start() {
+        let mut a = analysis(stream("h264", "High", 40, 1920, 1080, 8), "aac");
+        a.video[0].start_time = 0.5;
+        let plan = transcode(VideoCodec::H264, 1080, HdrOut::Keep(Hdr::Sdr));
+        let b = boundaries(&plan, &a);
+        assert_close(&[seek_time(&plan, &a, &b, 2)], &[12.5]);
     }
 
     #[test]

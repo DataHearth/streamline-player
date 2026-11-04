@@ -24,6 +24,7 @@ use crate::config::Config;
 use crate::decision::{Mode, Plan, VideoAction};
 use crate::error::ApiError;
 use crate::hw::{Backend, Hw};
+use crate::playlist;
 
 const POLL: Duration = Duration::from_millis(25);
 const MONITOR_INTERVAL: Duration = Duration::from_millis(50);
@@ -291,7 +292,7 @@ impl Session {
             analysis: &st.analysis,
             hw: &st.hw,
             start_index: start,
-            start_time: st.bounds[start as usize],
+            start_time: playlist::seek_time(&st.plan, &st.analysis, &st.bounds, start),
             out_dir: &self.dir,
         };
         let mut child = Command::new(self.cfg.ffmpeg())
