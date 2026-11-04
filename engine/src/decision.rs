@@ -405,12 +405,13 @@ fn transcode_video(
     let depth_ok = cap.profiles.is_empty()
         || cap.profiles.iter().any(|x| x == "main10" || x == "main_10")
         || (codec == VideoCodec::Av1 && cap.profiles.iter().any(|x| x == "main"));
-    let hdr_out =
-        if source_hdr && hdr_listed(caps, "hdr10") && codec != VideoCodec::H264 && depth_ok {
-            HdrOut::Keep(Hdr::Hdr10)
-        } else {
-            HdrOut::Tonemap
-        };
+    let hdr_out = if !source_hdr {
+        HdrOut::Keep(Hdr::Sdr)
+    } else if hdr_listed(caps, "hdr10") && codec != VideoCodec::H264 && depth_ok {
+        HdrOut::Keep(Hdr::Hdr10)
+    } else {
+        HdrOut::Tonemap
+    };
 
     let ladder = p.max_bitrate.map_or(u32::MAX, |b| ladder_height(b, codec));
     let height = even_down(v.height.min(ladder).min(cap.max_height));
@@ -695,6 +696,18 @@ mod tests {
         let c = hevc_caps(&["mkv"], &[]);
         match plan(&c, &a, &capped()).video {
             VideoAction::Transcode { hdr_out, .. } => assert_eq!(hdr_out, HdrOut::Tonemap),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn sdr_source_is_not_tonemapped() {
+        let mut a = fixture("hevc10_hdr10_truehd_pgs_ass_fonts");
+        a.video[0].hdr = Hdr::Sdr;
+        a.video[0].dv = None;
+        let c = hevc_caps(&["mkv"], &[]);
+        match plan(&c, &a, &capped()).video {
+            VideoAction::Transcode { hdr_out, .. } => assert_eq!(hdr_out, HdrOut::Keep(Hdr::Sdr)),
             other => panic!("{other:?}"),
         }
     }
