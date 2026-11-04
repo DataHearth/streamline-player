@@ -450,6 +450,18 @@ impl Jobs {
         self.0.sweep_ttl();
     }
 
+    /// Stops running jobs, killing their ffmpeg children, and drops the queue.
+    pub fn shutdown(&self) {
+        let mut q = self.0.lock();
+        q.interactive.clear();
+        q.background.clear();
+        for entry in q.jobs.values_mut() {
+            if let Some(h) = entry.abort.take() {
+                h.abort();
+            }
+        }
+    }
+
     pub fn spawn_ttl_sweeper(&self) -> JoinHandle<()> {
         let shared = self.0.clone();
         tokio::spawn(async move {
@@ -703,6 +715,22 @@ mod tests {
         jobs.cancel(&id(2)).unwrap();
         f.release();
         finished(&jobs, 1).await;
+        assert_eq!(f.started(), ["/m/blocker"]);
+    }
+
+    #[tokio::test]
+    async fn shutdown_aborts_running_and_drops_queue() {
+        let f = Fixture::new(|c| c.max_jobs = 1);
+        let jobs = f.jobs();
+        jobs.submit(analyze_req(1, "/m/blocker", Priority::Background))
+            .unwrap();
+        until(|| jobs.status(&id(1)).unwrap().state == JobState::Running).await;
+        jobs.submit(analyze_req(2, "/m/q", Priority::Background))
+            .unwrap();
+        jobs.shutdown();
+        f.release();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert_eq!(jobs.status(&id(1)).unwrap().state, JobState::Running);
         assert_eq!(f.started(), ["/m/blocker"]);
     }
 

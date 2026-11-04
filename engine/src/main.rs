@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
@@ -14,11 +15,13 @@ use opentelemetry_otlp::{MetricExporter, SpanExporter};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::metrics::SdkMeterProvider;
 use opentelemetry_sdk::trace::SdkTracerProvider;
+use tokio::sync::Notify;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Layer};
 
 const SERVICE_NAME: &str = "streamline-engine";
+const DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Parser)]
 #[command(version, about = "Streaming engine for Streamline")]
@@ -115,20 +118,89 @@ async fn serve(cfg: Config, secret: Vec<u8>) -> anyhow::Result<()> {
         hw,
         ffmpeg_version,
         sessions: sessions.clone(),
-        jobs,
+        jobs: jobs.clone(),
     };
     let listener = tokio::net::TcpListener::bind(cfg.listen)
         .await
         .with_context(|| format!("binding {}", cfg.listen))?;
     tracing::info!(listen = %cfg.listen, "serving");
-    axum::serve(listener, app(state))
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-            tracing::info!("shutting down");
+    let mut signals = Signals::new()?;
+    let drain = Arc::new(Notify::new());
+    let server = axum::serve(listener, app(state))
+        .with_graceful_shutdown({
+            let drain = drain.clone();
+            async move { drain.notified().await }
         })
-        .await?;
+        .into_future();
+    tokio::pin!(server);
+
+    tokio::select! {
+        result = &mut server => return Ok(result?),
+        () = signals.recv() => {}
+    }
+    tracing::info!("shutting down");
+    drain.notify_one();
     sessions.shutdown().await;
+    jobs.shutdown();
+    tokio::select! {
+        result = &mut server => result?,
+        () = tokio::time::sleep(DRAIN_TIMEOUT) => {
+            tracing::warn!("connections still open after {DRAIN_TIMEOUT:?}; exiting");
+        }
+        () = signals.recv() => tracing::warn!("second signal; exiting now"),
+    }
     Ok(())
+}
+
+#[cfg(unix)]
+struct Signals {
+    int: tokio::signal::unix::Signal,
+    term: tokio::signal::unix::Signal,
+}
+
+#[cfg(unix)]
+impl Signals {
+    fn new() -> std::io::Result<Self> {
+        use tokio::signal::unix::{SignalKind, signal};
+        Ok(Self {
+            int: signal(SignalKind::interrupt())?,
+            term: signal(SignalKind::terminate())?,
+        })
+    }
+
+    async fn recv(&mut self) {
+        tokio::select! {
+            _ = self.int.recv() => {}
+            _ = self.term.recv() => {}
+        }
+    }
+}
+
+#[cfg(windows)]
+struct Signals {
+    c: tokio::signal::windows::CtrlC,
+    close: tokio::signal::windows::CtrlClose,
+    shutdown: tokio::signal::windows::CtrlShutdown,
+}
+
+#[cfg(windows)]
+impl Signals {
+    fn new() -> std::io::Result<Self> {
+        use tokio::signal::windows;
+        Ok(Self {
+            c: windows::ctrl_c()?,
+            close: windows::ctrl_close()?,
+            shutdown: windows::ctrl_shutdown()?,
+        })
+    }
+
+    async fn recv(&mut self) {
+        tokio::select! {
+            _ = self.c.recv() => {}
+            _ = self.close.recv() => {}
+            _ = self.shutdown.recv() => {}
+        }
+    }
 }
 
 fn run(cli: Cli) -> anyhow::Result<()> {
