@@ -11,6 +11,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{Mutex as AsyncMutex, OwnedSemaphorePermit};
 use tokio::time;
+use tracing::Instrument;
 
 use super::{
     AudioOut, KEEP_BEHIND_SECS, RESUME_MARGIN_SECS, RUN_AHEAD_SECS, SEGMENT_WAIT, Served, VideoOut,
@@ -110,6 +111,7 @@ pub(super) struct Session {
     pub last_fetch: AtomicU64,
     pub bytes: AtomicU64,
     activity: Mutex<Instant>,
+    pub started: Instant,
 }
 
 enum Need {
@@ -175,6 +177,7 @@ impl Session {
             last_fetch: AtomicU64::new(0),
             bytes: AtomicU64::new(0),
             activity: Mutex::new(Instant::now()),
+            started: Instant::now(),
         }
     }
 
@@ -267,7 +270,14 @@ impl Session {
         st: &'a mut State,
         start: u32,
     ) -> Pin<Box<dyn Future<Output = Result<(), ApiError>> + Send + 'a>> {
-        Box::pin(self.spawn_run_inner(st, start))
+        Box::pin(
+            self.spawn_run_inner(st, start)
+                .instrument(tracing::info_span!(
+                    "engine.restart",
+                    session = %self.id,
+                    start
+                )),
+        )
     }
 
     async fn spawn_run_inner(self: &Arc<Self>, st: &mut State, start: u32) -> Result<(), ApiError> {
@@ -453,6 +463,26 @@ impl Session {
             },
         };
 
+        let segment = match need {
+            Need::Segment(n) => Some(i64::from(n)),
+            Need::Init => None,
+        };
+        let span = tracing::info_span!(
+            "engine.segment_wait",
+            segment,
+            waited_ms = tracing::field::Empty
+        );
+        let started = time::Instant::now();
+        let result = self.wait_for(need).instrument(span.clone()).await;
+        let waited_ms = started.elapsed().as_secs_f64() * 1000.0;
+        span.record("waited_ms", waited_ms);
+        crate::telemetry::metrics()
+            .segment_wait
+            .record(waited_ms, &[]);
+        result
+    }
+
+    async fn wait_for(self: &Arc<Self>, need: Need) -> Result<Served, ApiError> {
         let epoch = self.epoch.load(Ordering::SeqCst);
         let deadline = time::Instant::now() + SEGMENT_WAIT;
         loop {

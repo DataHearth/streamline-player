@@ -224,3 +224,47 @@ async fn jobs_require_bearer() {
     let res = e.get(&format!("/v1/jobs/{}", id(1))).await;
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn boots_and_answers_health() {
+    let dir = std::env::temp_dir().join(format!("engine-boot-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let port = {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        l.local_addr().unwrap().port()
+    };
+    let cfg = dir.join("engine.yaml");
+    std::fs::write(
+        &cfg,
+        format!(
+            "listen: 127.0.0.1:{port}\nsecret: boot-secret\ntmp_dir: {0}/live\njobs_dir: {0}/jobs\nhw_accel: none\n",
+            dir.display()
+        ),
+    )
+    .unwrap();
+    let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_engine"))
+        .arg("--config")
+        .arg(&cfg)
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let mut status = None;
+    for _ in 0..50 {
+        if let Ok(mut s) = tokio::net::TcpStream::connect(("127.0.0.1", port)).await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            s.write_all(
+                b"GET /v1/health HTTP/1.1\r\nhost: x\r\nauthorization: Bearer boot-secret\r\nconnection: close\r\n\r\n",
+            )
+            .await
+            .unwrap();
+            let mut buf = String::new();
+            s.read_to_string(&mut buf).await.unwrap();
+            status = buf.lines().next().map(str::to_owned);
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    let _ = child.kill().await;
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(status.as_deref(), Some("HTTP/1.1 200 OK"));
+}

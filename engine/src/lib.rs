@@ -9,6 +9,7 @@ pub mod hw;
 pub mod jobs;
 pub mod playlist;
 pub mod session;
+pub mod telemetry;
 pub mod token;
 
 use std::sync::Arc;

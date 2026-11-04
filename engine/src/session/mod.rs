@@ -6,9 +6,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use opentelemetry::KeyValue;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::task::JoinHandle;
+use tracing::Instrument;
 
 use crate::analysis::{self, Analysis, Hdr};
 use crate::caps::Capabilities;
@@ -368,6 +370,25 @@ impl Sessions {
     }
 
     pub async fn start(&self, r: StartRequest) -> Result<SessionResponse, ApiError> {
+        let span = tracing::info_span!("engine.start", session = %r.session_id);
+        let reply = self.start_inner(r).instrument(span).await?;
+        crate::telemetry::metrics().sessions.add(
+            1,
+            &[
+                KeyValue::new(
+                    "mode",
+                    serde_json::to_value(reply.mode)
+                        .ok()
+                        .and_then(|v| v.as_str().map(str::to_owned))
+                        .unwrap_or_default(),
+                ),
+                KeyValue::new("hw", reply.hw.clone()),
+            ],
+        );
+        Ok(reply)
+    }
+
+    async fn start_inner(&self, r: StartRequest) -> Result<SessionResponse, ApiError> {
         if !valid_id(&r.session_id) {
             return Err(ApiError::invalid_request("session_id must be 32 hex chars"));
         }
@@ -481,6 +502,9 @@ impl Sessions {
         s.stop_run(&mut st).await;
         st.permit = None;
         drop(st);
+        crate::telemetry::metrics()
+            .session_duration
+            .record(s.started.elapsed().as_secs_f64(), &[]);
         let _ = tokio::fs::remove_dir_all(&s.dir).await;
         Ok(())
     }
@@ -554,6 +578,13 @@ impl Sessions {
                 }
             }
         })
+    }
+
+    pub async fn shutdown(&self) {
+        let ids: Vec<String> = self.list().into_iter().map(|i| i.session_id).collect();
+        for id in ids {
+            let _ = self.delete(&id).await;
+        }
     }
 
     pub fn sweep_tmp(&self) {

@@ -6,11 +6,13 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime};
 
+use opentelemetry::KeyValue;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::process::Command;
 use tokio::sync::Notify;
 use tokio::task::{AbortHandle, JoinHandle};
+use tracing::Instrument;
 
 use crate::analysis::{Analysis, run_analyze_with};
 use crate::config::Config;
@@ -178,8 +180,14 @@ impl Shared {
     async fn run(&self, id: String, spec: JobSpec) {
         let cfg = self.cfg.clone();
         let dir = self.dir(&id);
+        let kind = match &spec {
+            JobSpec::Analyze { .. } => "analyze",
+            JobSpec::Subtitles { .. } => "subtitles",
+        };
+        let span = tracing::info_span!("engine.job", job = %id, r#type = kind);
+        let started = std::time::Instant::now();
         let task: JoinHandle<Result<Value, JobError>> =
-            tokio::spawn(async move { execute(&cfg, &spec, &dir).await });
+            tokio::spawn(async move { execute(&cfg, &spec, &dir).await }.instrument(span));
         {
             let mut q = self.lock();
             match q.jobs.get_mut(&id) {
@@ -195,6 +203,19 @@ impl Shared {
             Err(e) if e.is_cancelled() => return,
             Err(_) => Err("job panicked".to_owned()),
         };
+        let m = crate::telemetry::metrics();
+        let outcome_label = if outcome.is_ok() { "done" } else { "failed" };
+        m.jobs.add(
+            1,
+            &[
+                KeyValue::new("type", kind),
+                KeyValue::new("outcome", outcome_label),
+            ],
+        );
+        m.job_duration.record(
+            started.elapsed().as_secs_f64(),
+            &[KeyValue::new("type", kind)],
+        );
         let mut q = self.lock();
         let Some(entry) = q.jobs.get_mut(&id) else {
             return;
