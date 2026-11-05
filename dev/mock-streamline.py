@@ -242,6 +242,15 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404, {"error": {"code": "not_found"}})
 
     def do_POST(self):
+        if self.path == "/api/v1/playback/decisions":
+            b = self.body()
+            path = MEDIA.get(b.pop("media_id", None))
+            if path is None:
+                return self.reply(404, {"code": "media_not_found", "message": "no such media"})
+            if path in ANALYSIS:
+                b["analysis"] = ANALYSIS[path]
+            st, resp = engine("POST", "/v1/decisions", {"path": path, **b})
+            return self.reply(st, resp)
         if self.path == "/api/v1/playback/sessions":
             b = self.body()
             media_id = b.pop("media_id", None)

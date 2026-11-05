@@ -31,6 +31,20 @@ export type Watch = {
 	watched: boolean;
 };
 
+export type Reason = { code: string; text: string };
+export type Mode = "direct" | "remux" | "audio_transcode" | "transcode";
+export type VideoOut = { action: string; codec: string; width: number; height: number; hdr: string; dv_profile?: number };
+export type AudioOut = { action: string; codec: string; channels: number };
+export type Decision = { mode: Mode; video: VideoOut; audio: AudioOut; video_reasons: Reason[]; audio_reasons: Reason[]; needs_slot: boolean; error?: undefined } | { error: { code: string; message: string } };
+export type DecisionOption = { audio_index?: number | null; burn_in_subtitle?: number | null; max_bitrate?: number | null };
+
+let capabilities: Promise<unknown> | null = null;
+export const playerCapabilities = () => (capabilities ??= invoke("plugin:player|capabilities"));
+
+/** What the engine would do for each option, without starting anything. */
+export const decisions = async (mediaId: string, options: DecisionOption[]) =>
+	invoke<{ bit_rate: number; decisions: Decision[] }>("decisions", { mediaId, capabilities: await playerCapabilities(), options });
+
 const listOf = <T>(page: { items: T[] }) => page.items;
 
 export const library = (kind: Kind) => invoke<{ items: Title[] }>("library", { kind }).then(listOf);

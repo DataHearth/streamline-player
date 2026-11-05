@@ -4,6 +4,7 @@
 
 <script lang="ts">
 	import { goto } from "$app/navigation";
+	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
 	import { artwork, badges, episodesOf, inProgress, left, library, meta, orPoster, pct, stillPos, title as fetchTitle, watchState, type Kind, type Title } from "#lib/tv/api.ts";
 	import { onMount } from "svelte";
@@ -13,6 +14,7 @@
 
 	const SCREEN_H = 1080;
 	let loaded = $state(booted);
+	let failed = $state<string | null>(null);
 	let rows = $state.raw<Row[]>([]);
 	let fid = $state<string | null>(null);
 	let row = $state(0);
@@ -45,11 +47,14 @@
 	const poster = (kind: Kind, t: Title, label: string): Item => ({ key: `${label}:${t.id}`, kind, t, eyebrow: label, href: `/detail/${kind}/${t.id}` });
 
 	onMount(() => {
-		load().finally(() => {
-			booted = true;
-			loaded = true;
-		});
+		load().then(onLoaded, (e) => (failed = String(e)));
 	});
+
+	function onLoaded() {
+		booted = true;
+		loaded = true;
+		failed = null;
+	}
 
 	async function load() {
 		const [movies, shows, watch] = await Promise.all([library("movies"), library("series"), watchState()]);
@@ -88,8 +93,8 @@
 	};
 </script>
 
-<TvScreen tab={loaded ? "home" : undefined}>
-	{#if !loaded}<div class="boot"><img src="/streamline-mark.png" alt="" width="56" height="56" /></div>{/if}
+<TvScreen tab={loaded && failed === null ? "home" : undefined}>
+	{#if failed !== null}<LoadFailed error={failed} retry={load} onloaded={onLoaded} />{:else if !loaded}<div class="boot"><img src="/streamline-mark.png" alt="" width="56" height="56" /></div>{/if}
 	{#each slots as slot, i}
 		{#if slot}
 			<div class="bg" style:opacity={i === front ? 1 : 0}>

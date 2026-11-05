@@ -1,6 +1,9 @@
 <script lang="ts">
-	import { orPoster } from "#lib/tv/api.ts";
+	import { decisions, orPoster, playerCapabilities, type Decision } from "#lib/tv/api.ts";
 	import { focusDefault as focusStageDefault, move } from "#lib/tv/focus.ts";
+	import HaltScreen from "./HaltScreen.svelte";
+	import { haltFor, type Halt } from "./halt.ts";
+	import "./screen.css";
 	import { toast } from "#lib/tv/toast.svelte.ts";
 	import { addPluginListener, invoke } from "@tauri-apps/api/core";
 	import {
@@ -12,8 +15,6 @@
 		ChevronDown,
 		ChevronsRight,
 		CircleAlert,
-		Cpu,
-		Folder,
 		Gauge,
 		LoaderCircle,
 		Minus,
@@ -23,14 +24,13 @@
 		Plus,
 		RotateCcw,
 		RotateCw,
-		Server,
 		Settings,
 		SkipForward,
-		WifiOff,
 		X,
 	} from "@lucide/svelte";
-	import { onMount, tick, type Component } from "svelte";
+	import { onMount, tick } from "svelte";
 
+	type Preview = { bitRate: number; original?: Decision; presets: Record<number, Decision>; audio: Record<number, Decision> };
 	type Next = { code: string; title: string; overview: string; still: string; stillPos: string; label: string; href: string };
 	type More = { title: string; poster: string; href: string };
 	let {
@@ -84,21 +84,6 @@
 	type SubKind = "text" | "styled" | "image";
 	type Cue = { start: number; end: number; text: string };
 	type Tone = "ok" | "conv" | "warn";
-	type Halt = {
-		kind: "busy" | "unreachable" | "offline" | "nocodec" | "missing" | "error";
-		eyebrow: string;
-		icon: Component<{ size?: number; strokeWidth?: number }>;
-		title: string;
-		body?: string;
-		mono?: string;
-		note?: string;
-		wait?: string;
-		count?: (left: number) => string;
-		failed: boolean;
-		retryLabel?: string;
-		left?: number;
-		total?: number;
-	};
 	type Flash = { ph: "idle" | "in" | "out"; amt: number; rot: number };
 
 	const HIDE_MS = 3200;
@@ -122,7 +107,7 @@
 		pcm_s16le: "PCM",
 		pcm_s24le: "PCM",
 	};
-	const FMP4_AUDIO = ["aac", "mp3", "ac3", "eac3", "flac", "opus"];
+	const PRESETS = [20, 8, 4, 2, 1];
 	const SIZE_PX: Record<string, number> = { S: 20, M: 26, L: 32, XL: 40 };
 	const DEFAULT_SIZE_PX = 26;
 	const TV_CUE_SCALE = 1.7;
@@ -134,8 +119,6 @@
 	const SUB_OFFSET_LIMIT = 10;
 	const AUDIO_DELAY_LIMIT = 500;
 	const RECOVERY_WINDOW_MS = 30_000;
-	const RETRY_SECS = 10;
-	const OFFLINE_CHECK_SECS = 5;
 	const MENU_EXIT_MS = 240;
 	const SEEK_RUN_MS = 900;
 	const MODE_LABEL = { direct: "Direct", remux: "Remux", audio_transcode: "Audio converted", transcode: "Converted" };
@@ -167,6 +150,7 @@
 	let prefs = $state(loadPrefs());
 	let osd = $state<string | null>(null);
 	let quality = $state<Quality>("original");
+	let preview = $state.raw<Preview | null>(null);
 	let speed = $state(1);
 	let stats = $state(false);
 	let live = $state<Stats | null>(null);
@@ -180,7 +164,7 @@
 	let pf = $state<"idle" | "in" | "out">("idle");
 
 	let stage: HTMLElement;
-	let capabilities: unknown = null;
+	let previewId = 0;
 	let lastMove = Date.now();
 	let retryTimer: ReturnType<typeof setInterval> | undefined;
 	let seekTimer: ReturnType<typeof setTimeout> | undefined;
@@ -223,11 +207,11 @@
 		const range = dv_profile !== undefined ? " \u00B7 Dolby Vision" : hdr === "sdr" ? "" : " \u00B7 HDR";
 		return `${height >= 2160 ? "4K" : `${height}p`}${range}`;
 	});
-	const modeBadge = $derived(session ? MODE_LABEL[session.mode].toLowerCase() : "");
-	const modeTone = $derived<Tone>(full ? "ok" : "conv");
-	const qualText = $derived(
-		quality === "auto" ? "Auto" : quality === "original" ? "Original" : `${quality} Mbit/s`,
-	);
+	const originalPlays = $derived(!preview?.original || (!preview.original.error && preview.original.video.action === "copy"));
+	// A file this device can't play as-is has no Original to pick.
+	const qSel = $derived<Quality>(quality === "original" && !originalPlays ? "auto" : quality);
+	const fileMbit = $derived(preview ? `${(preview.bitRate / 1_000_000).toFixed(1)} Mbit/s` : "");
+	const qualText = $derived(qSel === "auto" ? "Auto" : qSel === "original" ? "Original" : `${qSel} Mbit/s`);
 	const menuNote = $derived.by(() => {
 		if (!session) return "";
 		const why = (r: Reason[]) => r.map((x) => x.text).join(", ");
@@ -287,19 +271,6 @@
 	const subName = (t: SubTrack) => `${language(t.language)}${t.forced ? " (forced)" : ""}`;
 	const channelLayout = (n: number) => (n >= 3 ? `${n - 1}.1` : `${n}.0`);
 	const audioName = (t: AudioTrack) => `${CODEC_NAMES[t.codec] ?? t.codec} ${channelLayout(t.channels)}`;
-
-	/** The engine's rule, for the tracks it hasn't been asked about yet. */
-	function audioAsIs(t: AudioTrack) {
-		const caps = capabilities as { audio?: { codecs: string[]; max_channels: number } } | null;
-		if (!caps?.audio?.codecs.includes(t.codec) || t.channels > caps.audio.max_channels) return false;
-		return session?.mode === "direct" || FMP4_AUDIO.includes(t.codec);
-	}
-
-	function audioTarget(t: AudioTrack) {
-		const caps = capabilities as { audio?: { codecs: string[] } } | null;
-		const has = (c: string) => caps?.audio?.codecs.includes(c);
-		return t.channels > 2 && has("eac3") ? "EAC3 5.1" : t.channels > 2 && has("ac3") ? "AC3 5.1" : "AAC 2.0";
-	}
 
 	const audioNote = $derived.by(() => {
 		if (!selectedAudio || !session) return "";
@@ -367,7 +338,80 @@
 		return `${name} ${HDR_NAMES[s.video.hdr] ?? "SDR"}`;
 	}
 	const originalSub = $derived(tracks?.video ? `${tracks.video.height}p ${CODEC_NAMES[tracks.video.codec] ?? tracks.video.codec}${rangeName(tracks.video.hdr, !!tracks.video.dv)}` : "");
-	const audioOutName = (s: Session) => `${CODEC_NAMES[s.audio.codec] ?? s.audio.codec} ${channelLayout(s.audio.channels)}`;
+	const audioOutName = (s: { audio: Session["audio"] }) => `${CODEC_NAMES[s.audio.codec] ?? s.audio.codec} ${channelLayout(s.audio.channels)}`;
+	const modeBadge = (d?: Decision) => (d && !d.error ? MODE_LABEL[d.mode].toLowerCase() : "");
+	const modeTone = (d?: Decision): Tone => (d && !d.error && !d.needs_slot ? "ok" : "conv");
+
+	function qualitySub(d: Decision | undefined) {
+		if (!d || d.error) return d?.error.message ?? "";
+		return d.video.action === "copy" ? `Same as Original \u00B7 the file is ${fileMbit}` : videoName(d.video.codec, d.video.height);
+	}
+
+	const autoSub = $derived.by(() => {
+		const d = preview?.original;
+		if (!d || d.error || originalPlays) return "Now Original";
+		return `Now ${videoName(d.video.codec, d.video.height)} \u00B7 ${d.video_reasons[0]?.text ?? ""}`;
+	});
+
+	async function refreshPreview() {
+		const id = ++previewId;
+		const list = tracks?.audio ?? [];
+		const base = { audio_index: audioPick, burn_in_subtitle: burn ? subPick : null };
+		const cap = typeof quality === "number" ? quality * 1_000_000 : null;
+		try {
+			const r = await decisions(mediaId, [base, ...PRESETS.map((n) => ({ ...base, max_bitrate: n * 1_000_000 })), ...list.map((t) => ({ ...base, audio_index: t.index, max_bitrate: cap }))]);
+			if (id !== previewId) return;
+			preview = {
+				bitRate: r.bit_rate,
+				original: r.decisions[0],
+				presets: Object.fromEntries(PRESETS.flatMap((n, i) => (r.decisions[i + 1] ? [[n, r.decisions[i + 1] as Decision]] : []))),
+				audio: Object.fromEntries(list.flatMap((t, i) => (r.decisions[i + 1 + PRESETS.length] ? [[t.index, r.decisions[i + 1 + PRESETS.length] as Decision]] : []))),
+			};
+		} catch {
+			// The panels fall back to what the running session says.
+		}
+	}
+
+	async function offerAlternatives() {
+		await refreshPreview();
+		if (halt?.kind !== "busy" || !preview) return;
+		const wanted = typeof quality === "number" ? preview.presets[quality] : preview.original;
+		const alts: NonNullable<Halt["alts"]> = [];
+		const orig = preview.original;
+		if (orig && !orig.error && !orig.needs_slot) {
+			alts.push({
+				icon: Play,
+				label: "Play the original",
+				sub: `${MODE_LABEL[orig.mode]} \u00B7 ${originalSub} \u00B7 ${fileMbit}`,
+				run: () => {
+					quality = "original";
+					start();
+					toast(`Playing the original \u00B7 ${MODE_LABEL[orig.mode]}`);
+				},
+			});
+		}
+		if (wanted && !wanted.error && wanted.video.action === "copy" && wanted.audio.action !== "copy") {
+			const t = tracks?.audio.find((x) => {
+				const d = preview?.audio[x.index];
+				return d && !d.error && !d.needs_slot;
+			});
+			if (t) {
+				const name = `${language(t.language)} \u00B7 ${audioName(t)}`;
+				alts.push({
+					icon: AudioLines,
+					label: `Switch to ${name}`,
+					sub: "Plays as-is on this device",
+					run: () => {
+						audioPick = t.index;
+						start();
+						toast(`Playing ${name}`);
+					},
+				});
+			}
+		}
+		const need = wanted && !wanted.error ? [...wanted.video_reasons, ...wanted.audio_reasons].map((r) => r.text).join(", ") : "";
+		halt = { ...halt, alts, body: `All conversions on ${host} are in use, and this stream needs one${need ? ` (${need})` : ""}.` };
+	}
 
 	const statRows = $derived.by(() => {
 		if (!session) return [];
@@ -516,6 +560,7 @@
 	async function refreshTracks() {
 		tracks = await invoke<Tracks>("media_tracks", { mediaId }).catch(() => tracks);
 		autoForced();
+		refreshPreview();
 	}
 
 	const fmt = (s: number) => {
@@ -572,7 +617,7 @@
 	function resumedToast(after: Halt["kind"] | undefined, s: Session) {
 		if (after === "unreachable") toast("Reconnected \u00B7 playback resumed");
 		else if (after === "offline") toast("Back online \u00B7 playback resumed", { icon: "wifi" });
-		else if (after === "busy") toast("Conversion started", { icon: "cpu", text: s.video.action === "copy" ? `Audio \u2192 ${audioOutName(s)}` : `${s.video.height}p ${CODEC_NAMES[s.video.codec] ?? s.video.codec}` });
+		else if (after === "busy" && s.mode !== "direct" && s.mode !== "remux") toast("Conversion started", { icon: "cpu", text: s.video.action === "copy" ? `Audio \u2192 ${audioOutName(s)}` : `${s.video.height}p ${CODEC_NAMES[s.video.codec] ?? s.video.codec}` });
 	}
 
 	async function start(at = position) {
@@ -582,7 +627,7 @@
 		stop();
 		buffering = true;
 		try {
-			capabilities ??= await player("capabilities");
+			const capabilities = await playerCapabilities();
 			refreshTracks();
 			const started = await invoke<Session>("start_session", { mediaId, capabilities, position: at, tracks: sessionTracks() });
 			// The viewer left while the server was still answering.
@@ -617,88 +662,10 @@
 	const sessionGone = (raw: string) => raw.includes('"not_found"');
 
 	function failedToStart(raw: string) {
-		let error: { code?: string; message?: string; retry_after?: number } | null = null;
-		try {
-			error = JSON.parse(raw);
-		} catch {
-			// Not JSON: the request never got an answer from the server.
-		}
-		const at = fmt(position);
-		if (error?.code === "transcode_limit") {
-			haltWithRetry(
-				{
-					kind: "busy",
-					eyebrow: "Server busy",
-					icon: Cpu,
-					title: "Waiting for a free slot",
-					body: `All conversions on ${host} are in use, and this stream needs one.`,
-					count: (left) => `Trying again in ${left} s`,
-					note: `You\u2019re at ${at}. Playback starts as soon as a slot frees up.`,
-					failed: false,
-					retryLabel: "Try now",
-				},
-				error.retry_after ?? RETRY_SECS,
-			);
-		} else if (error?.code === "file_not_found" || error?.code === "media_not_found") {
-			showHalt({
-				kind: "missing",
-				eyebrow: "File missing",
-				icon: Folder,
-				title: "This file isn\u2019t on the server",
-				body: "Streamline can\u2019t find it where the library expects it. It may have been moved, renamed or deleted.",
-				mono: error.message,
-				note: "Let your admin know. If it was moved, a library scan finds it again.",
-				failed: true,
-			});
-		} else if (error?.code === "transcode_unavailable" || error?.code === "ffmpeg_unavailable") {
-			showHalt({
-				kind: "nocodec",
-				eyebrow: "Can\u2019t play here",
-				icon: CircleAlert,
-				title: `${titleName} can\u2019t play on this device`,
-				body: `${PLAYER_NAME} can\u2019t decode this file\u2019s video, and the server can\u2019t convert it: ${error.message}.`,
-				note: "Play it on another device, or ask your admin to turn on software conversion.",
-				failed: true,
-			});
-		} else if (error) {
-			showHalt({
-				kind: "error",
-				eyebrow: "Playback error",
-				icon: CircleAlert,
-				title: "This can\u2019t play right now",
-				mono: error.message ?? error.code ?? raw,
-				failed: true,
-				retryLabel: "Try now",
-			});
-		} else if (navigator.onLine === false) {
-			haltWithRetry(
-				{
-					kind: "offline",
-					eyebrow: "Offline",
-					icon: WifiOff,
-					title: "This device lost its connection",
-					body: `Playback picks up at ${at} as soon as it\u2019s back.`,
-					wait: "Waiting for a network \u00B7 checking every 5 s",
-					failed: false,
-					retryLabel: "Try again",
-				},
-				OFFLINE_CHECK_SECS,
-			);
-		} else {
-			haltWithRetry(
-				{
-					kind: "unreachable",
-					eyebrow: "Can\u2019t reach the server",
-					icon: Server,
-					title: `${host} isn\u2019t answering`,
-					body: "The server may be off or restarting, or this device is away from your home network without the VPN.",
-					count: (left) => `Trying again in ${left} s \u00B7 your place is saved at ${at}`,
-					failed: true,
-					retryLabel: "Try now",
-				},
-				RETRY_SECS,
-			);
-		}
+		const { halt: h, retryIn } = haltFor(raw, { host, at: fmt(position), titleName });
+		if (retryIn) haltWithRetry(h, retryIn);
+		else showHalt(h);
+		if (h.kind === "busy") offerAlternatives();
 	}
 
 	async function stop() {
@@ -823,6 +790,7 @@
 				failedToStart(String(e));
 			}
 		}
+		refreshPreview();
 		if (!menu) focusDefault();
 	}
 
@@ -969,8 +937,8 @@
 	</div>
 {/snippet}
 
-{#snippet option(label: string, selected: boolean, onclick: () => void, sub = "", badge = "", tone: Tone = "ok", busy = false, pill = "")}
-	<button data-tv="1" data-tv-default={selected ? "1" : undefined} class="opt" class:sel={selected} disabled={busy} style:opacity={busy ? 0.62 : 1} {onclick}>
+{#snippet option(label: string, selected: boolean, onclick: () => void, sub = "", badge = "", tone: Tone = "ok", busy = false, pill = "", off = false)}
+	<button data-tv="1" data-tv-default={selected ? "1" : undefined} class="opt" class:sel={selected} disabled={busy || off} style:opacity={busy ? 0.62 : off ? 0.5 : 1} {onclick}>
 		<span class="opt-check" style:opacity={selected ? 1 : 0}><Check size={16} strokeWidth={2.5} /></span>
 		<span class="opt-text">
 			<span class="opt-label" style:font-weight={selected ? 600 : 500}>{label}{#if pill}<span class="opt-pill">{pill}</span>{/if}</span>
@@ -1085,25 +1053,31 @@
 			<div class="menu-body">
 				{#if tab === "quality"}
 					<div class="note"><span class="note-dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{menuNote}</span></div>
-					{@render option("Auto", quality === "auto", () => pickQuality("auto"), "Now Original", quality === "auto" ? modeBadge : "", modeTone)}
-					{@render option("Original", quality === "original", () => pickQuality("original"), originalSub, quality === "original" ? modeBadge : "", modeTone)}
-					{#each [20, 8, 4, 2, 1] as n}
-						{@const on = quality === n}
-						{@const same = on && session?.video.action === "copy"}
-						{@render option(`${n} Mbit/s`, on, () => pickQuality(n), same ? "Same as Original" : on && session ? `${session.video.height}p ${CODEC_NAMES[session.video.codec] ?? session.video.codec}` : "", on ? modeBadge : "", modeTone, false, on && !same && session?.video.hdr !== "sdr" ? "HDR" : "")}
+					{@render option("Auto", qSel === "auto", () => pickQuality("auto"), autoSub, modeBadge(preview?.original), modeTone(preview?.original))}
+					{#if originalPlays}
+						{@render option("Original", qSel === "original", () => pickQuality("original"), `${originalSub}${fileMbit ? ` \u00B7 ${fileMbit}` : ""}`, modeBadge(preview?.original), modeTone(preview?.original))}
+					{:else}
+						{@render option("Original", false, () => {}, `Not on this device \u00B7 ${preview?.original && !preview.original.error ? (preview.original.video_reasons[0]?.text ?? "") : ""}`, "", "ok", false, "", true)}
+					{/if}
+					{#each PRESETS as n}
+						{@const d = preview?.presets[n]}
+						{@const converted = !!d && !d.error && d.video.action !== "copy"}
+						{@render option(`${n} Mbit/s`, qSel === n, () => pickQuality(n), qualitySub(d), modeBadge(d), modeTone(d), false, converted && !d.error && d.video.hdr !== "sdr" ? "HDR" : "")}
 					{/each}
 				{:else if tab === "speed"}
 					{#each SPEEDS as x}{@render option(x === 1 ? "Normal" : `${x}\u00D7`, speed === x, () => pickSpeed(x))}{/each}
 				{:else if tab === "audio"}
 					<div class="note"><span class="note-dot" style:background={session?.audio.action === "copy" ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{audioNote}</span></div>
 					{#each tracks?.audio ?? [] as t, i}
-						{@const asIs = t.index === selectedAudio?.index ? session?.audio.action === "copy" : audioAsIs(t)}
+						{@const d = preview?.audio[t.index]}
+						{@const out = d && !d.error ? d : t.index === selectedAudio?.index ? session : null}
+						{@const asIs = out?.audio.action === "copy"}
 						{@render option(
 							`${language(t.language)}${i === 0 ? " (original)" : ""}`,
 							t.index === selectedAudio?.index,
 							() => pickAudio(t),
-							asIs ? audioName(t) : `${audioName(t)} \u2192 ${t.index === selectedAudio?.index && session ? (CODEC_NAMES[session.audio.codec] ?? session.audio.codec) : audioTarget(t)}`,
-							asIs ? "as-is" : "converted",
+							out && !asIs ? `${audioName(t)} \u2192 ${audioOutName(out)}` : audioName(t),
+							out ? (asIs ? "as-is" : "converted") : "",
 							asIs ? "ok" : "conv",
 						)}
 					{/each}
@@ -1209,7 +1183,7 @@
 	{/if}
 
 	{#if ended}
-		<div class="end" data-tv-trap="1">
+		<div class="end sl-full" data-tv-trap="1">
 			<img class="frame" src={frame} alt="" style:object-position={framePos} onerror={orPoster(poster)} />
 			<div class="halt-scrim end-scrim"></div>
 			<div class="halt-zoom">
@@ -1253,33 +1227,7 @@
 	{/if}
 
 	{#if halt}
-		<div class="halt" role="alertdialog" aria-label={halt.eyebrow} data-tv-trap="1">
-			<img class="frame" src={frame} alt="" style:object-position={framePos} onerror={orPoster(poster)} />
-			<div class="halt-scrim"></div>
-			<div class="halt-zoom">
-				<div class="halt-col">
-					<span class="eyebrow" style:color={halt.failed ? "var(--status-failed)" : "var(--status-warning)"}>
-						<halt.icon size={14} strokeWidth={2} />
-						{halt.eyebrow}
-					</span>
-					<span class="halt-title">{halt.title}</span>
-					{#if halt.body}<span class="halt-body">{halt.body}</span>{/if}
-					{#if halt.mono}<span class="halt-mono">{halt.mono}</span>{/if}
-					{#if halt.count && halt.left && halt.total}
-						<div class="count">
-							<div class="count-track"><div class="count-fill" style:width="{(halt.left / halt.total) * 100}%" style:background={halt.failed ? "var(--player-ink-muted)" : "var(--status-warning)"}></div></div>
-							<span class="count-text">{halt.count(halt.left)}</span>
-						</div>
-					{/if}
-					{#if halt.wait}<span class="halt-wait"><span class="wait-dot"></span>{halt.wait}</span>{/if}
-					{#if halt.note}<span class="halt-note">{halt.note}</span>{/if}
-					<div class="actions">
-						{#if halt.retryLabel}<button data-tv="1" data-tv-default="1" class="primary" onclick={() => start()}><RotateCw size={16} strokeWidth={2} />{halt.retryLabel}</button>{/if}
-						<button data-tv="1" data-tv-default={halt.retryLabel ? undefined : "1"} class="secondary" onclick={exit}>Back to {titleName}</button>
-					</div>
-				</div>
-			</div>
-		</div>
+		<HaltScreen {halt} {frame} {poster} {framePos} backLabel="Back to {titleName}" onretry={() => start()} onback={exit} />
 	{/if}
 </div>
 
@@ -2270,17 +2218,6 @@
 		background: linear-gradient(90deg, var(--hero-scrim) 0%, color-mix(in srgb, var(--bg-deep) 72%, transparent) 50%, color-mix(in srgb, var(--bg-deep) 40%, transparent) 100%);
 	}
 
-	.frame {
-		position: absolute;
-		inset: 0;
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		filter: blur(32px) saturate(1.2);
-		transform: scale(1.15);
-		opacity: 0.5;
-	}
-
 	.end-next {
 		display: flex;
 		align-items: center;
@@ -2398,187 +2335,5 @@
 			opacity: 0;
 			transform: translateY(10px);
 		}
-	}
-
-	.halt {
-		position: absolute;
-		inset: 0;
-		overflow: hidden;
-		background: var(--bg-deep);
-		animation: slp-fade 260ms var(--ease);
-	}
-
-	.halt-scrim {
-		position: absolute;
-		inset: 0;
-		background: linear-gradient(90deg, var(--hero-scrim) 0%, color-mix(in srgb, var(--bg-deep) 74%, transparent) 55%, color-mix(in srgb, var(--bg-deep) 45%, transparent) 100%);
-	}
-
-	.halt-zoom {
-		position: absolute;
-		inset: 0;
-		zoom: 1.75;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		padding: 0 70px;
-	}
-
-	.halt-col {
-		display: flex;
-		flex-direction: column;
-		gap: 14px;
-		max-width: 560px;
-		animation: halt-rise 320ms var(--ease);
-	}
-
-	@keyframes halt-rise {
-		from {
-			transform: translateY(10px);
-		}
-	}
-
-	.halt-note {
-		font-size: 14px;
-		line-height: 1.5;
-		color: var(--player-ink-muted);
-		text-wrap: pretty;
-	}
-
-	.halt-wait {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin-top: 2px;
-		font: 400 12px var(--font-mono);
-		color: var(--player-ink-muted);
-	}
-
-	.wait-dot {
-		flex: none;
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: var(--status-warning);
-		animation: slp-pulse 1.6s ease-in-out infinite;
-	}
-
-	@keyframes slp-pulse {
-		50% {
-			opacity: 0.3;
-		}
-	}
-
-	.eyebrow {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font: 500 11px var(--font-mono);
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-	}
-
-	.halt-title {
-		font-size: 36px;
-		line-height: 1.1;
-		font-weight: 700;
-		letter-spacing: -0.02em;
-		text-wrap: balance;
-	}
-
-	.halt-body {
-		font-size: 16px;
-		line-height: 1.5;
-		color: var(--player-ink-muted);
-		text-wrap: pretty;
-	}
-
-	.halt-mono {
-		padding: 10px 12px;
-		border-radius: var(--radius-md);
-		background: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
-		border: 1px solid var(--border);
-		font: 400 12px var(--font-mono);
-		line-height: 1.5;
-		color: var(--player-ink-muted);
-		overflow-wrap: anywhere;
-	}
-
-	.count {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		max-width: 420px;
-		margin-top: 4px;
-	}
-
-	.count-track {
-		height: 4px;
-		border-radius: var(--radius-full);
-		background: var(--player-control-hover);
-		overflow: hidden;
-	}
-
-	.count-fill {
-		height: 100%;
-		border-radius: var(--radius-full);
-		transition: width 1s linear;
-	}
-
-	.count-text {
-		font: 400 12px var(--font-mono);
-		font-variant-numeric: tabular-nums;
-		color: var(--player-ink-muted);
-	}
-
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 10px;
-		margin-top: 8px;
-	}
-
-	.primary {
-		height: 48px;
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 0 22px 0 18px;
-		border: 0;
-		border-radius: var(--radius-player-controls);
-		background: var(--player-ink);
-		color: var(--fg-on-accent);
-		font-size: 15px;
-		font-weight: 600;
-		cursor: pointer;
-		outline: none;
-		white-space: nowrap;
-		transition: transform var(--dur-fast);
-	}
-
-	.primary:focus {
-		box-shadow: 0 0 0 3px var(--player-accent);
-		transform: scale(1.04);
-	}
-
-	.secondary {
-		height: 48px;
-		padding: 0 20px;
-		border-radius: var(--radius-player-controls);
-		border: 1px solid rgba(255, 255, 255, 0.18);
-		background: transparent;
-		color: var(--player-ink);
-		font-size: 15px;
-		font-weight: 500;
-		cursor: pointer;
-		outline: none;
-		white-space: nowrap;
-		transition: transform var(--dur-fast);
-	}
-
-	.secondary:focus {
-		background: var(--player-ink);
-		color: var(--fg-on-accent);
-		transform: scale(1.04);
 	}
 </style>

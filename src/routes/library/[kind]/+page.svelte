@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
+	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
 	import { artwork, episodesOf, inProgress, library, pct, title as fetchTitle, watchState, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
 	import { Check } from "@lucide/svelte";
@@ -18,16 +19,21 @@
 	let watch = $state.raw<Watch[]>([]);
 	let flags = $state<Flag[]>([]);
 	let doneShows = $state.raw(new Set<number>());
+	let failed = $state<string | null>(null);
 
 	$effect(() => {
 		const current = kind;
 		flags = [];
-		Promise.all([library(current), watchState()]).then(([t, w]) => {
-			titles = [...t].sort((a, b) => b.added_at.localeCompare(a.added_at));
-			watch = w;
-			if (current === "series") markDoneShows(w);
-		});
+		failed = null;
+		load(current).catch((e) => (failed = String(e)));
 	});
+
+	async function load(current: Kind) {
+		const [t, w] = await Promise.all([library(current), watchState()]);
+		titles = [...t].sort((a, b) => b.added_at.localeCompare(a.added_at));
+		watch = w;
+		if (current === "series") markDoneShows(w);
+	}
 
 	async function markDoneShows(w: Watch[]) {
 		const started = [...new Set(w.filter((x) => x.watched).flatMap((x) => x.series_id ?? []))];
@@ -54,7 +60,10 @@
 	}
 </script>
 
-<TvScreen tab={kind} scroll>
+<TvScreen tab={failed === null ? kind : undefined} scroll>
+	{#if failed !== null}
+		<LoadFailed error={failed} retry={() => load(kind)} onloaded={() => (failed = null)} onback={() => history.back()} />
+	{:else}
 	{#key kind}
 		<div class="page">
 			<div class="head">
@@ -80,6 +89,7 @@
 			</div>
 		</div>
 	{/key}
+	{/if}
 </TvScreen>
 
 <style>

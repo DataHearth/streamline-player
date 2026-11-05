@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
+	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, badges, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
+	import { artwork, badges, decisions, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Decision, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
 	import { toast } from "#lib/tv/toast.svelte.ts";
 	import { Check, CheckCheck, Eye, Play, RotateCcw } from "@lucide/svelte";
 
@@ -14,6 +15,9 @@
 	let similar = $state.raw<(Title & { kind: Kind })[]>([]);
 	let season = $state<number | null>(null);
 	let heroBlur = $state(false);
+	let failed = $state<string | null>(null);
+	let playback = $state.raw<Decision | null>(null);
+	const PLAIN = { direct: "Plays as-is", remux: "Plays in original quality", audio_transcode: "Original picture, converted sound", transcode: "Converted for this device" };
 	const seasonParam = $derived(Number(page.url.searchParams.get("s")) || null);
 
 	$effect(() => {
@@ -21,14 +25,18 @@
 		t = null;
 		season = null;
 		heroBlur = false;
-		Promise.all([fetchTitle(k, i), watchState(), k === "movies" ? everything() : Promise.resolve([])]).then(([title, w, all]) => {
-			t = title;
-			watch = w;
-			const g = title.genres[0] ?? "";
-			const pool = all.filter((m) => !(m.kind === k && m.id === title.id));
-			similar = [...pool.filter((m) => m.genres[0] === g).slice(0, MAX_SIMILAR), ...pool.filter((m) => m.genres[0] !== g && m.genres.includes(g)).slice(0, 4)].slice(0, MAX_SIMILAR);
-		});
+		failed = null;
+		load(k, i).catch((e) => (failed = String(e)));
 	});
+
+	async function load(k: Kind, i: number) {
+		const [title, w, all] = await Promise.all([fetchTitle(k, i), watchState(), k === "movies" ? everything() : Promise.resolve([])]);
+		t = title;
+		watch = w;
+		const g = title.genres[0] ?? "";
+		const pool = all.filter((m) => !(m.kind === k && m.id === title.id));
+		similar = [...pool.filter((m) => m.genres[0] === g).slice(0, MAX_SIMILAR), ...pool.filter((m) => m.genres[0] !== g && m.genres.includes(g)).slice(0, 4)].slice(0, MAX_SIMILAR);
+	}
 
 	const stateOf = (media?: string) => watch.find((w) => w.media_id === media);
 	const movieMedia = $derived(t?.media_files?.[0]?.id);
@@ -45,6 +53,19 @@
 		if (kind === "series") return nextEp ? `${progressEp ? "Resume" : "Play"} S${nextEp.season} · E${nextEp.number}` : "Play";
 		return movieWatch && hasRestart ? `Resume · ${left(movieWatch.duration_seconds - movieWatch.position_seconds)}` : "Play";
 	});
+	const playMedia = $derived(kind === "series" ? nextEp?.media_file_id : movieMedia);
+	const full = $derived(playback && !playback.error && (playback.mode === "direct" || playback.mode === "remux"));
+
+	// Failing to know how it will play must not get in the way of the page.
+	$effect(() => {
+		const media = playMedia;
+		if (!media) return;
+		decisions(media, [{}]).then(
+			(r) => (playback = r.decisions[0] ?? null),
+			() => (playback = null),
+		);
+	});
+
 	const eyebrow = $derived(t ? (kind === "series" ? [t.network, ...t.genres] : t.genres).filter(Boolean).join(" · ") : "");
 
 	function play() {
@@ -62,7 +83,9 @@
 </script>
 
 <TvScreen onback={() => history.back()} scroll>
-	{#if t}
+	{#if failed !== null}
+		<LoadFailed error={failed} retry={() => load(kind, id)} onloaded={() => (failed = null)} onback={() => history.back()} />
+	{:else if t}
 		<div class="page">
 			<div class="hero-img">
 				<img
@@ -95,6 +118,12 @@
 						{#if watched}<CheckCheck size={26} strokeWidth={2.2} />Watched{:else}<Eye size={26} strokeWidth={2.2} />Mark watched{/if}
 					</button>
 				</div>
+				{#if playback && !playback.error}
+					<div class="status">
+						<span class="status-dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"} style:box-shadow="0 0 0 5px color-mix(in srgb, {full ? 'var(--status-available) 18%' : 'var(--status-downloading) 20%'}, transparent)"></span>
+						<span>{PLAIN[playback.mode]}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="more">
 				{#if kind === "series"}
@@ -221,6 +250,22 @@
 		line-clamp: 3;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
+	}
+
+	.status {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		margin-top: 4px;
+		font: 400 22px var(--font-mono);
+		color: var(--fg);
+		white-space: nowrap;
+	}
+
+	.status-dot {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
 	}
 
 	.actions {

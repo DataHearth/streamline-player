@@ -136,6 +136,25 @@ async fn start_session(
 }
 
 #[tauri::command]
+async fn decisions(
+    api: tauri::State<'_, Api>,
+    media_id: String,
+    capabilities: Value,
+    options: Value,
+) -> Result<Value, String> {
+    api.call(
+        reqwest::Method::POST,
+        "/playback/decisions",
+        Some(json!({
+            "media_id": media_id,
+            "capabilities": capabilities,
+            "options": options,
+        })),
+    )
+    .await
+}
+
+#[tauri::command]
 async fn media_tracks(api: tauri::State<'_, Api>, media_id: String) -> Result<Value, String> {
     api.call(
         reqwest::Method::GET,
@@ -228,6 +247,7 @@ pub fn run() {
             watch_state,
             set_watched,
             playback_status,
+            decisions,
             media_tracks,
             subtitle_text,
             start_session,

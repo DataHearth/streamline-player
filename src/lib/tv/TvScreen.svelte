@@ -62,7 +62,7 @@
 
 <svelte:window onkeydown={onKey} />
 
-<div class="stage" bind:this={stage}>
+<div class="stage" data-tv-screen="1" bind:this={stage}>
 	<div class="scroller" class:scroll bind:this={scroller}>{@render children()}</div>
 	{#if tab}
 		<div class="nav" data-tv-nav="1">

@@ -2,6 +2,8 @@
 	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import TvPlayer from "#lib/player/TvPlayer.svelte";
+	import LoadFailed from "#lib/tv/LoadFailed.svelte";
+	import TvScreen from "#lib/tv/TvScreen.svelte";
 	import { artwork, episodesOf, everything, stillPos, title as fetchTitle, watchState, type Kind, type Title } from "#lib/tv/api.ts";
 
 	type Play = { key: string; mediaId: string; titleName: string; heading: string; eyebrow: string; frame: string; poster: string; framePos: string; start: number; next: { code: string; title: string; overview: string; still: string; stillPos: string; label: string; href: string } | null; more: { title: string; poster: string; href: string }[] };
@@ -11,6 +13,7 @@
 	const epId = $derived(Number(page.url.searchParams.get("ep")) || null);
 	const resume = $derived(page.url.searchParams.has("resume"));
 	let play = $state.raw<Play | null>(null);
+	let failed = $state<string | null>(null);
 	let fromDetail = false;
 	let season: number | null = null;
 
@@ -72,9 +75,15 @@
 
 	$effect(() => {
 		let stale = false;
-		load(kind, id, epId, resume).then((p) => {
-			if (!stale) play = p;
-		});
+		failed = null;
+		load(kind, id, epId, resume).then(
+			(p) => {
+				if (!stale) play = p;
+			},
+			(e) => {
+				if (!stale) failed = String(e);
+			},
+		);
 		return () => {
 			stale = true;
 		};
@@ -87,7 +96,16 @@
 	}
 </script>
 
-{#if play}
+{#if failed !== null}
+	<TvScreen onback={exit}>
+		<LoadFailed
+			error={failed}
+			retry={() => load(kind, id, epId, resume).then((p) => (play = p))}
+			onloaded={() => (failed = null)}
+			onback={exit}
+		/>
+	</TvScreen>
+{:else if play}
 	{#key play.key}
 		<TvPlayer {...play} onexit={exit} onnext={() => play?.next && goto(play.next.href, { replaceState: true })} onopen={(href: string) => goto(href, { replaceState: true })} />
 	{/key}
