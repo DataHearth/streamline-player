@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::analysis::{Analysis, AudioStream, Hdr, VideoStream};
 use crate::caps::Capabilities;
@@ -33,7 +33,8 @@ impl Reason {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
 pub struct SessionParams {
     pub audio_index: Option<u32>,
     pub burn_in_subtitle: Option<u32>,
@@ -355,7 +356,7 @@ fn video_fit(
     {
         reasons.push(Reason::new(
             "bitrate_cap",
-            format!("{} bit/s is over {max}", a.bit_rate),
+            format!("capped at {} Mbit/s", max as f64 / 1_000_000.0),
         ));
     }
     if p.burn_in_subtitle.is_some() {

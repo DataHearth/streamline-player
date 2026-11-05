@@ -19,7 +19,7 @@ use crate::decision::{
     AudioAction, DvHandling, HdrOut, Mode, Plan, Reason, SessionParams, VideoAction, VideoCodec,
     decide,
 };
-use crate::error::ApiError;
+use crate::error::{ApiError, ErrorBody};
 use crate::hw::{Backend, Hw};
 use crate::playlist;
 
@@ -33,6 +33,7 @@ pub const SEGMENT_WAIT: Duration = Duration::from_secs(30);
 pub const REAP_INTERVAL: Duration = Duration::from_secs(60);
 
 const TRANSCODE_RETRY_AFTER: u64 = 10;
+const MAX_DECISION_OPTIONS: usize = 32;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct StartRequest {
@@ -49,6 +50,38 @@ pub struct StartRequest {
     pub burn_in_subtitle: Option<u32>,
     #[serde(default)]
     pub max_bitrate: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DecisionsRequest {
+    pub path: String,
+    pub capabilities: Capabilities,
+    #[serde(default)]
+    pub analysis: Option<Analysis>,
+    pub options: Vec<SessionParams>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+pub enum DecisionOut {
+    Plan {
+        mode: Mode,
+        video: VideoOut,
+        audio: AudioOut,
+        video_reasons: Vec<Reason>,
+        audio_reasons: Vec<Reason>,
+        hw: String,
+        needs_slot: bool,
+    },
+    Refused {
+        error: ErrorBody,
+    },
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DecisionsResponse {
+    pub bit_rate: u64,
+    pub decisions: Vec<DecisionOut>,
 }
 
 /// An absent field keeps the session's current value, an explicit `null`
@@ -380,6 +413,65 @@ impl Sessions {
             .map_err(|_| ApiError::transcode_limit(TRANSCODE_RETRY_AFTER))
     }
 
+    async fn input_and_analysis(
+        &self,
+        path: &str,
+        given: Option<Analysis>,
+    ) -> Result<(PathBuf, Analysis), ApiError> {
+        let cfg = &self.inner.cfg;
+        let input = cfg.path_map.rewrite(path);
+        if !tokio::fs::metadata(&input).await.is_ok_and(|m| m.is_file()) {
+            return Err(ApiError::file_not_found(format!(
+                "no such file: {}",
+                input.display()
+            )));
+        }
+        let analysis = match given.filter(analysis::is_current) {
+            Some(a) => a,
+            None => analysis::run_analyze(&cfg.ffprobe(), &input)
+                .await
+                .map_err(|e| match e {
+                    analysis::AnalysisError::Spawn(m) => ApiError::ffmpeg_unavailable(m),
+                    e => ApiError::unreadable_file(e.to_string()),
+                })?,
+        };
+        Ok((input, analysis))
+    }
+
+    /// What each option would do, without starting ffmpeg or taking a slot. An option
+    /// the engine can't play is refused on its own, so the others still answer.
+    pub async fn decisions(&self, r: DecisionsRequest) -> Result<DecisionsResponse, ApiError> {
+        if r.options.len() > MAX_DECISION_OPTIONS {
+            return Err(ApiError::invalid_request(format!(
+                "at most {MAX_DECISION_OPTIONS} options"
+            )));
+        }
+        let (_, analysis) = self.input_and_analysis(&r.path, r.analysis).await?;
+        let hw = &self.inner.hw;
+        let decisions = r
+            .options
+            .iter()
+            .map(
+                |params| match decide(&r.capabilities, &analysis, params, &hw.encoders) {
+                    Ok(plan) => DecisionOut::Plan {
+                        mode: plan.mode,
+                        video: video_out(&plan, &analysis),
+                        audio: audio_out(&plan, &analysis),
+                        video_reasons: plan.video_reasons.clone(),
+                        audio_reasons: plan.audio_reasons.clone(),
+                        hw: hw_name(&plan, hw).to_owned(),
+                        needs_slot: is_transcode(plan.mode),
+                    },
+                    Err(e) => DecisionOut::Refused { error: e.into() },
+                },
+            )
+            .collect();
+        Ok(DecisionsResponse {
+            bit_rate: analysis.bit_rate,
+            decisions,
+        })
+    }
+
     pub async fn start(&self, r: StartRequest) -> Result<SessionResponse, ApiError> {
         let span = tracing::info_span!("engine.start", session = %r.session_id);
         let reply = self.start_inner(r).instrument(span).await?;
@@ -407,22 +499,7 @@ impl Sessions {
             return Err(ApiError::session_exists());
         }
         let cfg = &self.inner.cfg;
-        let input = cfg.path_map.rewrite(&r.path);
-        if !tokio::fs::metadata(&input).await.is_ok_and(|m| m.is_file()) {
-            return Err(ApiError::file_not_found(format!(
-                "no such file: {}",
-                input.display()
-            )));
-        }
-        let analysis = match r.analysis.filter(analysis::is_current) {
-            Some(a) => a,
-            None => analysis::run_analyze(&cfg.ffprobe(), &input)
-                .await
-                .map_err(|e| match e {
-                    analysis::AnalysisError::Spawn(m) => ApiError::ffmpeg_unavailable(m),
-                    e => ApiError::unreadable_file(e.to_string()),
-                })?,
-        };
+        let (input, analysis) = self.input_and_analysis(&r.path, r.analysis).await?;
         let params = SessionParams {
             audio_index: r.audio_index,
             burn_in_subtitle: r.burn_in_subtitle,

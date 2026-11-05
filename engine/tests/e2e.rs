@@ -988,3 +988,77 @@ async fn analyze_job() {
         );
     }
 }
+
+#[tokio::test]
+async fn decisions_preview_every_option_without_starting_anything() {
+    if !have_ffmpeg() {
+        return;
+    }
+    let e = env().await;
+    let src = e.root.join("in.mkv");
+    make_h264_mkv(&src);
+    let (status, v) = e
+        .api(
+            "POST",
+            "/v1/decisions",
+            Some(json!({
+                "path": src.display().to_string(),
+                "capabilities": caps_json("h264", "mkv"),
+                "options": [{}, {"max_bitrate": 100_000}, {"audio_index": 99}],
+            })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    assert!(v["bit_rate"].as_u64().unwrap() > 0, "{v}");
+
+    let original = &v["decisions"][0];
+    assert_eq!(original["mode"], "direct", "{v}");
+    assert_eq!(original["video"]["action"], "copy");
+    assert_eq!(original["needs_slot"], false);
+    assert!(original.get("url_path").is_none());
+
+    let capped = &v["decisions"][1];
+    assert_eq!(capped["mode"], "transcode", "{v}");
+    assert_eq!(capped["needs_slot"], true);
+    assert_eq!(capped["video_reasons"][0]["code"], "bitrate_cap");
+    assert_eq!(capped["video_reasons"][0]["text"], "capped at 0.1 Mbit/s");
+
+    assert_eq!(v["decisions"][2]["error"]["code"], "invalid_request", "{v}");
+
+    let (_, list) = e.api("GET", "/v1/sessions", None).await;
+    assert_eq!(list["sessions"], json!([]));
+}
+
+#[tokio::test]
+async fn decisions_answer_for_a_missing_file_and_refuse_too_many_options() {
+    let e = env().await;
+    let (status, v) = e
+        .api(
+            "POST",
+            "/v1/decisions",
+            Some(json!({
+                "path": e.root.join("gone.mkv").display().to_string(),
+                "capabilities": caps_json("h264", "mkv"),
+                "options": [{}],
+            })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{v}");
+    assert_eq!(v["code"], "file_not_found");
+
+    let src = e.root.join("present.mkv");
+    std::fs::write(&src, b"not read: too many options are refused first").unwrap();
+    let (status, v) = e
+        .api(
+            "POST",
+            "/v1/decisions",
+            Some(json!({
+                "path": src.display().to_string(),
+                "capabilities": caps_json("h264", "mkv"),
+                "options": vec![json!({}); 33],
+            })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{v}");
+    assert_eq!(v["code"], "invalid_request");
+}

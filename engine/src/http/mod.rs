@@ -8,7 +8,7 @@ use axum::http::request::Parts;
 use axum::http::{Method, header};
 use axum::middleware::{self, Next};
 use axum::response::Response;
-use axum::routing::{get, patch};
+use axum::routing::{get, patch, post};
 use serde::de::DeserializeOwned;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -26,6 +26,7 @@ pub fn router(state: AppState) -> Router {
             "/sessions/{id}",
             patch(control::patch_session).delete(control::delete_session),
         )
+        .route("/decisions", post(control::decisions))
         .route("/jobs", get(control::list_jobs).post(control::submit_job))
         .route(
             "/jobs/{id}",

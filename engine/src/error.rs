@@ -11,6 +11,21 @@ pub struct ApiError {
     pub retry_after: Option<u64>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ErrorBody {
+    pub code: &'static str,
+    pub message: String,
+}
+
+impl From<ApiError> for ErrorBody {
+    fn from(e: ApiError) -> Self {
+        Self {
+            code: e.code,
+            message: e.message,
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct Envelope<'a> {
     message: &'a str,

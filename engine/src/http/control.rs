@@ -14,7 +14,9 @@ use crate::decision::EncoderSet;
 use crate::error::ApiError;
 use crate::http::Params;
 use crate::jobs::{JobRequest, JobSpec, JobState, JobStatus, Priority};
-use crate::session::{PatchRequest, SessionInfo, SessionResponse, StartRequest};
+use crate::session::{
+    DecisionsRequest, DecisionsResponse, PatchRequest, SessionInfo, SessionResponse, StartRequest,
+};
 
 fn parse<T: DeserializeOwned>(body: &Bytes) -> Result<T, ApiError> {
     serde_json::from_slice(body).map_err(|e| ApiError::invalid_request(e.to_string()))
@@ -56,6 +58,14 @@ pub async fn health(State(s): State<AppState>) -> Json<Health> {
         encoders: encoder_names(&s.hw.encoders),
         decoders: s.hw.decoders(),
     })
+}
+
+pub async fn decisions(
+    State(s): State<AppState>,
+    body: Bytes,
+) -> Result<Json<DecisionsResponse>, ApiError> {
+    let req: DecisionsRequest = parse(&body)?;
+    Ok(Json(s.sessions.decisions(req).await?))
 }
 
 pub async fn start_session(
