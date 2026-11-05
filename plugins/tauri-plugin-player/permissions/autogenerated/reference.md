@@ -9,12 +9,14 @@ Allows controlling the native player and listening to its events
 - `allow-play`
 - `allow-pause`
 - `allow-seek`
+- `allow-stop`
 - `allow-speed`
 - `allow-stats`
 - `allow-subtitle`
 - `allow-timing`
 - `allow-registerListener`
 - `allow-removeListener`
+- `allow-remove-listener`
 
 ## Permission Table
 
@@ -184,6 +186,32 @@ Denies the removeListener command without any pre-configured scope.
 <tr>
 <td>
 
+`player:allow-remove-listener`
+
+</td>
+<td>
+
+Enables the remove_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-remove-listener`
+
+</td>
+<td>
+
+Denies the remove_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `player:allow-seek`
 
 </td>
@@ -255,6 +283,32 @@ Enables the stats command without any pre-configured scope.
 <td>
 
 Denies the stats command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-stop`
+
+</td>
+<td>
+
+Enables the stop command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-stop`
+
+</td>
+<td>
+
+Denies the stop command without any pre-configured scope.
 
 </td>
 </tr>

@@ -1,13 +1,17 @@
 """Stands in for Streamline's playback API until the server side lands.
 
 Proxies /api/v1/playback/* to the engine's control plane and mints the HLS
-token like Streamline will (HMAC-SHA256 over "hls|<id>|<exp>"). No auth, no
-watch state: the heartbeat is accepted and dropped. Files are analyzed and their
-subtitles extracted at start, as Streamline does at import; a session opened before
-that finishes probes instead, and its tracks read as still preparing.
+token like Streamline will (HMAC-SHA256 over "hls|<id>|<exp>"). No auth; watch
+state lives in memory. Files are analyzed and their subtitles extracted at start,
+as Streamline does at import; a session opened before that finishes probes instead,
+and its tracks read as still preparing.
 
-    python3 dev/mock-streamline.py --secret <engine secret> \
-        --media demo=/path/to/clip.mkv [--media other=/path ...]
+The library is dev/mock-library.json, in Streamline's shapes, with its titles played
+by the --clip files in turn. A --media id shows up as a movie of that name, playing its
+own file. --art points at img/p/<slug>.jpg and img/b/<slug>.jpg artwork.
+
+    python3 dev/mock-streamline.py --secret <engine secret> --art /path/to/img \
+        --clip /path/to/clip.mkv [--clip ...] [--media film=/path/to/film.mkv ...]
 
 The public URL defaults to 10.0.2.2, the Android emulator's alias for the host.
 """
@@ -15,7 +19,10 @@ The public URL defaults to 10.0.2.2, the Android emulator's alias for the host.
 import argparse
 import hashlib
 import hmac
+import datetime
+import itertools
 import json
+import os
 import re
 import secrets
 import threading
@@ -33,10 +40,64 @@ p.add_argument("--engine", default="http://127.0.0.1:8097")
 p.add_argument("--public", default="http://10.0.2.2:8097", help="engine URL as the device sees it")
 p.add_argument("--secret", required=True)
 p.add_argument("--media", action="append", default=[], help="id=path, repeatable")
+p.add_argument("--clip", action="append", default=[], help="file the library's titles play, repeatable")
+p.add_argument("--art", default="", help="directory holding the artwork")
 args = p.parse_args()
-MEDIA = dict(m.split("=", 1) for m in args.media)
+FILES = dict(m.split("=", 1) for m in args.media)
+MEDIA = dict(FILES)
 ANALYSIS = {}
 SUBTITLES = {}
+SESSIONS = {}
+WATCH = {}
+WATCHED_AT = 0.9
+
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mock-library.json")) as f:
+    LIBRARY = json.load(f)
+MOVIES = LIBRARY["movies"]
+SERIES = LIBRARY["series"]
+REFS = {}
+clips = itertools.cycle(args.clip or list(FILES.values()))
+for number, media_id in enumerate(FILES):
+    MOVIES.insert(number, {
+        "id": 1000 + number, "slug": media_id, "title": media_id, "original_title": media_id, "year": 2026,
+        "overview": "", "runtime": 0, "status": "available", "monitored": True, "tmdb_id": 0, "genres": ["Test"],
+        "rating": 0, "added_at": datetime.datetime.now(datetime.UTC).isoformat(), "file_summary": {"file_count": 1},
+        "media_files": [{"id": media_id}],
+    })
+for movie in MOVIES:
+    media_id = movie["media_files"][0]["id"]
+    MEDIA.setdefault(media_id, next(clips))
+    REFS[media_id] = {"movie_id": movie["id"]}
+for show in SERIES:
+    for season in show["seasons"]:
+        for episode in season["episodes"]:
+            MEDIA.setdefault(episode["media_file_id"], next(clips))
+            REFS[episode["media_file_id"]] = {"series_id": show["id"], "season": season["number"], "episode_id": episode["id"]}
+
+
+def summary(item):
+    return {k: v for k, v in item.items() if k not in ("media_files", "seasons")}
+
+
+def art(kind, item_id, name):
+    items = MOVIES if kind == "movies" else SERIES
+    slug = next((i["slug"] for i in items if str(i["id"]) == item_id), None)
+    folder = {"poster": "p", "backdrop": "b"}[name]
+    path = os.path.join(args.art, folder, f"{slug}.jpg")
+    return path if slug and os.path.exists(path) else None
+
+
+def note_progress(sid, position):
+    media_id = SESSIONS.get(sid)
+    if media_id is None:
+        return
+    analysis = ANALYSIS.get(MEDIA[media_id], {})
+    duration = analysis.get("duration", 0)
+    WATCH[media_id] = {
+        **REFS.get(media_id, {}), "media_id": media_id, "position_seconds": position, "duration_seconds": duration,
+        "watched": duration > 0 and position >= WATCHED_AT * duration,
+        "updated_at": datetime.datetime.now(datetime.UTC).isoformat(),
+    }
 
 
 def engine(method, path, body=None):
@@ -85,6 +146,7 @@ def tracks(media_id, path, base):
         "preparing": job is None,
         "container": analysis.get("container", ""),
         "video": next(iter(analysis.get("video", [])), None),
+        "chapters": analysis.get("chapters", []),
         "audio": analysis.get("audio", []),
         "subtitles": [{**s, "files": files.get(s["index"], {})} for s in analysis.get("subtitles", [])],
         "fonts": [url(f) for f in result["fonts"]],
@@ -112,6 +174,29 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n) or b"{}")
 
     def do_GET(self):
+        if self.path == "/api/v1/movies":
+            return self.reply(200, {"items": [summary(m) for m in MOVIES], "total": len(MOVIES)})
+        if self.path == "/api/v1/series":
+            return self.reply(200, {"items": [summary(s) for s in SERIES], "total": len(SERIES)})
+        m = re.fullmatch(r"/api/v1/(movies|series)/(\d+)", self.path)
+        if m:
+            found = next((i for i in (MOVIES if m[1] == "movies" else SERIES) if str(i["id"]) == m[2]), None)
+            return self.reply(200, found) if found else self.reply(404, {"error": {"code": "not_found"}})
+        if self.path == "/api/v1/watchstate":
+            return self.reply(200, {"items": sorted(WATCH.values(), key=lambda w: w["updated_at"], reverse=True)})
+        m = re.fullmatch(r"/api/v1/posters/(movies|series)/(\d+)/(poster|backdrop)\.jpg", self.path)
+        if m:
+            path = art(m[1], m[2], m[3])
+            if not path:
+                return self.reply(404, {"error": {"code": "not_found"}})
+            with open(path, "rb") as image:
+                data = image.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return None
         if self.path == "/api/v1/playback/status":
             st, _ = engine("GET", "/v1/health")
             return self.reply(200, {"available": st == 200, "media": sorted(MEDIA)})
@@ -142,18 +227,31 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/v1/playback/sessions":
             b = self.body()
-            path = MEDIA.get(b.pop("media_id", None))
+            media_id = b.pop("media_id", None)
+            path = MEDIA.get(media_id)
             if path is None:
                 return self.reply(404, {"error": {"code": "media_not_found"}})
             sid = secrets.token_hex(16)
             if path in ANALYSIS:
                 b["analysis"] = ANALYSIS[path]
+            SESSIONS[sid] = media_id
             st, resp = engine("POST", "/v1/sessions", {"session_id": sid, "path": path, **b})
             return self.reply(st, with_url(sid, resp) if st < 300 else resp)
-        if re.fullmatch(r"/api/v1/playback/sessions/[0-9a-f]{32}/progress", self.path):
-            self.body()
+        m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})/progress", self.path)
+        if m:
+            note_progress(m[1], self.body().get("position", 0))
             return self.reply(204)
         self.reply(404, {"error": {"code": "not_found"}})
+
+    def do_PUT(self):
+        m = re.fullmatch(r"/api/v1/watchstate/(.+)", self.path)
+        if not m or m[1] not in MEDIA:
+            return self.reply(404, {"error": {"code": "not_found"}})
+        WATCH[m[1]] = {
+            **REFS.get(m[1], {}), "media_id": m[1], "position_seconds": 0, "duration_seconds": 0,
+            "watched": self.body().get("watched", False), "updated_at": datetime.datetime.now(datetime.UTC).isoformat(),
+        }
+        self.reply(200, WATCH[m[1]])
 
     def do_PATCH(self):
         m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})", self.path)
@@ -170,7 +268,7 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(st, resp)
 
 
-for media_path in MEDIA.values():
+for media_path in set(MEDIA.values()):
     threading.Thread(target=prepare, args=(media_path,), daemon=True).start()
 
 host, port = args.listen.rsplit(":", 1)

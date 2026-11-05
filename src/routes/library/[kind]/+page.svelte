@@ -1,0 +1,212 @@
+<script lang="ts">
+	import { goto } from "$app/navigation";
+	import { page } from "$app/state";
+	import TvScreen from "#lib/tv/TvScreen.svelte";
+	import { artwork, inProgress, library, pct, watchState, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
+	import { Check } from "@lucide/svelte";
+
+	type Flag = "unwatched" | "progress" | "uhd" | "hdr";
+	const FLAGS: [Flag, string][] = [
+		["unwatched", "Unwatched"],
+		["progress", "In progress"],
+		["uhd", "4K"],
+		["hdr", "HDR"],
+	];
+
+	const kind = $derived(page.params.kind as Kind);
+	let titles = $state.raw<Title[]>([]);
+	let watch = $state.raw<Watch[]>([]);
+	let flags = $state<Flag[]>([]);
+
+	$effect(() => {
+		const current = kind;
+		flags = [];
+		Promise.all([library(current), watchState()]).then(([t, w]) => {
+			titles = [...t].sort((a, b) => b.added_at.localeCompare(a.added_at));
+			watch = w;
+		});
+	});
+
+	const stateOf = (t: Title) => watch.filter((w) => (kind === "movies" ? w.movie_id === t.id : w.series_id === t.id));
+	const going = (t: Title) => stateOf(t).find(inProgress);
+	const watched = (t: Title) => kind === "movies" && stateOf(t).some((w) => w.watched);
+
+	const test: Record<Flag, (t: Title) => boolean> = {
+		unwatched: (t) => !watched(t) && !going(t),
+		progress: (t) => !!going(t),
+		uhd: (t) => t.file_summary?.resolution === "2160p",
+		hdr: (t) => !!t.file_summary?.hdr,
+	};
+	const items = $derived(titles.filter((t) => flags.every((f) => test[f](t))));
+
+	function toggle(f: Flag) {
+		const other: Partial<Record<Flag, Flag>> = { unwatched: "progress", progress: "unwatched" };
+		flags = flags.includes(f) ? flags.filter((x) => x !== f) : [...flags.filter((x) => x !== other[f]), f];
+	}
+</script>
+
+<TvScreen tab={kind} scroll>
+	{#key kind}
+		<div class="page">
+			<div class="head">
+				<h1>{kind === "series" ? "Shows" : "Movies"}</h1>
+				<span class="count">{items.length} of {titles.length} {kind === "series" ? "shows" : "movies"}</span>
+			</div>
+			<div class="filters" data-tv-row="1">
+				{#each FLAGS as [f, label]}
+					<button data-tv="1" class="filter" class:on={flags.includes(f)} onclick={() => toggle(f)}>{#if flags.includes(f)}<Check size={22} strokeWidth={2.5} />{/if}{label}</button>
+				{/each}
+			</div>
+			<div class="grid">
+				{#each items as t}
+					<div class="item">
+						<button data-tv="1" data-fid={String(t.id)} class="card" aria-label={t.title} onclick={() => goto(`/detail/${kind}/${t.id}`)}>
+							<img src={artwork(kind, t.id, "poster")} alt="" loading="lazy" />
+							{#if going(t)}<span class="bar"><span style:width="{pct(going(t))}%"></span></span>{/if}
+							{#if watched(t)}<span class="done"><Check size={22} strokeWidth={3} /></span>{/if}
+						</button>
+						<span class="name">{t.title}</span>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/key}
+</TvScreen>
+
+<style>
+	.page {
+		padding: 156px 96px 96px;
+		display: flex;
+		flex-direction: column;
+		gap: 30px;
+	}
+
+	.head {
+		display: flex;
+		align-items: baseline;
+		gap: 22px;
+	}
+
+	h1 {
+		margin: 0;
+		font-size: 58px;
+		font-weight: 700;
+		letter-spacing: -0.03em;
+	}
+
+	.count {
+		font: 400 24px var(--font-mono);
+		color: var(--fg-subtle);
+	}
+
+	.filters {
+		display: flex;
+		gap: 14px;
+	}
+
+	.filter {
+		height: 56px;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 0 26px;
+		border-radius: 28px;
+		border: 0;
+		background: var(--surface-2);
+		color: var(--fg-muted);
+		font-size: 23px;
+		font-weight: 500;
+		cursor: pointer;
+		outline: none;
+		transition: transform var(--dur-fast);
+	}
+
+	.filter.on {
+		background: rgba(255, 255, 255, 0.16);
+		color: var(--fg);
+	}
+
+	.filter:focus {
+		background: var(--player-ink);
+		color: var(--fg-on-accent);
+		transform: scale(1.06);
+	}
+
+	.grid {
+		display: grid;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+		gap: 52px 40px;
+		padding-top: 10px;
+	}
+
+	.item {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		min-width: 0;
+	}
+
+	.card {
+		position: relative;
+		display: block;
+		width: 100%;
+		aspect-ratio: 2 / 3;
+		padding: 0;
+		border: 0;
+		border-radius: 14px;
+		overflow: hidden;
+		background: var(--bg-card);
+		cursor: pointer;
+		outline: none;
+		transition: transform 220ms var(--ease), box-shadow 220ms;
+	}
+
+	.card:focus {
+		transform: translateY(-12px) scale(1.04);
+		box-shadow: 0 0 0 3px var(--bg-deep), 0 0 0 8px var(--accent), 0 0 64px color-mix(in srgb, var(--accent) 60%, transparent), 0 28px 56px rgba(0, 0, 0, 0.65);
+	}
+
+	.card img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.bar {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 6px;
+		background: rgba(255, 255, 255, 0.2);
+	}
+
+	.bar > span {
+		display: block;
+		height: 100%;
+		background: var(--accent);
+	}
+
+	.done {
+		position: absolute;
+		right: 12px;
+		top: 12px;
+		width: 40px;
+		height: 40px;
+		display: grid;
+		place-items: center;
+		border-radius: 50%;
+		background: var(--accent);
+		color: var(--fg-on-accent);
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+	}
+
+	.name {
+		font-size: 26px;
+		font-weight: 500;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+</style>

@@ -1,0 +1,1159 @@
+{
+ "movies": [
+  {
+   "id": 1,
+   "slug": "dune2",
+   "title": "Dune: Part Two",
+   "original_title": "Dune: Part Two",
+   "year": 2024,
+   "overview": "Paul Atreides joins the Fremen of Arrakis and takes the war to the house that destroyed his family, while a prophecy closes in around him.",
+   "runtime": 166,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 1,
+   "genres": [
+    "Science fiction",
+    "Adventure"
+   ],
+   "rating": 8.2,
+   "added_at": "2026-11-02T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "TrueHD Atmos",
+    "channels": "7.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-1"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "slug": "furiosa",
+   "title": "Furiosa: A Mad Max Saga",
+   "original_title": "Furiosa: A Mad Max Saga",
+   "year": 2024,
+   "overview": "Taken from the Green Place as a child, Furiosa spends fifteen years in the Wasteland planning her way home.",
+   "runtime": 149,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 2,
+   "genres": [
+    "Action",
+    "Adventure"
+   ],
+   "rating": 7.5,
+   "added_at": "2026-10-31T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-2"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "slug": "alienromulus",
+   "title": "Alien: Romulus",
+   "original_title": "Alien: Romulus",
+   "year": 2024,
+   "overview": "Young colonists strip an abandoned station for a way off their mining world and wake something up.",
+   "runtime": 119,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 3,
+   "genres": [
+    "Horror",
+    "Science fiction"
+   ],
+   "rating": 7.2,
+   "added_at": "2026-10-29T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-3"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "slug": "wildrobot",
+   "title": "The Wild Robot",
+   "original_title": "The Wild Robot",
+   "year": 2024,
+   "overview": "A robot washed up on a wild island learns to survive, and ends up raising an orphaned gosling.",
+   "runtime": 102,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 4,
+   "genres": [
+    "Animation",
+    "Family"
+   ],
+   "rating": 8.4,
+   "added_at": "2026-10-27T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-4"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "slug": "civilwar",
+   "title": "Civil War",
+   "original_title": "Civil War",
+   "year": 2024,
+   "overview": "A team of journalists drives across a divided America to reach Washington before it falls.",
+   "runtime": 109,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 5,
+   "genres": [
+    "War",
+    "Thriller"
+   ],
+   "rating": 7,
+   "added_at": "2026-10-25T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-5"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "slug": "gladiator2",
+   "title": "Gladiator II",
+   "original_title": "Gladiator II",
+   "year": 2024,
+   "overview": "Years after Maximus, a captured warrior fights his way through the Colosseum toward the emperors who conquered his home.",
+   "runtime": 148,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 6,
+   "genres": [
+    "Action",
+    "Drama"
+   ],
+   "rating": 6.8,
+   "added_at": "2026-10-23T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-6"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "slug": "godzillam1",
+   "title": "Godzilla Minus One",
+   "original_title": "Godzilla Minus One",
+   "year": 2023,
+   "overview": "Post-war Japan, already at zero, faces a monster that could push it below.",
+   "runtime": 125,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 7,
+   "genres": [
+    "Science fiction",
+    "Drama"
+   ],
+   "rating": 7.6,
+   "added_at": "2026-10-21T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-7"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "slug": "poorthings",
+   "title": "Poor Things",
+   "original_title": "Poor Things",
+   "year": 2023,
+   "overview": "Brought back to life by an eccentric surgeon, Bella Baxter sets out to see the world on her own terms.",
+   "runtime": 141,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 8,
+   "genres": [
+    "Comedy",
+    "Science fiction"
+   ],
+   "rating": 7.8,
+   "added_at": "2026-10-19T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-8"
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "slug": "anatomy",
+   "title": "Anatomy of a Fall",
+   "original_title": "Anatomy of a Fall",
+   "year": 2023,
+   "overview": "A novelist stands trial for her husband’s death. Their son is the only witness.",
+   "runtime": 152,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 9,
+   "genres": [
+    "Drama",
+    "Mystery"
+   ],
+   "rating": 7.7,
+   "added_at": "2026-10-17T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "1080p",
+    "codec": "H.264",
+    "hdr": "",
+    "audio": "EAC3",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-9"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "slug": "zone",
+   "title": "The Zone of Interest",
+   "original_title": "The Zone of Interest",
+   "year": 2023,
+   "overview": "The commandant of Auschwitz and his wife build a dream life on the other side of the camp wall.",
+   "runtime": 105,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 10,
+   "genres": [
+    "Drama",
+    "History"
+   ],
+   "rating": 7.1,
+   "added_at": "2026-10-15T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "1080p",
+    "codec": "H.264",
+    "hdr": "",
+    "audio": "EAC3",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-10"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "slug": "pastlives",
+   "title": "Past Lives",
+   "original_title": "Past Lives",
+   "year": 2023,
+   "overview": "Two childhood friends from Seoul find each other again, twenty years and an ocean later.",
+   "runtime": 106,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 11,
+   "genres": [
+    "Romance",
+    "Drama"
+   ],
+   "rating": 7.8,
+   "added_at": "2026-10-13T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "1080p",
+    "codec": "H.264",
+    "hdr": "",
+    "audio": "EAC3",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-11"
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "slug": "oppenheimer",
+   "title": "Oppenheimer",
+   "original_title": "Oppenheimer",
+   "year": 2023,
+   "overview": "The physicist who led the Manhattan Project, before and after the test that changed the world.",
+   "runtime": 180,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 12,
+   "genres": [
+    "Drama",
+    "History"
+   ],
+   "rating": 8.1,
+   "added_at": "2026-10-11T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "TrueHD Atmos",
+    "channels": "7.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-12"
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "slug": "arrival",
+   "title": "Arrival",
+   "original_title": "Arrival",
+   "year": 2016,
+   "overview": "A linguist is brought in to talk to the visitors whose twelve ships now hang over the Earth.",
+   "runtime": 116,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 13,
+   "genres": [
+    "Science fiction",
+    "Drama"
+   ],
+   "rating": 7.6,
+   "added_at": "2026-10-09T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "1080p",
+    "codec": "H.264",
+    "hdr": "",
+    "audio": "DTS-HD MA",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-13"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "slug": "interstellar",
+   "title": "Interstellar",
+   "original_title": "Interstellar",
+   "year": 2014,
+   "overview": "With crops failing on Earth, a former pilot leads a crew through a wormhole to find humanity a new home.",
+   "runtime": 169,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 14,
+   "genres": [
+    "Science fiction",
+    "Drama"
+   ],
+   "rating": 8.4,
+   "added_at": "2026-10-07T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "TrueHD Atmos",
+    "channels": "7.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-14"
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "slug": "br2049",
+   "title": "Blade Runner 2049",
+   "original_title": "Blade Runner 2049",
+   "year": 2017,
+   "overview": "A blade runner digs up a secret that could tip what is left of society into chaos, and goes looking for Rick Deckard.",
+   "runtime": 164,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 15,
+   "genres": [
+    "Science fiction",
+    "Drama"
+   ],
+   "rating": 7.6,
+   "added_at": "2026-10-05T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "TrueHD Atmos",
+    "channels": "7.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-15"
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "slug": "inception",
+   "title": "Inception",
+   "original_title": "Inception",
+   "year": 2010,
+   "overview": "A thief who steals secrets from dreams takes one last job: planting an idea instead.",
+   "runtime": 148,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 16,
+   "genres": [
+    "Science fiction",
+    "Action"
+   ],
+   "rating": 8.4,
+   "added_at": "2026-10-03T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "1080p",
+    "codec": "H.264",
+    "hdr": "",
+    "audio": "DTS-HD MA",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-16"
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "slug": "matrix",
+   "title": "The Matrix",
+   "original_title": "The Matrix",
+   "year": 1999,
+   "overview": "A hacker learns the world he lives in is a simulation, and that he may be the one to end it.",
+   "runtime": 136,
+   "status": "available",
+   "monitored": true,
+   "tmdb_id": 17,
+   "genres": [
+    "Science fiction",
+    "Action"
+   ],
+   "rating": 8.2,
+   "added_at": "2026-10-01T00:00:00.000Z",
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "1080p",
+    "codec": "H.264",
+    "hdr": "",
+    "audio": "DTS-HD MA",
+    "channels": "5.1"
+   },
+   "media_files": [
+    {
+     "id": "movie-17"
+    }
+   ]
+  }
+ ],
+ "series": [
+  {
+   "id": 1,
+   "slug": "severance",
+   "title": "Severance",
+   "original_title": "Severance",
+   "year": 2022,
+   "overview": "Lumon employees have their memories surgically split between work and home. At work, some of them start asking questions.",
+   "network": "Apple TV+",
+   "rating": 8.4,
+   "genres": [
+    "Science fiction",
+    "Drama"
+   ],
+   "added_at": "2026-11-02T00:00:00.000Z",
+   "first_aired": "2022–",
+   "total_seasons": 2,
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "Dolby Vision",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "seasons": [
+    {
+     "id": 1,
+     "number": 1,
+     "name": "Season 1",
+     "total": 6,
+     "episodes": [
+      {
+       "id": 1,
+       "number": 1,
+       "title": "Good News About Hell",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 57,
+       "media_file_id": "ep-1-1-1"
+      },
+      {
+       "id": 2,
+       "number": 2,
+       "title": "Half Loop",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 53,
+       "media_file_id": "ep-1-1-2"
+      },
+      {
+       "id": 3,
+       "number": 3,
+       "title": "In Perpetuity",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 53,
+       "media_file_id": "ep-1-1-3"
+      },
+      {
+       "id": 4,
+       "number": 4,
+       "title": "The You You Are",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 55,
+       "media_file_id": "ep-1-1-4"
+      },
+      {
+       "id": 5,
+       "number": 5,
+       "title": "The Grim Barbarity of Optics and Design",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 51,
+       "media_file_id": "ep-1-1-5"
+      },
+      {
+       "id": 6,
+       "number": 6,
+       "title": "Hide and Seek",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 54,
+       "media_file_id": "ep-1-1-6"
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "number": 2,
+     "name": "Season 2",
+     "total": 6,
+     "episodes": [
+      {
+       "id": 7,
+       "number": 1,
+       "title": "Hello, Ms. Cobel",
+       "overview": "Mark returns to a severed floor that has quietly changed.",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 59,
+       "media_file_id": "ep-1-2-1"
+      },
+      {
+       "id": 8,
+       "number": 2,
+       "title": "Goodbye, Mrs. Selvig",
+       "overview": "Outside, the fallout from the overtime contingency lands.",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 48,
+       "media_file_id": "ep-1-2-2"
+      },
+      {
+       "id": 9,
+       "number": 3,
+       "title": "Who Is Alive?",
+       "overview": "An evening out goes sideways; Mark goes looking for answers.",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 50,
+       "media_file_id": "ep-1-2-3"
+      },
+      {
+       "id": 10,
+       "number": 4,
+       "title": "Woe’s Hollow",
+       "overview": "The team is sent off-site for an outdoor retreat.",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 49,
+       "media_file_id": "ep-1-2-4"
+      },
+      {
+       "id": 11,
+       "number": 5,
+       "title": "Trojan’s Horse",
+       "overview": "Secrets strain the team while Mark chases a lead.",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 50,
+       "media_file_id": "ep-1-2-5"
+      },
+      {
+       "id": 12,
+       "number": 6,
+       "title": "Attila",
+       "overview": "Irving follows his suspicions. A dinner gets awkward.",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 51,
+       "media_file_id": "ep-1-2-6"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "slug": "shogun",
+   "title": "Shōgun",
+   "original_title": "Shōgun",
+   "year": 2024,
+   "overview": "In 1600 Japan, a shipwrecked English navigator is drawn into a war between rival lords.",
+   "network": "FX",
+   "rating": 8.6,
+   "genres": [
+    "Drama",
+    "History"
+   ],
+   "added_at": "2026-10-31T00:00:00.000Z",
+   "first_aired": "2024",
+   "total_seasons": 1,
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "seasons": [
+    {
+     "id": 1,
+     "number": 1,
+     "name": "Season 1",
+     "total": 6,
+     "episodes": [
+      {
+       "id": 13,
+       "number": 1,
+       "title": "Anjin",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 70,
+       "media_file_id": "ep-2-1-1"
+      },
+      {
+       "id": 14,
+       "number": 2,
+       "title": "Servants of Two Masters",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 59,
+       "media_file_id": "ep-2-1-2"
+      },
+      {
+       "id": 15,
+       "number": 3,
+       "title": "Tomorrow Is Tomorrow",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 59,
+       "media_file_id": "ep-2-1-3"
+      },
+      {
+       "id": 16,
+       "number": 4,
+       "title": "The Eightfold Fence",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 58,
+       "media_file_id": "ep-2-1-4"
+      },
+      {
+       "id": 17,
+       "number": 5,
+       "title": "Broken to the Fist",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 59,
+       "media_file_id": "ep-2-1-5"
+      },
+      {
+       "id": 18,
+       "number": 6,
+       "title": "Ladies of the Willow World",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 61,
+       "media_file_id": "ep-2-1-6"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "slug": "lastofus",
+   "title": "The Last of Us",
+   "original_title": "The Last of Us",
+   "year": 2023,
+   "overview": "Twenty years after a fungal outbreak, a smuggler is hired to get a teenage girl across a ruined America.",
+   "network": "HBO",
+   "rating": 8.6,
+   "genres": [
+    "Drama",
+    "Science fiction"
+   ],
+   "added_at": "2026-10-29T00:00:00.000Z",
+   "first_aired": "2023–",
+   "total_seasons": 2,
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "1080p",
+    "codec": "H.264",
+    "hdr": "",
+    "audio": "EAC3",
+    "channels": "5.1"
+   },
+   "seasons": [
+    {
+     "id": 1,
+     "number": 1,
+     "name": "Season 1",
+     "total": 6,
+     "episodes": [
+      {
+       "id": 19,
+       "number": 1,
+       "title": "When You’re Lost in the Darkness",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 81,
+       "media_file_id": "ep-3-1-1"
+      },
+      {
+       "id": 20,
+       "number": 2,
+       "title": "Infected",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 53,
+       "media_file_id": "ep-3-1-2"
+      },
+      {
+       "id": 21,
+       "number": 3,
+       "title": "Long, Long Time",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 76,
+       "media_file_id": "ep-3-1-3"
+      },
+      {
+       "id": 22,
+       "number": 4,
+       "title": "Please Hold to My Hand",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 46,
+       "media_file_id": "ep-3-1-4"
+      },
+      {
+       "id": 23,
+       "number": 5,
+       "title": "Endure and Survive",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 59,
+       "media_file_id": "ep-3-1-5"
+      },
+      {
+       "id": 24,
+       "number": 6,
+       "title": "Kin",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 59,
+       "media_file_id": "ep-3-1-6"
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "number": 2,
+     "name": "Season 2",
+     "total": 6,
+     "episodes": [
+      {
+       "id": 25,
+       "number": 1,
+       "title": "Future Days",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 51,
+       "media_file_id": "ep-3-2-1"
+      },
+      {
+       "id": 26,
+       "number": 2,
+       "title": "Through the Valley",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 56,
+       "media_file_id": "ep-3-2-2"
+      },
+      {
+       "id": 27,
+       "number": 3,
+       "title": "The Path",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 58,
+       "media_file_id": "ep-3-2-3"
+      },
+      {
+       "id": 28,
+       "number": 4,
+       "title": "Day One",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 52,
+       "media_file_id": "ep-3-2-4"
+      },
+      {
+       "id": 29,
+       "number": 5,
+       "title": "Feel Her Love",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 49,
+       "media_file_id": "ep-3-2-5"
+      },
+      {
+       "id": 30,
+       "number": 6,
+       "title": "The Price",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 61,
+       "media_file_id": "ep-3-2-6"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "slug": "arcane",
+   "title": "Arcane",
+   "original_title": "Arcane",
+   "year": 2021,
+   "overview": "Two sisters end up on opposite sides of a war between the city of Piltover and the undercity below it.",
+   "network": "Netflix",
+   "rating": 8.8,
+   "genres": [
+    "Animation",
+    "Action"
+   ],
+   "added_at": "2026-10-27T00:00:00.000Z",
+   "first_aired": "2021–2024",
+   "total_seasons": 2,
+   "file_summary": {
+    "file_count": 1,
+    "resolution": "2160p",
+    "codec": "HEVC Main10",
+    "hdr": "HDR10",
+    "audio": "EAC3 Atmos",
+    "channels": "5.1"
+   },
+   "seasons": [
+    {
+     "id": 1,
+     "number": 1,
+     "name": "Season 1",
+     "total": 6,
+     "episodes": [
+      {
+       "id": 31,
+       "number": 1,
+       "title": "Welcome to the Playground",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 44,
+       "media_file_id": "ep-4-1-1"
+      },
+      {
+       "id": 32,
+       "number": 2,
+       "title": "Some Mysteries Are Better Left Unsolved",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 39,
+       "media_file_id": "ep-4-1-2"
+      },
+      {
+       "id": 33,
+       "number": 3,
+       "title": "The Base Violence Necessary for Change",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 43,
+       "media_file_id": "ep-4-1-3"
+      },
+      {
+       "id": 34,
+       "number": 4,
+       "title": "Happy Progress Day!",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 41,
+       "media_file_id": "ep-4-1-4"
+      },
+      {
+       "id": 35,
+       "number": 5,
+       "title": "Everybody Wants to Be My Enemy",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 40,
+       "media_file_id": "ep-4-1-5"
+      },
+      {
+       "id": 36,
+       "number": 6,
+       "title": "When These Walls Come Tumbling Down",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 40,
+       "media_file_id": "ep-4-1-6"
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "number": 2,
+     "name": "Season 2",
+     "total": 6,
+     "episodes": [
+      {
+       "id": 37,
+       "number": 1,
+       "title": "Heavy Is the Crown",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 40,
+       "media_file_id": "ep-4-2-1"
+      },
+      {
+       "id": 38,
+       "number": 2,
+       "title": "Watch It All Burn",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 41,
+       "media_file_id": "ep-4-2-2"
+      },
+      {
+       "id": 39,
+       "number": 3,
+       "title": "Finally Got It Right",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 43,
+       "media_file_id": "ep-4-2-3"
+      },
+      {
+       "id": 40,
+       "number": 4,
+       "title": "Paint the Town Blue",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 38,
+       "media_file_id": "ep-4-2-4"
+      },
+      {
+       "id": 41,
+       "number": 5,
+       "title": "Blisters and Bedrock",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 40,
+       "media_file_id": "ep-4-2-5"
+      },
+      {
+       "id": 42,
+       "number": 6,
+       "title": "The Message Hidden Within the Pattern",
+       "overview": "",
+       "air_date": "2024-01-01",
+       "status": "available",
+       "has_file": true,
+       "runtime": 42,
+       "media_file_id": "ep-4-2-6"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

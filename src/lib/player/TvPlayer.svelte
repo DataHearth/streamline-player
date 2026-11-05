@@ -1,9 +1,5 @@
 <script lang="ts">
-	import "#lib/design/fonts.css";
-	import "#lib/design/colors.css";
-	import "#lib/design/motion.css";
-	import "#lib/design/shape.css";
-	import "#lib/design/typography.css";
+	import { focusDefault as focusStageDefault, move } from "#lib/tv/focus.ts";
 	import { addPluginListener, invoke } from "@tauri-apps/api/core";
 	import {
 		Activity,
@@ -28,6 +24,34 @@
 		X,
 	} from "@lucide/svelte";
 	import { onMount, tick } from "svelte";
+
+	type Next = { code: string; title: string; overview: string; still: string; stillPos: string; label: string; href: string };
+	type More = { title: string; poster: string; href: string };
+	let {
+		mediaId,
+		heading,
+		eyebrow,
+		frame,
+		framePos,
+		start: startAt,
+		next,
+		more,
+		onexit,
+		onnext,
+		onopen,
+	}: {
+		mediaId: string;
+		heading: string;
+		eyebrow: string;
+		frame: string;
+		framePos: string;
+		start: number;
+		next: Next | null;
+		more: More[];
+		onexit: () => void;
+		onnext: () => void;
+		onopen: (href: string) => void;
+	} = $props();
 
 	type Reason = { code: string; text: string };
 	type Session = {
@@ -90,13 +114,11 @@
 	const AUDIO_DELAY_LIMIT = 500;
 	const RECOVERY_WINDOW_MS = 30_000;
 	const RETRY_SECS = 10;
-	const STAGE_WIDTH = 1920;
 	const MODE_LABEL = { direct: "Direct play", remux: "Remux", audio_transcode: "Audio conversion", transcode: "Transcode" };
 
-	let media = $state<string[]>([]);
-	let mediaIdx = $state(0);
 	let session = $state<Session | null>(null);
-	let position = $state(0);
+	// svelte-ignore state_referenced_locally
+	let position = $state(startAt);
 	let duration = $state(0);
 	let playing = $state(false);
 	let buffering = $state(true);
@@ -123,7 +145,6 @@
 	let encodeSpeed = $state<number | null>(null);
 	let subTouched = false;
 	let halt = $state<Halt | null>(null);
-	let zoom = $state(1);
 	let skL = $state<Flash>({ ph: "idle", amt: 0, rot: 0 });
 	let skR = $state<Flash>({ ph: "idle", amt: 0, rot: 0 });
 	let pf = $state<"idle" | "in" | "out">("idle");
@@ -140,8 +161,8 @@
 	let osdTimer: ReturnType<typeof setTimeout> | undefined;
 	let positionAt = 0;
 
-	const title = $derived(media[mediaIdx] ?? "");
-	const controlsOn = $derived(controls || !playing || menu);
+	const isEpisode = $derived(/ S\d+ E\d+$/.test(eyebrow));
+	const controlsOn = $derived(controls || (!playing && !buffering) || menu);
 	const pct = $derived(duration > 0 ? (position / duration) * 100 : 0);
 	const full = $derived(session?.mode === "direct" || session?.mode === "remux");
 	const modeLabel = $derived.by(() => {
@@ -419,7 +440,7 @@
 	}
 
 	async function refreshTracks() {
-		tracks = await invoke<Tracks>("media_tracks", { mediaId: title }).catch(() => tracks);
+		tracks = await invoke<Tracks>("media_tracks", { mediaId }).catch(() => tracks);
 		autoForced();
 	}
 
@@ -439,8 +460,7 @@
 
 	async function focusDefault() {
 		await tick();
-		const root = stage?.querySelector<HTMLElement>("[data-tv-trap]") ?? stage;
-		root?.querySelector<HTMLElement>("[data-tv-default]")?.focus();
+		if (stage) focusStageDefault(stage);
 	}
 
 	function clearHalt() {
@@ -465,12 +485,8 @@
 		buffering = true;
 		try {
 			capabilities ??= await player("capabilities");
-			if (!media.length) {
-				const status = await invoke<{ media: string[] }>("playback_status");
-				media = status.media;
-			}
 			refreshTracks();
-			const started = await invoke<Session>("start_session", { mediaId: title, capabilities, position: at, tracks: sessionTracks() });
+			const started = await invoke<Session>("start_session", { mediaId, capabilities, position: at, tracks: sessionTracks() });
 			// The viewer left while the server was still answering.
 			if (id !== startId) {
 				invoke("stop_session", { id: started.session_id }).catch(() => {});
@@ -545,29 +561,20 @@
 		await invoke("stop_session", { id }).catch(() => {});
 	}
 
-	// ponytail: no library screen yet, so leaving the player moves on to the mock's next clip.
 	async function exit() {
 		clearHalt();
+		startId++;
+		await leave();
+		onexit();
+	}
+
+	async function leave() {
+		if (session) await invoke("heartbeat", { id: session.session_id, position, paused: true }).catch(() => {});
 		await stop();
-		if (media.length) mediaIdx = (mediaIdx + 1) % media.length;
-		quality = "auto";
-		paused = false;
-		position = 0;
-		tracks = null;
-		audioPick = null;
-		subPick = null;
-		burn = false;
-		subOffset = 0;
-		audioDelay = 0;
-		subTouched = false;
-		cues = [];
+		player("stop").catch(() => {});
 		player("subtitle", {}).catch(() => {});
-		syncTiming();
-		duration = 0;
-		ended = false;
-		stats = false;
-		pickSpeed(1);
-		await start();
+		player("speed", { speed: 1 }).catch(() => {});
+		player("timing", { subtitleOffset: 0, subtitleScale: 1, audioDelay: 0 }).catch(() => {});
 	}
 
 	function finish() {
@@ -576,7 +583,7 @@
 		menu = false;
 		stats = false;
 		buffering = false;
-		stop();
+		leave();
 		focusDefault();
 	}
 
@@ -678,33 +685,11 @@
 			stats = false;
 			return focusDefault();
 		}
-		if (controls && playing) {
+		if (controls && (playing || buffering)) {
 			controls = false;
 			return;
 		}
 		exit();
-	}
-
-	function moveFocus(key: string) {
-		const root = stage.querySelector<HTMLElement>("[data-tv-trap]") ?? stage;
-		const from = document.activeElement as HTMLElement | null;
-		const els = [...root.querySelectorAll<HTMLElement>("[data-tv]:not([disabled])")].filter((e) => e !== from);
-		if (!from || !root.contains(from)) return els[0]?.focus();
-		const a = from.getBoundingClientRect();
-		const [ax, ay] = [a.left + a.width / 2, a.top + a.height / 2];
-		const horizontal = key === "ArrowLeft" || key === "ArrowRight";
-		const sign = key === "ArrowLeft" || key === "ArrowUp" ? -1 : 1;
-		let best: HTMLElement | null = null;
-		let bestScore = Infinity;
-		for (const el of els) {
-			const b = el.getBoundingClientRect();
-			const [dx, dy] = [b.left + b.width / 2 - ax, b.top + b.height / 2 - ay];
-			const along = (horizontal ? dx : dy) * sign;
-			if (along <= 1) continue;
-			const score = along + 2 * Math.abs(horizontal ? dy : dx);
-			if (score < bestScore) [best, bestScore] = [el, score];
-		}
-		best?.focus();
 	}
 
 	function onKey(e: KeyboardEvent) {
@@ -719,7 +704,7 @@
 		if (halt || menu || ended) {
 			if (arrow) {
 				e.preventDefault();
-				moveFocus(k);
+				move(k, stage);
 			}
 			return;
 		}
@@ -746,14 +731,11 @@
 			focusDefault();
 		} else if (arrow) {
 			e.preventDefault();
-			moveFocus(k);
+			move(k, stage);
 		}
 	}
 
 	onMount(() => {
-		const resize = () => (zoom = window.innerWidth / STAGE_WIDTH);
-		resize();
-		window.addEventListener("resize", resize);
 		const listeners = [
 			addPluginListener<{ position: number; duration: number }>("player", "position", (e) => {
 				position = e.position;
@@ -777,7 +759,7 @@
 			addPluginListener("player", "back", back),
 			addPluginListener("player", "subtitleFailed", () => flashOsd("Subtitles unavailable")),
 		];
-		start();
+		start(startAt);
 		const cueTimer = setInterval(updateCue, 100);
 		const beat = setInterval(() => {
 			if (session) invoke("heartbeat", { id: session.session_id, position, paused: !playing }).catch(() => {});
@@ -790,9 +772,9 @@
 			clearInterval(beat);
 			clearInterval(hide);
 			clearInterval(retryTimer);
-			window.removeEventListener("resize", resize);
 			listeners.forEach((l) => l.then((h) => h.unregister()));
-			stop();
+			startId++;
+			leave();
 		};
 	});
 </script>
@@ -857,7 +839,7 @@
 	</div>
 {/snippet}
 
-<div class="stage" bind:this={stage} style:zoom>
+<div class="stage" bind:this={stage}>
 	<div class="scrim" style:opacity={controlsOn ? 1 : 0}></div>
 
 	{#if buffering}<div class="sl-spin" role="status" aria-label="Buffering"></div>{/if}
@@ -890,7 +872,7 @@
 		{#if controlsOn && !ended}
 			<div class="controls">
 				<div class="head">
-					<span class="tv-title">{title}</span>
+					<span class="tv-heading"><span class="tv-eyebrow">{eyebrow}</span><span class="tv-title">{heading}</span></span>
 					<span class="mode"><span class="dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"}></span>{modeLabel}</span>
 				</div>
 				<button data-tv="1" data-scrub="1" class="scrub" aria-label="Seek">
@@ -1020,22 +1002,51 @@
 
 	{#if ended}
 		<div class="end" data-tv-trap="1">
+			<img class="frame" src={frame} alt="" style:object-position={framePos} />
 			<div class="halt-scrim end-scrim"></div>
 			<div class="halt-zoom">
-				<div class="halt-col end-col">
-					<span class="eyebrow" style:color="var(--player-accent-text)">Finished</span>
-					<span class="halt-title">{title}</span>
-					<div class="actions">
-						<button data-tv="1" data-tv-default="1" class="primary end-done" onclick={exit}>Done</button>
-						<button data-tv="1" class="secondary end-again" onclick={replay}><RotateCcw size={16} strokeWidth={2} />Watch again</button>
+				{#if next}
+					<div class="end-next">
+						<div class="halt-col end-col">
+							<span class="eyebrow" style:color="var(--player-accent-text)">Up next &middot; {next.code}</span>
+							<span class="halt-title">{next.title}</span>
+							{#if next.overview}<span class="end-syn">{next.overview}</span>{/if}
+							<div class="actions">
+								<button data-tv="1" data-tv-default="1" class="primary" onclick={onnext}><Play size={16} fill="currentColor" />{next.label}</button>
+								<button data-tv="1" class="secondary" onclick={exit}>Done</button>
+							</div>
+						</div>
+						<div class="end-still"><img src={next.still} alt="" style:object-position={next.stillPos} /></div>
 					</div>
-				</div>
+				{:else}
+					<div class="end-done-col">
+						<div class="halt-col end-col">
+							<span class="eyebrow" style:color="var(--player-accent-text)">{isEpisode ? `Finished \u00B7 ${eyebrow.split(" \u00B7 ").at(-1)}` : "Finished"}</span>
+							<span class="halt-title">{isEpisode ? eyebrow.split(" \u00B7 ")[0] : heading}</span>
+							<div class="actions">
+								<button data-tv="1" data-tv-default="1" class="primary end-done" onclick={exit}>Done</button>
+								<button data-tv="1" class="secondary end-again" onclick={replay}><RotateCcw size={16} strokeWidth={2} />Watch again</button>
+							</div>
+						</div>
+						{#if more.length}
+							<div class="end-more">
+								<span class="more-title">More like this</span>
+								<div class="more-row" data-tv-row="1">
+									{#each more as it}
+										<button data-tv="1" class="more-card" aria-label={it.title} onclick={() => onopen(it.href)}><img src={it.poster} alt="" loading="lazy" /></button>
+									{/each}
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		</div>
 	{/if}
 
 	{#if halt}
 		<div class="halt" role="alertdialog" aria-label={halt.eyebrow} data-tv-trap="1">
+			<img class="frame" src={frame} alt="" style:object-position={framePos} />
 			<div class="halt-scrim"></div>
 			<div class="halt-zoom">
 				<div class="halt-col">
@@ -1063,26 +1074,13 @@
 </div>
 
 <style>
-	:global(html),
-	:global(body) {
-		margin: 0;
-		height: 100%;
-		overflow: hidden;
-		background: transparent;
-		color: var(--player-ink);
-		font-family: var(--font-sans);
-	}
-
-	button {
-		font-family: inherit;
-	}
-
 	.stage {
 		position: fixed;
 		left: 0;
 		top: 0;
 		width: 1920px;
 		height: 1080px;
+		zoom: var(--tv-zoom, 1);
 		overflow: hidden;
 		user-select: none;
 	}
@@ -1210,6 +1208,19 @@
 		align-items: flex-end;
 		justify-content: space-between;
 		gap: 40px;
+	}
+
+	.tv-heading {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.tv-eyebrow {
+		font: 500 22px var(--font-mono);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--player-accent-text);
 	}
 
 	.tv-title {
@@ -1875,6 +1886,103 @@
 
 	.end-scrim {
 		background: linear-gradient(90deg, var(--hero-scrim) 0%, color-mix(in srgb, var(--bg-deep) 72%, transparent) 50%, color-mix(in srgb, var(--bg-deep) 40%, transparent) 100%);
+	}
+
+	.frame {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		filter: blur(32px) saturate(1.2);
+		transform: scale(1.15);
+		opacity: 0.5;
+	}
+
+	.end-next {
+		display: flex;
+		align-items: center;
+		gap: 48px;
+		animation: slp-rise 360ms var(--ease);
+	}
+
+	.end-next .end-col {
+		flex: 1 1 0;
+		min-width: 0;
+		max-width: 520px;
+		animation: none;
+	}
+
+	.end-syn {
+		font-size: 14px;
+		line-height: 1.55;
+		color: var(--player-ink-muted);
+		text-wrap: pretty;
+	}
+
+	.end-still {
+		flex: none;
+		width: 400px;
+		aspect-ratio: 16 / 9;
+		border-radius: 14px;
+		overflow: hidden;
+		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--border);
+	}
+
+	.end-still img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.end-done-col {
+		display: flex;
+		flex-direction: column;
+		gap: 36px;
+	}
+
+	.end-more {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		animation: slp-rise 440ms var(--ease);
+	}
+
+	.more-title {
+		font-size: 15px;
+		font-weight: 600;
+	}
+
+	.more-row {
+		display: flex;
+		gap: 14px;
+	}
+
+	.more-card {
+		flex: none;
+		width: 130px;
+		padding: 0;
+		border: 0;
+		border-radius: var(--radius-md);
+		background: transparent;
+		cursor: pointer;
+		outline: none;
+		transition: transform var(--dur-fast), box-shadow var(--dur-fast);
+	}
+
+	.more-card:focus {
+		transform: scale(1.06);
+		box-shadow: 0 0 0 3px var(--player-accent);
+	}
+
+	.more-card img {
+		width: 100%;
+		aspect-ratio: 2 / 3;
+		border-radius: var(--radius-md);
+		object-fit: cover;
+		display: block;
+		box-shadow: 0 0 0 1px var(--border);
 	}
 
 	.end-col {

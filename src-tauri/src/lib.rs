@@ -10,6 +10,43 @@ const SERVER: &str = match option_env!("STREAMLINE_URL") {
 
 struct Api(reqwest::Client);
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Kind {
+    Movies,
+    Series,
+}
+
+impl Kind {
+    fn path(&self) -> &'static str {
+        match self {
+            Kind::Movies => "/movies",
+            Kind::Series => "/series",
+        }
+    }
+}
+
+// Images load through <img>, which can't carry the device key, so they pass through here.
+async fn artwork(client: reqwest::Client, path: String) -> tauri::http::Response<Vec<u8>> {
+    let fetched = async {
+        let resp = client
+            .get(format!("{SERVER}/api/v1/posters{path}"))
+            .send()
+            .await?
+            .error_for_status()?;
+        resp.bytes().await
+    };
+    match fetched.await {
+        Ok(bytes) => tauri::http::Response::builder()
+            .header("Content-Type", "image/jpeg")
+            .body(bytes.to_vec()),
+        Err(_) => tauri::http::Response::builder()
+            .status(404)
+            .body(Vec::new()),
+    }
+    .expect("static response parts are valid")
+}
+
 impl Api {
     async fn call(
         &self,
@@ -17,9 +54,7 @@ impl Api {
         path: &str,
         body: Option<Value>,
     ) -> Result<Value, String> {
-        let mut req = self
-            .0
-            .request(method, format!("{SERVER}/api/v1/playback{path}"));
+        let mut req = self.0.request(method, format!("{SERVER}/api/v1{path}"));
         if let Some(b) = body {
             req = req.json(&b);
         }
@@ -40,8 +75,39 @@ impl Api {
 }
 
 #[tauri::command]
+async fn library(api: tauri::State<'_, Api>, kind: Kind) -> Result<Value, String> {
+    api.call(reqwest::Method::GET, kind.path(), None).await
+}
+
+#[tauri::command]
+async fn title(api: tauri::State<'_, Api>, kind: Kind, id: u32) -> Result<Value, String> {
+    api.call(reqwest::Method::GET, &format!("{}/{id}", kind.path()), None)
+        .await
+}
+
+#[tauri::command]
+async fn watch_state(api: tauri::State<'_, Api>) -> Result<Value, String> {
+    api.call(reqwest::Method::GET, "/watchstate", None).await
+}
+
+#[tauri::command]
+async fn set_watched(
+    api: tauri::State<'_, Api>,
+    media_id: String,
+    watched: bool,
+) -> Result<Value, String> {
+    api.call(
+        reqwest::Method::PUT,
+        &format!("/watchstate/{media_id}"),
+        Some(json!({ "watched": watched })),
+    )
+    .await
+}
+
+#[tauri::command]
 async fn playback_status(api: tauri::State<'_, Api>) -> Result<Value, String> {
-    api.call(reqwest::Method::GET, "/status", None).await
+    api.call(reqwest::Method::GET, "/playback/status", None)
+        .await
 }
 
 #[tauri::command]
@@ -60,7 +126,7 @@ async fn start_session(
     if let (Some(body), Some(tracks)) = (body.as_object_mut(), tracks.as_object()) {
         body.extend(tracks.clone());
     }
-    api.call(reqwest::Method::POST, "/sessions", Some(body))
+    api.call(reqwest::Method::POST, "/playback/sessions", Some(body))
         .await
 }
 
@@ -68,7 +134,7 @@ async fn start_session(
 async fn media_tracks(api: tauri::State<'_, Api>, media_id: String) -> Result<Value, String> {
     api.call(
         reqwest::Method::GET,
-        &format!("/media/{media_id}/tracks"),
+        &format!("/playback/media/{media_id}/tracks"),
         None,
     )
     .await
@@ -92,7 +158,7 @@ async fn patch_session(
 ) -> Result<Value, String> {
     api.call(
         reqwest::Method::PATCH,
-        &format!("/sessions/{id}"),
+        &format!("/playback/sessions/{id}"),
         Some(changes),
     )
     .await
@@ -100,15 +166,23 @@ async fn patch_session(
 
 #[tauri::command]
 async fn session_info(api: tauri::State<'_, Api>, id: String) -> Result<Value, String> {
-    api.call(reqwest::Method::GET, &format!("/sessions/{id}"), None)
-        .await
+    api.call(
+        reqwest::Method::GET,
+        &format!("/playback/sessions/{id}"),
+        None,
+    )
+    .await
 }
 
 #[tauri::command]
 async fn stop_session(api: tauri::State<'_, Api>, id: String) -> Result<(), String> {
-    api.call(reqwest::Method::DELETE, &format!("/sessions/{id}"), None)
-        .await
-        .map(drop)
+    api.call(
+        reqwest::Method::DELETE,
+        &format!("/playback/sessions/{id}"),
+        None,
+    )
+    .await
+    .map(drop)
 }
 
 #[tauri::command]
@@ -121,7 +195,7 @@ async fn heartbeat(
     let body = json!({ "position": position, "paused": paused });
     api.call(
         reqwest::Method::POST,
-        &format!("/sessions/{id}/progress"),
+        &format!("/playback/sessions/{id}/progress"),
         Some(body),
     )
     .await
@@ -130,10 +204,23 @@ async fn heartbeat(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let client = reqwest::Client::new();
+    let images = client.clone();
     tauri::Builder::default()
         .plugin(tauri_plugin_player::init())
-        .manage(Api(reqwest::Client::new()))
+        .manage(Api(client))
+        .register_asynchronous_uri_scheme_protocol("artwork", move |_ctx, request, responder| {
+            let client = images.clone();
+            let path = request.uri().path().to_owned();
+            tauri::async_runtime::spawn(async move {
+                responder.respond(artwork(client, path).await);
+            });
+        })
         .invoke_handler(tauri::generate_handler![
+            library,
+            title,
+            watch_state,
+            set_watched,
             playback_status,
             media_tracks,
             subtitle_text,

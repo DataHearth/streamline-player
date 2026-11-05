@@ -1,0 +1,27 @@
+/* Shadows are a scale: shadow-1 rail, shadow-2 hovered card, shadow-3 modal/sheet, shadow-4 popover.
+   Elevation comes from a lighter surface first, shadow second.
+   shadow-glow and shadow-card-hover derive from the accent, so a theme only sets --accent / --accent-glow. */
+:root {
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 16px 32px rgba(0, 0, 0, 0.45);
+  --shadow-4: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 0 24px var(--accent-glow);
+  --shadow-card-hover: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent), 0 24px 48px rgba(0, 0, 0, 0.5);
+  --shadow-tv-focus: 0 0 0 4px #7c8cff, 0 0 40px rgba(124, 140, 255, 0.45), 0 24px 48px rgba(0, 0, 0, 0.6);
+}
+[data-theme="dark"] {
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 16px 32px rgba(0, 0, 0, 0.45);
+  --shadow-4: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 0 24px var(--accent-glow);
+  --shadow-card-hover: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent), 0 24px 48px rgba(0, 0, 0, 0.5);
+  --shadow-tv-focus: 0 0 0 4px #7c8cff, 0 0 40px rgba(124, 140, 255, 0.45), 0 24px 48px rgba(0, 0, 0, 0.6);
+}
+[data-theme="light"] {
+  --shadow-1: 0 1px 2px rgba(17, 17, 24, 0.08);
+  --shadow-2: 0 4px 12px rgba(17, 17, 24, 0.08);
+  --shadow-3: 0 16px 32px rgba(17, 17, 24, 0.12);
+  --shadow-4: 0 24px 64px rgba(17, 17, 24, 0.16);
+}

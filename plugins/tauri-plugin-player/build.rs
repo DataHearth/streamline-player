@@ -6,12 +6,14 @@ const COMMANDS: &[&str] = &[
     "play",
     "pause",
     "seek",
+    "stop",
     "speed",
     "stats",
     "subtitle",
     "timing",
     "registerListener",
     "removeListener",
+    "remove_listener",
 ];
 
 fn main() {

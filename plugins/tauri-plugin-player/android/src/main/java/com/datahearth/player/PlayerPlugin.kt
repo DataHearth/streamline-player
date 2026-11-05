@@ -272,6 +272,12 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun stop(invoke: Invoke) = onPlayer(invoke) {
+        it.stop()
+        it.clearMediaItems()
+    }
+
+    @Command
     fun capabilities(invoke: Invoke) = invoke.resolve(Capabilities.build(activity))
 
     @Command
