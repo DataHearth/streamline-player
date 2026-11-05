@@ -5,6 +5,8 @@ use crate::caps::Capabilities;
 use crate::error::ApiError;
 
 const MAX_TRANSCODE_BITRATE: u64 = 40_000_000;
+const MIN_BITRATE_AT_1080P: u64 = 4_000_000;
+const MIN_H264_BITRATE_AT_1080P: u64 = 8_000_000;
 const FMP4_AUDIO: [&str; 6] = ["aac", "mp3", "ac3", "eac3", "flac", "opus"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -474,9 +476,27 @@ fn transcode_video(
         height = even_down((f64::from(width) / aspect).round() as u32);
     }
 
-    let bitrate = p
-        .max_bitrate
-        .unwrap_or(a.bit_rate)
+    // A probe can report no bitrate, and a target of 0 is not an encode.
+    let source = match a.bit_rate {
+        0 => MAX_TRANSCODE_BITRATE,
+        known => known,
+    };
+    // Above 1 when an anamorphic source is squared up: those pixels carry no new detail.
+    let pixels = (f64::from(width) * f64::from(height)
+        / (f64::from(v.width) * f64::from(v.height)))
+    .min(1.0);
+    let min_at_1080p = if codec == VideoCodec::H264 {
+        MIN_H264_BITRATE_AT_1080P
+    } else {
+        MIN_BITRATE_AT_1080P
+    };
+    // Scaling alone starves compressed sources: on the 7900 XT, a 4.8 Mbit/s 4K film at 1.2 Mbit/s
+    // scored VMAF 58 on its worst frames, against 79 at this minimum.
+    let floor =
+        (min_at_1080p as f64 * f64::from(width) * f64::from(height) / (1920.0 * 1080.0)) as u64;
+    let bitrate = ((source as f64 * pixels) as u64)
+        .max(floor.min(source))
+        .min(p.max_bitrate.unwrap_or(u64::MAX))
         .min(MAX_TRANSCODE_BITRATE);
     let deinterlace = !matches!(v.field_order.as_str(), "progressive" | "unknown" | "");
 
@@ -800,6 +820,120 @@ mod tests {
         assert_eq!(ladder_height(4_000_000, H264), 720);
         assert_eq!(ladder_height(1_999_999, Av1), 480);
         assert_eq!(ladder_height(1_999_999, H264), 360);
+    }
+
+    fn target_bitrate(
+        (width, height): (u32, u32),
+        bit_rate: u64,
+        max_bitrate: Option<u64>,
+        codec: &str,
+        (max_width, max_height): (u32, u32),
+    ) -> u64 {
+        let mut a = fixture("hevc444");
+        a.bit_rate = bit_rate;
+        a.video[0].width = width;
+        a.video[0].height = height;
+        let cap = VideoCap {
+            max_width,
+            max_height,
+            ..vcap(codec, &[])
+        };
+        let c = caps(vec![cap], &[], &["aac"], &["mkv"]);
+        let p = SessionParams {
+            max_bitrate,
+            ..Default::default()
+        };
+        match plan(&c, &a, &p).video {
+            VideoAction::Transcode { bitrate, .. } => bitrate,
+            other => panic!("{other:?}"),
+        }
+    }
+
+    const UHD: (u32, u32) = (3840, 2160);
+    const FHD: (u32, u32) = (1920, 1080);
+
+    #[test]
+    fn transcode_bitrate_follows_the_pixels() {
+        assert_eq!(
+            target_bitrate(UHD, 60_000_000, None, "hevc", FHD),
+            15_000_000
+        );
+        assert_eq!(
+            target_bitrate(UHD, 16_000_000, None, "hevc", FHD),
+            4_000_000
+        );
+        assert_eq!(
+            target_bitrate(UHD, 60_000_000, None, "hevc", UHD),
+            40_000_000
+        );
+    }
+
+    #[test]
+    fn transcode_bitrate_never_exceeds_the_source_or_the_cap() {
+        assert_eq!(
+            target_bitrate(FHD, 5_000_000, Some(20_000_000), "hevc", UHD),
+            5_000_000
+        );
+        assert_eq!(
+            target_bitrate(UHD, 60_000_000, Some(8_000_000), "hevc", UHD),
+            8_000_000
+        );
+    }
+
+    #[test]
+    fn h264_keeps_a_1080p_minimum_below_the_source_and_cap() {
+        assert_eq!(
+            target_bitrate(UHD, 16_000_000, None, "h264", FHD),
+            8_000_000
+        );
+        assert_eq!(target_bitrate(UHD, 5_000_000, None, "h264", FHD), 5_000_000);
+        assert_eq!(
+            target_bitrate(UHD, 60_000_000, Some(4_000_000), "h264", UHD),
+            4_000_000
+        );
+    }
+
+    #[test]
+    fn compressed_sources_keep_a_minimum_scaled_by_pixels() {
+        assert_eq!(target_bitrate(UHD, 4_800_000, None, "hevc", FHD), 4_000_000);
+        assert_eq!(target_bitrate(UHD, 3_000_000, None, "hevc", FHD), 3_000_000);
+        assert_eq!(
+            target_bitrate((3840, 1608), 4_638_000, None, "hevc", FHD),
+            2_977_777
+        );
+        assert_eq!(
+            target_bitrate((3840, 1600), 16_000_000, None, "h264", FHD),
+            5_925_925
+        );
+        assert_eq!(
+            target_bitrate(UHD, 4_800_000, Some(500_000), "hevc", FHD),
+            500_000
+        );
+    }
+
+    #[test]
+    fn anamorphic_upscale_stays_at_the_source_bitrate() {
+        let mut a = fixture("hevc444");
+        a.bit_rate = 2_000_000;
+        a.video[0].width = 720;
+        a.video[0].height = 576;
+        a.video[0].sar = (64, 45);
+        let c = caps(vec![vcap("hevc", &[])], &[], &["aac"], &["mkv"]);
+        match plan(&c, &a, &SessionParams::default()).video {
+            VideoAction::Transcode { bitrate, width, .. } => {
+                assert_eq!((bitrate, width), (2_000_000, 1024));
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn unknown_source_bitrate_falls_back_to_the_limit_and_cap() {
+        assert_eq!(target_bitrate(FHD, 0, None, "hevc", FHD), 40_000_000);
+        assert_eq!(
+            target_bitrate(FHD, 0, Some(20_000_000), "hevc", FHD),
+            20_000_000
+        );
     }
 
     #[test]
