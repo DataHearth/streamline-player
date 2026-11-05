@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-timing"
+description = "Enables the timing command without any pre-configured scope."
+commands.allow = ["timing"]
+
+[[permission]]
+identifier = "deny-timing"
+description = "Denies the timing command without any pre-configured scope."
+commands.deny = ["timing"]

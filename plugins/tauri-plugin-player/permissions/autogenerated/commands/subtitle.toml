@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-subtitle"
+description = "Enables the subtitle command without any pre-configured scope."
+commands.allow = ["subtitle"]
+
+[[permission]]
+identifier = "deny-subtitle"
+description = "Denies the subtitle command without any pre-configured scope."
+commands.deny = ["subtitle"]

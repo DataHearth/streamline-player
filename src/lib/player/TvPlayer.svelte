@@ -5,7 +5,26 @@
 	import "#lib/design/shape.css";
 	import "#lib/design/typography.css";
 	import { addPluginListener, invoke } from "@tauri-apps/api/core";
-	import { Check, Cpu, Pause, Play, RotateCcw, RotateCw, Server, Settings, TriangleAlert, X } from "@lucide/svelte";
+	import {
+		AudioLines,
+		Captions,
+		CaptionsOff,
+		Check,
+		ChevronDown,
+		Cpu,
+		LoaderCircle,
+		Minus,
+		Moon,
+		Pause,
+		Play,
+		Plus,
+		RotateCcw,
+		RotateCw,
+		Server,
+		Settings,
+		TriangleAlert,
+		X,
+	} from "@lucide/svelte";
 	import { onMount, tick } from "svelte";
 
 	type Reason = { code: string; text: string };
@@ -14,11 +33,18 @@
 		mode: "direct" | "remux" | "audio_transcode" | "transcode";
 		url: string;
 		video: { action: string; codec: string; width: number; height: number };
-		audio: { codec: string };
+		audio: { action: string; codec: string };
 		video_reasons: Reason[];
 		audio_reasons: Reason[];
 	};
 	type Quality = "auto" | "original" | number;
+	type Tab = "subs" | "audio" | "quality";
+	type AudioTrack = { index: number; codec: string; channels: number; language: string; default: boolean };
+	type SubTrack = { index: number; codec: string; language: string; forced: boolean; sdh: boolean; files: Record<string, string> };
+	type Tracks = { preparing: boolean; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
+	type SubKind = "text" | "styled" | "image";
+	type Cue = { start: number; end: number; text: string };
+	type Tone = "ok" | "conv" | "warn";
 	type Halt = {
 		eyebrow: string;
 		title: string;
@@ -33,6 +59,28 @@
 	const HIDE_MS = 3200;
 	const HEARTBEAT_MS = 10_000;
 	const SEEK_STEP = 10;
+	const PLAYER_NAME = "ExoPlayer";
+	const TAB_NAMES: Record<Tab, string> = { audio: "Audio", subs: "Subtitles", quality: "Quality" };
+	const CODEC_NAMES: Record<string, string> = {
+		aac: "AAC",
+		ac3: "AC-3",
+		eac3: "E-AC-3",
+		dts: "DTS",
+		truehd: "TrueHD",
+		flac: "FLAC",
+		opus: "Opus",
+		mp3: "MP3",
+		pcm_s16le: "PCM",
+		pcm_s24le: "PCM",
+	};
+	const FMP4_AUDIO = ["aac", "mp3", "ac3", "eac3", "flac", "opus"];
+	const SIZE_PX: Record<string, number> = { S: 20, M: 26, L: 32, XL: 40 };
+	const DEFAULT_SIZE_PX = 26;
+	const TV_CUE_SCALE = 1.7;
+	const OSD_MS = 900;
+	const SUB_OFFSET_LIMIT = 10;
+	const AUDIO_DELAY_LIMIT = 500;
+	const RECOVERY_WINDOW_MS = 30_000;
 	const RETRY_SECS = 10;
 	const STAGE_WIDTH = 1920;
 	const MODE_LABEL = { direct: "Direct play", remux: "Remux", audio_transcode: "Audio conversion", transcode: "Transcode" };
@@ -46,6 +94,19 @@
 	let buffering = $state(true);
 	let controls = $state(true);
 	let menu = $state(false);
+	let tab = $state<Tab>("quality");
+	let tracks = $state<Tracks | null>(null);
+	let audioPick = $state<number | null>(null);
+	let subPick = $state<number | null>(null);
+	let burn = $state(false);
+	let burnBack = $state("");
+	let subOffset = $state(0);
+	let audioDelay = $state(0);
+	let cues = $state.raw<Cue[]>([]);
+	let cueText = $state("");
+	let styleOpen = $state(false);
+	let prefs = $state(loadPrefs());
+	let osd = $state<string | null>(null);
 	let quality = $state<Quality>("auto");
 	let halt = $state<Halt | null>(null);
 	let zoom = $state(1);
@@ -58,7 +119,12 @@
 	let lastMove = Date.now();
 	let retryTimer: ReturnType<typeof setInterval> | undefined;
 	let seekTimer: ReturnType<typeof setTimeout> | undefined;
+	let startId = 0;
+	let paused = false;
+	let lastRecovery = 0;
 	let pfTimer: ReturnType<typeof setTimeout> | undefined;
+	let osdTimer: ReturnType<typeof setTimeout> | undefined;
+	let positionAt = 0;
 
 	const title = $derived(media[mediaIdx] ?? "");
 	const controlsOn = $derived(controls || !playing || menu);
@@ -86,6 +152,190 @@
 				return `The server converts the video to ${session.video.codec} (${why(session.video_reasons)}).`;
 		}
 	});
+
+	const selectedSub = $derived(tracks?.subtitles.find((t) => t.index === subPick) ?? null);
+	const selectedAudio = $derived(
+		tracks?.audio.find((t) => t.index === audioPick) ?? tracks?.audio.find((t) => t.default) ?? tracks?.audio[0] ?? null,
+	);
+	const subKind = $derived<SubKind | "burn">(burn ? "burn" : selectedSub ? subInfo(selectedSub).kind : "text");
+	const cueSize = $derived(Math.round((subKind === "text" || subKind === "styled" ? (SIZE_PX[prefs.subSize] ?? DEFAULT_SIZE_PX) : DEFAULT_SIZE_PX) * TV_CUE_SCALE));
+
+	function loadPrefs() {
+		const fallback = { subSize: "M", subBg: "Shadow", subColor: "White" };
+		try {
+			return { ...fallback, ...JSON.parse(localStorage.getItem("subtitle-style") ?? "{}") };
+		} catch {
+			return fallback;
+		}
+	}
+
+	function setPref(key: "subSize" | "subBg" | "subColor", value: string) {
+		prefs = { ...prefs, [key]: value };
+		try {
+			localStorage.setItem("subtitle-style", JSON.stringify(prefs));
+		} catch {
+			// The style still applies for this session.
+		}
+		syncTiming();
+	}
+
+	function language(code: string) {
+		try {
+			return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;
+		} catch {
+			return code || "Unknown";
+		}
+	}
+
+	function subInfo(t: SubTrack): { kind: SubKind; label: string; fmt: string; burnOnly?: boolean } {
+		if (t.codec === "ass" || t.codec === "ssa") return { kind: "styled", label: "Styled (ASS)", fmt: "ASS" };
+		if (t.codec === "hdmv_pgs_subtitle") return { kind: "image", label: "Image (PGS)", fmt: "PGS" };
+		if (t.codec === "dvd_subtitle") return { kind: "image", label: "Image (VobSub)", fmt: "VobSub", burnOnly: true };
+		return { kind: "text", label: t.codec === "webvtt" ? "Text (WebVTT)" : "Text (SRT)", fmt: "SRT" };
+	}
+
+	const subName = (t: SubTrack) => `${language(t.language)}${t.forced ? " (forced)" : ""}`;
+	const channelLayout = (n: number) => (n >= 3 ? `${n - 1}.1` : `${n}.0`);
+	const audioName = (t: AudioTrack) => `${CODEC_NAMES[t.codec] ?? t.codec} ${channelLayout(t.channels)}`;
+
+	/** The engine's rule, for the tracks it hasn't been asked about yet. */
+	function audioAsIs(t: AudioTrack) {
+		const caps = capabilities as { audio?: { codecs: string[]; max_channels: number } } | null;
+		if (!caps?.audio?.codecs.includes(t.codec) || t.channels > caps.audio.max_channels) return false;
+		return session?.mode === "direct" || FMP4_AUDIO.includes(t.codec);
+	}
+
+	function audioTarget(t: AudioTrack) {
+		const caps = capabilities as { audio?: { codecs: string[] } } | null;
+		const has = (c: string) => caps?.audio?.codecs.includes(c);
+		return t.channels > 2 && has("eac3") ? "E-AC-3" : t.channels > 2 && has("ac3") ? "AC-3" : "AAC";
+	}
+
+	const audioNote = $derived.by(() => {
+		if (!selectedAudio || !session) return "";
+		const name = audioName(selectedAudio);
+		return session.audio.action === "copy"
+			? `${PLAYER_NAME} plays ${name} as-is.`
+			: `${PLAYER_NAME} can\u2019t decode ${name}, so the server converts it to ${CODEC_NAMES[session.audio.codec] ?? session.audio.codec}.`;
+	});
+
+	const styleNote = $derived(
+		subKind === "styled"
+			? "Styled (ASS) subtitles keep the file\u2019s own fonts, colors and placement. Only Size applies, as a scale."
+			: subKind === "image"
+				? "Image subtitles are pictures, shown as they were made. Their look can\u2019t be changed."
+				: subKind === "burn"
+					? "Burned-in subtitles are part of the picture. Their look can\u2019t be changed."
+					: "",
+	);
+	const styleSummary = $derived(
+		subKind === "text"
+			? `${prefs.subSize} \u00B7 ${prefs.subBg} \u00B7 ${prefs.subColor}`
+			: subKind === "styled"
+				? `File\u2019s own look \u00B7 ${prefs.subSize}`
+				: "Drawn as authored",
+	);
+	const styleOk = (key: string) => subKind === "text" || (subKind === "styled" && key === "subSize");
+
+	const fmtOffset = (v: number, seconds: boolean) => {
+		const sign = v > 0 ? "+" : v < 0 ? "\u2212" : "";
+		return seconds ? `${sign}${Math.abs(v).toFixed(1)} s` : `${sign}${Math.abs(v)} ms`;
+	};
+
+	function flashOsd(text: string) {
+		clearTimeout(osdTimer);
+		osd = text;
+		osdTimer = setTimeout(() => (osd = null), OSD_MS);
+	}
+
+	function syncTiming() {
+		const size = (SIZE_PX[prefs.subSize] ?? DEFAULT_SIZE_PX) / DEFAULT_SIZE_PX;
+		player("timing", { subtitleOffset: subOffset, subtitleScale: size, audioDelay }).catch(() => {});
+	}
+
+	function nudgeSub(step: number) {
+		subOffset = step === 0 ? 0 : Math.max(-SUB_OFFSET_LIMIT, Math.min(SUB_OFFSET_LIMIT, Math.round((subOffset + step) * 10) / 10));
+		lastMove = Date.now();
+		syncTiming();
+		flashOsd(`Subtitles ${fmtOffset(subOffset, true)}`);
+	}
+
+	function nudgeAudio(step: number) {
+		audioDelay = step === 0 ? 0 : Math.max(-AUDIO_DELAY_LIMIT, Math.min(AUDIO_DELAY_LIMIT, audioDelay + step));
+		lastMove = Date.now();
+		syncTiming();
+		flashOsd(`Audio ${fmtOffset(audioDelay, false)}`);
+	}
+
+	const parseStamp = (t: string) => t.split(":").reduce((acc, part) => acc * 60 + Number(part.replace(",", ".")), 0);
+
+	function parseCues(raw: string): Cue[] {
+		const out: Cue[] = [];
+		for (const block of raw.replace(/\r/g, "").split(/\n{2,}/)) {
+			const lines = block.split("\n");
+			const at = lines.findIndex((l) => l.includes("-->"));
+			const [from, to] = lines[at]?.split("-->") ?? [];
+			if (!from || !to) continue;
+			const text = lines.slice(at + 1).join("\n").replace(/<[^>]*>/g, "").trim();
+			if (text) out.push({ start: parseStamp(from.trim()), end: parseStamp(to.trim().split(/\s/)[0] ?? ""), text });
+		}
+		return out;
+	}
+
+	// ponytail: a linear scan on each tick, a few thousand cues at most; binary search if it ever shows.
+	function updateCue() {
+		if (!cues.length) {
+			if (cueText) cueText = "";
+			return;
+		}
+		const now = (playing ? position + (performance.now() - positionAt) / 1000 : position) - subOffset;
+		const text = cues.filter((c) => c.start <= now && now < c.end).map((c) => c.text).join("\n");
+		if (text !== cueText) cueText = text;
+	}
+
+	async function pickSub(t: SubTrack | null) {
+		const info = t && subInfo(t);
+		const wantsBurn = !!info?.burnOnly;
+		const changedBurn = wantsBurn !== burn || (wantsBurn && subPick !== t?.index);
+		if (wantsBurn && !burn && session) burnBack = MODE_LABEL[session.mode];
+		subPick = t?.index ?? null;
+		burn = wantsBurn;
+		cues = [];
+		if (changedBurn) await repatch({ burn_in_subtitle: wantsBurn ? t?.index : null });
+		try {
+			if (!t || !info || wantsBurn) {
+				await player("subtitle", {});
+			} else if (info.kind === "text") {
+				await player("subtitle", {});
+				cues = parseCues(await invoke<string>("subtitle_text", { url: t.files.vtt }));
+			} else if (info.kind === "styled") {
+				await player("subtitle", { kind: "ass", url: t.files.ass, fonts: tracks?.fonts ?? [] });
+			} else {
+				await player("subtitle", { kind: "pgs", url: t.files.sup });
+			}
+			syncTiming();
+		} catch {
+			flashOsd("Subtitles unavailable");
+		}
+	}
+
+	async function pickAudio(t: AudioTrack) {
+		if (t.index === selectedAudio?.index) return;
+		audioPick = t.index;
+		await repatch({ audio_index: t.index });
+	}
+
+	function sessionTracks() {
+		return {
+			max_bitrate: typeof quality === "number" ? quality * 1_000_000 : null,
+			audio_index: audioPick,
+			burn_in_subtitle: burn ? subPick : null,
+		};
+	}
+
+	async function refreshTracks() {
+		tracks = await invoke<Tracks>("media_tracks", { mediaId: title }).catch(() => tracks);
+	}
 
 	const fmt = (s: number) => {
 		const t = Math.max(0, Math.floor(s));
@@ -123,7 +373,8 @@
 		focusDefault();
 	}
 
-	async function start(at = 0) {
+	async function start(at = position) {
+		const id = ++startId;
 		clearHalt();
 		buffering = true;
 		try {
@@ -132,15 +383,36 @@
 				const status = await invoke<{ media: string[] }>("playback_status");
 				media = status.media;
 			}
-			session = await invoke<Session>("start_session", { mediaId: title, capabilities, position: at });
+			refreshTracks();
+			const started = await invoke<Session>("start_session", { mediaId: title, capabilities, position: at, tracks: sessionTracks() });
+			// The viewer left while the server was still answering.
+			if (id !== startId) {
+				invoke("stop_session", { id: started.session_id }).catch(() => {});
+				return;
+			}
+			session = started;
 			await player("load", { url: session.url });
-			await player("play");
+			if (at > 0) await player("seek", { seconds: at });
+			if (!paused) await player("play");
 			showControls(true);
 		} catch (e) {
+			if (id !== startId) return;
 			buffering = false;
 			failedToStart(String(e));
 		}
 	}
+
+	// The session can vanish under a healthy player: a pause past the orphan timeout, an engine
+	// restart, a network cut. The viewer only sees a spinner. Failing again right after a recovery
+	// means something else is wrong, so that one is shown.
+	async function recoverSession() {
+		lastRecovery = Date.now();
+		const at = position;
+		await stop();
+		await start(at);
+	}
+
+	const sessionGone = (raw: string) => raw.includes('"not_found"');
 
 	function failedToStart(raw: string) {
 		let error: { code?: string; message?: string; retry_after?: number } | null = null;
@@ -193,13 +465,24 @@
 		await stop();
 		if (media.length) mediaIdx = (mediaIdx + 1) % media.length;
 		quality = "auto";
+		paused = false;
 		position = 0;
+		tracks = null;
+		audioPick = null;
+		subPick = null;
+		burn = false;
+		subOffset = 0;
+		audioDelay = 0;
+		cues = [];
+		player("subtitle", {}).catch(() => {});
+		syncTiming();
 		duration = 0;
 		await start();
 	}
 
 	function togglePlay() {
 		const wasPlaying = playing;
+		paused = wasPlaying;
 		player(wasPlaying ? "pause" : "play");
 		clearTimeout(pfTimer);
 		pf = "in";
@@ -234,29 +517,42 @@
 	}
 
 	async function pickQuality(q: Quality) {
-		menu = false;
-		if (q === quality || !session) return;
+		if (q === quality || !session) {
+			menu = false;
+			return;
+		}
 		quality = q;
+		await repatch({ max_bitrate: typeof q === "number" ? q * 1_000_000 : null });
+	}
+
+	async function repatch(changes: Record<string, unknown>) {
+		menu = false;
+		if (!session) return;
 		const at = position;
-		const maxBitrate = typeof q === "number" ? q * 1_000_000 : null;
 		buffering = true;
 		try {
 			session = await invoke<Session>("patch_session", {
 				id: session.session_id,
-				changes: { max_bitrate: maxBitrate, position: at },
+				changes: { ...changes, position: at },
 			});
 			await player("load", { url: session.url });
 			await player("seek", { seconds: at });
-			await player("play");
+			if (!paused) await player("play");
 		} catch (e) {
-			buffering = false;
-			failedToStart(String(e));
+			if (sessionGone(String(e))) {
+				await recoverSession();
+			} else {
+				buffering = false;
+				failedToStart(String(e));
+			}
 		}
 		focusDefault();
 	}
 
-	function openMenu() {
+	function openMenu(next: Tab) {
+		tab = next;
 		menu = true;
+		refreshTracks();
 		focusDefault();
 	}
 
@@ -345,6 +641,7 @@
 		const listeners = [
 			addPluginListener<{ position: number; duration: number }>("player", "position", (e) => {
 				position = e.position;
+				positionAt = performance.now();
 				duration = e.duration;
 			}),
 			addPluginListener<{ state: string }>("player", "state", (e) => {
@@ -352,13 +649,19 @@
 				playing = e.state === "playing";
 			}),
 			addPluginListener<{ code: string; message: string }>("player", "error", (e) => {
+				if (e.code.startsWith("ERROR_CODE_IO_") && Date.now() - lastRecovery > RECOVERY_WINDOW_MS) {
+					recoverSession();
+					return;
+				}
 				buffering = false;
 				halt = { eyebrow: "Playback error", title: "This stream stopped", mono: `${e.code}: ${e.message}`, failed: true };
 				focusDefault();
 			}),
 			addPluginListener("player", "back", back),
+			addPluginListener("player", "subtitleFailed", () => flashOsd("Subtitles unavailable")),
 		];
 		start();
+		const cueTimer = setInterval(updateCue, 100);
 		const beat = setInterval(() => {
 			if (session) invoke("heartbeat", { id: session.session_id, position, paused: !playing }).catch(() => {});
 		}, HEARTBEAT_MS);
@@ -366,6 +669,7 @@
 			if (controls && playing && !menu && Date.now() - lastMove > HIDE_MS) controls = false;
 		}, 250);
 		return () => {
+			clearInterval(cueTimer);
 			clearInterval(beat);
 			clearInterval(hide);
 			clearInterval(retryTimer);
@@ -389,17 +693,73 @@
 	</div>
 {/snippet}
 
-{#snippet option(label: string, q: Quality)}
-	<button data-tv="1" data-tv-default={quality === q ? "1" : undefined} class="opt" class:sel={quality === q} onclick={() => pickQuality(q)}>
-		<span class="opt-check" style:opacity={quality === q ? 1 : 0}><Check size={16} strokeWidth={2.5} /></span>
-		<span class="opt-label" style:font-weight={quality === q ? 600 : 500}>{label}</span>
+{#snippet option(label: string, selected: boolean, onclick: () => void, sub = "", badge = "", tone: Tone = "ok", busy = false)}
+	<button data-tv="1" data-tv-default={selected ? "1" : undefined} class="opt" class:sel={selected} disabled={busy} style:opacity={busy ? 0.62 : 1} {onclick}>
+		<span class="opt-check" style:opacity={selected ? 1 : 0}><Check size={16} strokeWidth={2.5} /></span>
+		<span class="opt-text">
+			<span class="opt-label" style:font-weight={selected ? 600 : 500}>{label}</span>
+			{#if sub}<span class="opt-sub">{#if busy}<span class="opt-spin"><LoaderCircle size={11} strokeWidth={2} /></span>{/if}{sub}</span>{/if}
+		</span>
+		{#if badge}<span class="badge {tone}">{badge}</span>{/if}
 	</button>
+{/snippet}
+
+{#snippet stepper(label: string, desc: string, value: string, zero: boolean, what: string, dec: () => void, inc: () => void, reset: () => void, disabled = false)}
+	<div class="stepper" style:opacity={disabled ? 0.5 : 1}>
+		<span class="stepper-text">
+			<span class="stepper-label">{label}</span>
+			{#if !zero}<span class="stepper-desc">{desc}</span>{/if}
+		</span>
+		<div class="stepper-box" style:pointer-events={disabled ? "none" : "auto"}>
+			<button data-tv="1" disabled={disabled} class="step" aria-label="{what} earlier" onclick={dec}><Minus size={14} strokeWidth={2} /></button>
+			<span class="stepper-value" style:color={zero ? "var(--player-ink-muted)" : "var(--player-accent-text)"}>{value}</span>
+			<button data-tv="1" disabled={disabled} class="step" aria-label="{what} later" onclick={inc}><Plus size={14} strokeWidth={2} /></button>
+		</div>
+		<button data-tv="1" disabled={zero} class="reset" style:opacity={zero ? 0 : 1} aria-label="Reset {what.toLowerCase()} timing" onclick={reset}>Reset</button>
+	</div>
+{/snippet}
+
+{#snippet styleGroup(label: string, key: "subSize" | "subBg" | "subColor", values: string[])}
+	{@const on = styleOk(key)}
+	{@const idx = values.indexOf(prefs[key])}
+	<div class="style-row" style:opacity={on ? 1 : 0.42}>
+		<span class="style-label">{label}</span>
+		<div class="seg-box" style:pointer-events={on ? "auto" : "none"}>
+			<span
+				class="seg-ind"
+				aria-hidden="true"
+				style:width="calc((100% - {6 + (values.length - 1) * 4}px) / {values.length})"
+				style:transform="translateX(calc({Math.max(0, idx)} * (100% + 4px)))"
+				style:background={on ? "var(--player-accent)" : "var(--surface-2)"}
+				style:opacity={idx < 0 ? 0 : 1}
+			></span>
+			{#each values as v}
+				<button data-tv="1" disabled={!on} class="seg-opt" style:color={prefs[key] === v && on ? "var(--fg-on-accent)" : "var(--player-ink-muted)"} onclick={() => setPref(key, v)}>{v}</button>
+			{/each}
+		</div>
+	</div>
 {/snippet}
 
 <div class="stage" bind:this={stage} style:zoom>
 	<div class="scrim" style:opacity={controlsOn ? 1 : 0}></div>
 
 	{#if buffering}<div class="sl-spin" role="status" aria-label="Buffering"></div>{/if}
+
+	{#if cueText}
+		<div class="cue-wrap" style:bottom="{controlsOn ? 400 : 90}px">
+			<span
+				class="sl-cue"
+				style:font-size="{cueSize}px"
+				style:color={prefs.subColor === "Yellow" ? "#FDE68A" : "#FFFFFF"}
+				style:text-shadow={prefs.subBg === "Shadow" ? "0 2px 4px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.6)" : prefs.subBg === "None" ? "0 0 2px rgba(0,0,0,0.9)" : "none"}
+				style:background={prefs.subBg === "Box" ? "rgba(0,0,0,0.72)" : "transparent"}
+				style:padding={prefs.subBg === "Box" ? "4px 12px" : "0"}>{cueText}</span>
+		</div>
+	{/if}
+
+	{#if osd}
+		<div class="osd-wrap"><div class="sl-osd">{osd}</div></div>
+	{/if}
 
 	<div class="pf" aria-hidden="true">
 		<div class="pf-disc" class:on={pf === "in"}>
@@ -425,7 +785,11 @@
 					<button data-tv="1" data-tv-default="1" class="play" aria-label={playing ? "Pause" : "Play"} onclick={togglePlay}>
 						{#if playing}<Pause size={36} fill="currentColor" />{:else}<Play size={36} fill="currentColor" />{/if}
 					</button>
-					<button data-tv="1" class="pill" onclick={openMenu}><Settings size={28} strokeWidth={1.9} />{qualText}</button>
+					<button data-tv="1" class="pill" onclick={() => openMenu("subs")}>
+						{#if selectedSub}<Captions size={28} strokeWidth={1.9} />{subName(selectedSub)}{:else}<CaptionsOff size={28} strokeWidth={1.9} />Subtitles{/if}
+					</button>
+					<button data-tv="1" class="pill" onclick={() => openMenu("audio")}><AudioLines size={28} strokeWidth={1.9} />Audio</button>
+					<button data-tv="1" class="pill" onclick={() => openMenu("quality")}><Settings size={28} strokeWidth={1.9} />{qualText}</button>
 				</div>
 			</div>
 		{/if}
@@ -435,15 +799,86 @@
 		<div class="menu-scrim"></div>
 		<div class="menu" data-tv-trap="1">
 			<div class="menu-head">
-				<span class="menu-title">Quality</span>
+				<span class="menu-title">{TAB_NAMES[tab]}</span>
 				<div class="grow"></div>
 				<button data-tv="1" class="close" aria-label="Close" onclick={() => { menu = false; focusDefault(); }}><X size={16} strokeWidth={2} /></button>
 			</div>
 			<div class="menu-body">
-				<div class="note"><span class="note-dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{menuNote}</span></div>
-				{@render option("Auto", "auto")}
-				{@render option("Original", "original")}
-				{#each [20, 8, 4, 2, 1] as n}{@render option(`${n} Mbit/s`, n)}{/each}
+				{#if tab === "quality"}
+					<div class="note"><span class="note-dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{menuNote}</span></div>
+					{@render option("Auto", quality === "auto", () => pickQuality("auto"))}
+					{@render option("Original", quality === "original", () => pickQuality("original"))}
+					{#each [20, 8, 4, 2, 1] as n}{@render option(`${n} Mbit/s`, quality === n, () => pickQuality(n))}{/each}
+				{:else if tab === "audio"}
+					<div class="note"><span class="note-dot" style:background={session?.audio.action === "copy" ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{audioNote}</span></div>
+					{#each tracks?.audio ?? [] as t, i}
+						{@const asIs = t.index === selectedAudio?.index ? session?.audio.action === "copy" : audioAsIs(t)}
+						{@render option(
+							`${language(t.language)}${i === 0 ? " (original)" : ""}`,
+							t.index === selectedAudio?.index,
+							() => pickAudio(t),
+							asIs ? audioName(t) : `${audioName(t)} \u2192 ${t.index === selectedAudio?.index && session ? (CODEC_NAMES[session.audio.codec] ?? session.audio.codec) : audioTarget(t)}`,
+							asIs ? "as-is" : "converted",
+							asIs ? "ok" : "conv",
+						)}
+					{/each}
+					{@render stepper(
+						"Audio delay",
+						audioDelay > 0 ? "Sound plays later than the picture." : "Sound plays earlier than the picture.",
+						fmtOffset(audioDelay, false),
+						audioDelay === 0,
+						"Audio",
+						() => nudgeAudio(-10),
+						() => nudgeAudio(10),
+						() => nudgeAudio(0),
+					)}
+					<div class="night">
+						<Moon size={16} strokeWidth={1.75} />
+						<span class="night-text"><span class="night-title">Night mode</span><span>Evens out loud and quiet scenes</span></span>
+						<span class="night-later">Later</span>
+					</div>
+				{:else}
+					{#if tracks?.preparing}
+						<div class="note"><span class="note-dot" style:background="var(--status-downloading)"></span><span>This file was just added. Streamline is still preparing its subtitles; they show up here in about a minute.</span></div>
+					{:else if burn && selectedSub}
+						<div class="note"><span class="note-dot" style:background="var(--status-warning)"></span><span>{PLAYER_NAME} can&rsquo;t draw {subInfo(selectedSub).fmt} subtitles, so the server burns {subName(selectedSub)} into the picture. That converts the video; any other track goes back to {burnBack}.</span></div>
+					{/if}
+					{@render option("Off", subPick === null, () => { menu = false; pickSub(null); focusDefault(); })}
+					{#each tracks?.subtitles ?? [] as t}
+						{@const info = subInfo(t)}
+						{#if tracks?.preparing && !info.burnOnly}
+							{@render option(subName(t), false, () => {}, "Preparing\u2026", "", "ok", true)}
+						{:else if info.burnOnly}
+							{@render option(subName(t), subPick === t.index, () => pickSub(t), `${info.label} \u00B7 burn in`, "converts the video", "warn")}
+						{:else}
+							{@render option(subName(t), subPick === t.index, () => { menu = false; pickSub(t); focusDefault(); }, `${info.label}${t.sdh ? " \u00B7 sound descriptions" : ""}`)}
+						{/if}
+					{/each}
+					{@render stepper(
+						"Sync",
+						subOffset > 0 ? "Subtitles show later than in the file." : "Subtitles show earlier than in the file.",
+						fmtOffset(subOffset, true),
+						subOffset === 0,
+						"Subtitles",
+						() => nudgeSub(-0.1),
+						() => nudgeSub(0.1),
+						() => nudgeSub(0),
+						subPick === null,
+					)}
+					<div class="style-box">
+						<button data-tv="1" class="style-head" aria-expanded={styleOpen} onclick={() => (styleOpen = !styleOpen)}>
+							<span class="style-eyebrow">Subtitle style</span>
+							<span class="style-summary">{styleSummary}</span>
+							<span class="style-chevron" style:transform={styleOpen ? "rotate(180deg)" : "none"}><ChevronDown size={15} strokeWidth={2} /></span>
+						</button>
+						{#if styleOpen}
+							{#if styleNote}<div class="style-note">{styleNote}</div>{/if}
+							{@render styleGroup("Size", "subSize", ["S", "M", "L", "XL"])}
+							{@render styleGroup("Background", "subBg", ["None", "Shadow", "Box"])}
+							{@render styleGroup("Color", "subColor", ["White", "Yellow"])}
+						{/if}
+					</div>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -875,6 +1310,324 @@
 
 	.opt.sel {
 		background: color-mix(in srgb, var(--player-accent) 10%, transparent);
+	}
+
+	.opt-text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	.opt-sub {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		font: 400 11px var(--font-mono);
+		color: var(--fg-subtle);
+	}
+
+	.opt:focus .opt-sub {
+		color: inherit;
+	}
+
+	.opt-spin {
+		display: grid;
+		animation: slp-spin 1s linear infinite;
+	}
+
+	@keyframes slp-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.badge {
+		flex: none;
+		padding: 2px 7px;
+		border-radius: var(--radius-full);
+		font: 500 10.5px var(--font-mono);
+		border: 1px solid;
+	}
+
+	.badge.ok {
+		color: var(--status-available);
+		background: color-mix(in srgb, var(--status-available) 12%, transparent);
+		border-color: color-mix(in srgb, var(--status-available) 25%, transparent);
+	}
+
+	.badge.conv {
+		color: var(--status-downloading);
+		background: color-mix(in srgb, var(--status-downloading) 14%, transparent);
+		border-color: color-mix(in srgb, var(--status-downloading) 30%, transparent);
+	}
+
+	.badge.warn {
+		color: var(--status-warning);
+		background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+		border-color: color-mix(in srgb, var(--status-warning) 30%, transparent);
+	}
+
+	.stepper {
+		margin: 8px 4px 2px;
+		padding-top: 8px;
+		border-top: 1px solid var(--border);
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		transition: opacity var(--dur-base);
+	}
+
+	.stepper-text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.stepper-label {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--player-ink);
+	}
+
+	.stepper-desc {
+		font-size: 11.5px;
+		line-height: 1.4;
+		color: var(--fg-subtle);
+		text-wrap: pretty;
+	}
+
+	.stepper-box {
+		flex: none;
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		padding: 3px;
+		border-radius: 9px;
+		background: var(--surface);
+	}
+
+	.step {
+		width: 30px;
+		height: 30px;
+		display: grid;
+		place-items: center;
+		border: 0;
+		border-radius: 7px;
+		background: transparent;
+		color: var(--player-ink);
+		outline: none;
+	}
+
+	.stepper-value {
+		min-width: 62px;
+		text-align: center;
+		font: 500 12px var(--font-mono);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.reset {
+		flex: none;
+		height: 30px;
+		padding: 0 6px;
+		border: 0;
+		border-radius: 7px;
+		background: transparent;
+		color: var(--player-accent-text);
+		font-size: 12px;
+		font-weight: 500;
+		outline: none;
+		transition: opacity var(--dur-fast);
+	}
+
+	.step:focus,
+	.reset:focus,
+	.seg-opt:focus,
+	.style-head:focus {
+		background: var(--player-ink);
+		color: var(--fg-on-accent);
+	}
+
+	.night {
+		margin: 10px 4px 2px;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 10px 12px;
+		border-radius: var(--radius-md);
+		border: 1px dashed var(--border-strong);
+		color: var(--fg-subtle);
+	}
+
+	.night-text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		font-size: 11.5px;
+		line-height: 1.4;
+	}
+
+	.night-title {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--player-ink-muted);
+	}
+
+	.night-later {
+		flex: none;
+		font: 500 10px var(--font-mono);
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--fg-faint);
+	}
+
+	.style-box {
+		margin: 8px 4px 2px;
+		padding-top: 4px;
+		border-top: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.style-head {
+		width: 100%;
+		min-height: 38px;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 0 2px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--player-ink);
+		text-align: left;
+		outline: none;
+	}
+
+	.style-eyebrow {
+		flex: none;
+		font: 500 10.5px var(--font-mono);
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--fg-faint);
+	}
+
+	.style-summary {
+		flex: 1;
+		min-width: 0;
+		text-align: right;
+		font: 400 11.5px var(--font-mono);
+		color: var(--fg-subtle);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.style-chevron {
+		flex: none;
+		display: grid;
+		color: var(--fg-subtle);
+		transition: transform var(--dur-base) var(--ease);
+	}
+
+	.style-note {
+		margin-top: -4px;
+		font-size: 11.5px;
+		line-height: 1.45;
+		color: var(--fg-subtle);
+		text-wrap: pretty;
+	}
+
+	.style-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		transition: opacity var(--dur-base);
+	}
+
+	.style-label {
+		width: 84px;
+		font-size: 12.5px;
+		color: var(--fg-subtle);
+	}
+
+	.seg-box {
+		position: relative;
+		flex: 1;
+		display: flex;
+		gap: 4px;
+		padding: 3px;
+		border-radius: 9px;
+		background: var(--surface);
+	}
+
+	.seg-ind {
+		position: absolute;
+		left: 3px;
+		top: 3px;
+		bottom: 3px;
+		border-radius: 7px;
+		transition: transform var(--dur-slow) var(--ease), background-color var(--dur-base), opacity var(--dur-base);
+	}
+
+	.seg-opt {
+		position: relative;
+		flex: 1;
+		height: 30px;
+		border: 0;
+		border-radius: 7px;
+		background: transparent;
+		font-size: 12.5px;
+		font-weight: 500;
+		outline: none;
+		transition: color var(--dur-base);
+	}
+
+	.cue-wrap {
+		position: absolute;
+		left: 0;
+		right: 0;
+		display: flex;
+		justify-content: center;
+		pointer-events: none;
+		transition: bottom 250ms var(--ease);
+	}
+
+	.sl-cue {
+		display: inline-block;
+		max-width: 80%;
+		border-radius: var(--radius-sm);
+		font-family: var(--font-sans);
+		font-weight: 500;
+		line-height: 1.3;
+		text-align: center;
+		white-space: pre-line;
+	}
+
+	.osd-wrap {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		pointer-events: none;
+	}
+
+	.sl-osd {
+		display: inline-flex;
+		align-items: center;
+		gap: 12px;
+		padding: 18px 30px;
+		border-radius: 14px;
+		background: rgba(0, 0, 0, 0.6);
+		backdrop-filter: blur(12px);
+		color: var(--player-ink);
+		font: 500 40px var(--font-mono);
 	}
 
 	.opt.sel:focus {

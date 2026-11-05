@@ -50,10 +50,38 @@ async fn start_session(
     media_id: String,
     capabilities: Value,
     position: f64,
+    tracks: Value,
 ) -> Result<Value, String> {
-    let body = json!({ "media_id": media_id, "capabilities": capabilities, "position": position });
+    let mut body = json!({
+        "media_id": media_id,
+        "capabilities": capabilities,
+        "position": position,
+    });
+    if let (Some(body), Some(tracks)) = (body.as_object_mut(), tracks.as_object()) {
+        body.extend(tracks.clone());
+    }
     api.call(reqwest::Method::POST, "/sessions", Some(body))
         .await
+}
+
+#[tauri::command]
+async fn media_tracks(api: tauri::State<'_, Api>, media_id: String) -> Result<Value, String> {
+    api.call(
+        reqwest::Method::GET,
+        &format!("/media/{media_id}/tracks"),
+        None,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn subtitle_text(api: tauri::State<'_, Api>, url: String) -> Result<String, String> {
+    let resp = api.0.get(url).send().await.map_err(|e| e.to_string())?;
+    resp.error_for_status()
+        .map_err(|e| e.to_string())?
+        .text()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -101,6 +129,8 @@ pub fn run() {
         .manage(Api(reqwest::Client::new()))
         .invoke_handler(tauri::generate_handler![
             playback_status,
+            media_tracks,
+            subtitle_text,
             start_session,
             patch_session,
             stop_session,

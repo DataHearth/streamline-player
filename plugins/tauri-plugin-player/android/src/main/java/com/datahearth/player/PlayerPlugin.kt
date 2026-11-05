@@ -1,10 +1,13 @@
 package com.datahearth.player
 
 import android.app.Activity
+import android.content.Context
 import android.graphics.Color
+import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Gravity
 import android.view.SurfaceView
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -13,10 +16,17 @@ import androidx.activity.OnBackPressedCallback
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioRendererEventListener
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
@@ -34,6 +44,37 @@ class SeekArgs {
     var seconds: Double = 0.0
 }
 
+@InvokeArg
+class SubtitleArgs {
+    var kind: String? = null
+    var url: String? = null
+    var fonts: Array<String> = emptyArray()
+}
+
+@InvokeArg
+class TimingArgs {
+    var subtitleOffset: Double = 0.0
+    var subtitleScale: Double = 1.0
+    var audioDelay: Double = 0.0
+}
+
+/**
+ * Audio delay: the audio renderer is ExoPlayer's master clock, and video is rendered against it.
+ * Reporting a later position shows the picture earlier, so the sound plays later than the picture.
+ */
+@androidx.annotation.OptIn(UnstableApi::class)
+private class DelayableAudioRenderer(
+    context: Context,
+    selector: MediaCodecSelector,
+    fallback: Boolean,
+    handler: Handler?,
+    listener: AudioRendererEventListener?,
+    sink: AudioSink,
+    private val delayUs: () -> Long,
+) : MediaCodecAudioRenderer(context, selector, fallback, handler, listener, sink) {
+    override fun getPositionUs(): Long = super.getPositionUs() + delayUs()
+}
+
 private const val TAG = "PlayerPlugin"
 private const val POSITION_INTERVAL_MS = 500L
 
@@ -45,6 +86,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     private val main = Handler(Looper.getMainLooper())
     private var player: ExoPlayer? = null
     private var surfaceView: SurfaceView? = null
+    private var overlay: SubtitleOverlay? = null
+    @Volatile private var audioDelayUs = 0L
     private var resumeOnForeground = false
 
     private val positionTicker = object : Runnable {
@@ -70,13 +113,22 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         content.addView(
             surface,
             0,
-            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER),
         )
         surfaceView = surface
+        val subtitles = SubtitleOverlay(activity) { player?.currentPosition ?: 0L }
+        content.addView(
+            subtitles,
+            1,
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+        )
+        overlay = subtitles
+        content.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitVideo() }
 
-        val p = ExoPlayer.Builder(activity).build()
+        val p = ExoPlayer.Builder(activity, renderers()).build()
         p.setVideoSurfaceView(surface)
         p.addListener(object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) = fitVideo()
             override fun onPlaybackStateChanged(playbackState: Int) {
                 emitState()
                 if (playbackState == Player.STATE_ENDED) logDecoderCounters()
@@ -106,6 +158,43 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         // WebView instead of reaching the page.
         webView.requestFocus()
         Log.i(TAG, "attached SurfaceView behind ${webView.javaClass.simpleName} in ${content.javaClass.simpleName}")
+    }
+
+    @androidx.annotation.OptIn(UnstableApi::class)
+    private fun renderers() = object : DefaultRenderersFactory(activity) {
+        override fun buildAudioRenderers(
+            context: Context,
+            extensionRendererMode: Int,
+            mediaCodecSelector: MediaCodecSelector,
+            enableDecoderFallback: Boolean,
+            audioSink: AudioSink,
+            eventHandler: Handler,
+            eventListener: AudioRendererEventListener,
+            out: ArrayList<Renderer>,
+        ) {
+            out.add(DelayableAudioRenderer(context, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, audioSink) { audioDelayUs })
+        }
+    }
+
+    // ExoPlayer stretches to its surface, so the surface takes the picture's shape, centered.
+    private fun fitVideo() {
+        val surface = surfaceView ?: return
+        val parent = surface.parent as? ViewGroup ?: return
+        val video = player?.videoSize ?: return
+        val (screenW, screenH) = parent.width to parent.height
+        if (video.width == 0 || video.height == 0 || screenW == 0 || screenH == 0) return
+        val aspect = video.width * video.pixelWidthHeightRatio / video.height
+        val (w, h) = if (aspect >= screenW.toFloat() / screenH) {
+            screenW to Math.round(screenW / aspect)
+        } else {
+            Math.round(screenH * aspect) to screenH
+        }
+        val left = (screenW - w) / 2
+        val top = (screenH - h) / 2
+        overlay?.videoRect = Rect(left, top, left + w, top + h)
+        if (surface.layoutParams.width != w || surface.layoutParams.height != h) {
+            surface.layoutParams = FrameLayout.LayoutParams(w, h, Gravity.CENTER)
+        }
     }
 
     @androidx.annotation.OptIn(UnstableApi::class)
@@ -191,6 +280,32 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    @Command
+    fun subtitle(invoke: Invoke) {
+        val args = invoke.parseArgs(SubtitleArgs::class.java)
+        val url = args.url
+        val dir = activity.cacheDir.resolve("subtitles")
+        val load: (() -> SubtitleSource)? = when {
+            url == null -> null
+            args.kind == "ass" -> { -> AssSource(fetchCached(url, dir), args.fonts.map { fetchCached(it, dir) }) }
+            args.kind == "pgs" -> { -> PgsSource(fetchCached(url, dir)) }
+            else -> null
+        }
+        main.post {
+            overlay?.show(load) { trigger("subtitleFailed", JSObject()) }
+            invoke.resolve()
+        }
+    }
+
+    @Command
+    fun timing(invoke: Invoke) {
+        val args = invoke.parseArgs(TimingArgs::class.java)
+        overlay?.offsetMs = (args.subtitleOffset * 1000).toLong()
+        overlay?.scale = args.subtitleScale.toFloat()
+        audioDelayUs = (args.audioDelay * 1000).toLong()
+        invoke.resolve()
+    }
+
     override fun onPause(activity: AppCompatActivity) {
         main.post {
             val p = player ?: return@post
@@ -213,6 +328,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
             stopTicker()
             player?.release()
             player = null
+            overlay?.release()
+            overlay = null
         }
     }
 }

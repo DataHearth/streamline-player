@@ -6,6 +6,8 @@ const COMMANDS: &[&str] = &[
     "play",
     "pause",
     "seek",
+    "subtitle",
+    "timing",
     "registerListener",
     "removeListener",
 ];

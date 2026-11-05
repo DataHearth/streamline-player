@@ -75,7 +75,7 @@ object Capabilities {
             })
             put("audio", audio(context, codecs))
             put("containers", JSONArray(listOf("mp4", "mkv")))
-            put("subtitles", JSONArray(listOf("webvtt", "srt", "pgs")))
+            put("subtitles", JSONArray(listOf("webvtt", "srt", "ass", "pgs")))
             put("hls_keyframe_exact", false)
         }
     }

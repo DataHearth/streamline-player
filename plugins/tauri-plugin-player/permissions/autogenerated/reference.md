@@ -9,6 +9,8 @@ Allows controlling the native player and listening to its events
 - `allow-play`
 - `allow-pause`
 - `allow-seek`
+- `allow-subtitle`
+- `allow-timing`
 - `allow-registerListener`
 - `allow-removeListener`
 
@@ -199,6 +201,58 @@ Enables the seek command without any pre-configured scope.
 <td>
 
 Denies the seek command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-subtitle`
+
+</td>
+<td>
+
+Enables the subtitle command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-subtitle`
+
+</td>
+<td>
+
+Denies the subtitle command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-timing`
+
+</td>
+<td>
+
+Enables the timing command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-timing`
+
+</td>
+<td>
+
+Denies the timing command without any pre-configured scope.
 
 </td>
 </tr>
