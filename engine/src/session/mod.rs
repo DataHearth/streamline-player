@@ -72,6 +72,7 @@ pub enum DecisionOut {
         audio_reasons: Vec<Reason>,
         hw: String,
         needs_slot: bool,
+        bandwidth: u64,
     },
     Refused {
         error: ErrorBody,
@@ -132,6 +133,7 @@ pub struct SessionResponse {
     pub video_reasons: Vec<Reason>,
     pub audio_reasons: Vec<Reason>,
     pub hw: String,
+    pub bandwidth: u64,
     pub duration: f64,
     pub url_path: String,
 }
@@ -315,6 +317,7 @@ fn response(plan: &Plan, a: &Analysis, hw: &Hw) -> SessionResponse {
         video_reasons: plan.video_reasons.clone(),
         audio_reasons: plan.audio_reasons.clone(),
         hw: hw_name(plan, hw).to_owned(),
+        bandwidth: bandwidth(plan, a),
         duration: a.duration,
         url_path: if plan.mode == Mode::Direct {
             "file"
@@ -461,6 +464,7 @@ impl Sessions {
                         audio_reasons: plan.audio_reasons.clone(),
                         hw: hw_name(&plan, hw).to_owned(),
                         needs_slot: is_transcode(plan.mode),
+                        bandwidth: bandwidth(&plan, &analysis),
                     },
                     Err(e) => DecisionOut::Refused { error: e.into() },
                 },

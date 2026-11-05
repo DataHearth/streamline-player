@@ -1015,6 +1015,7 @@ async fn decisions_preview_every_option_without_starting_anything() {
     assert_eq!(original["mode"], "direct", "{v}");
     assert_eq!(original["video"]["action"], "copy");
     assert_eq!(original["needs_slot"], false);
+    assert_eq!(original["bandwidth"], v["bit_rate"]);
     assert!(original.get("url_path").is_none());
 
     let capped = &v["decisions"][1];
@@ -1022,6 +1023,10 @@ async fn decisions_preview_every_option_without_starting_anything() {
     assert_eq!(capped["needs_slot"], true);
     assert_eq!(capped["video_reasons"][0]["code"], "bitrate_cap");
     assert_eq!(capped["video_reasons"][0]["text"], "capped at 0.1 Mbit/s");
+    assert!(
+        capped["bandwidth"].as_u64().unwrap() < original["bandwidth"].as_u64().unwrap(),
+        "{v}"
+    );
 
     assert_eq!(v["decisions"][2]["error"]["code"], "invalid_request", "{v}");
 
