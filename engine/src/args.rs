@@ -463,6 +463,10 @@ pub fn live_args(s: &RunSpec) -> Vec<String> {
 
     let n = s.start_index;
     let dir = s.out_dir.display();
+    // frag_discont writes each fragment's real time instead of counting from the run's start and
+    // shifting it with an edit list in the init. A player that plays on through a run change keeps
+    // the first init, so without it the position falls back by the new run's start and playback
+    // stalls.
     // ponytail: hls_time 0.001 cuts at every keyframe, one segment per GOP. On
     // 1-second-GOP Blu-ray remuxes that is many small requests; the upgrade is an
     // explicit segmenter that groups GOPs.
@@ -477,6 +481,8 @@ pub fn live_args(s: &RunSpec) -> Vec<String> {
         "event",
         "-hls_flags",
         "independent_segments+temp_file",
+        "-hls_segment_options",
+        "movflags=+frag_discont",
         "-start_number",
         &n.to_string(),
         "-hls_fmp4_init_filename",

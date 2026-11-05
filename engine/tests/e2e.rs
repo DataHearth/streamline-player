@@ -526,11 +526,17 @@ async fn assert_restart_matches_in_order(
     let mut extra = extra;
     extra["position"] = json!(bounds[k]);
     e.start(&b, src, caps, extra).await;
-    let init = e.hls(&b, "init.mp4").await;
-    let restarted = first_video_pts(e, &b, &init, k).await;
+    let own_init = e.hls(&b, "init.mp4").await;
+    let restarted = first_video_pts(e, &b, &own_init, k).await;
     assert!(
         (in_order - restarted).abs() < RESTART_SLACK_SECS,
         "seg_{k}: restart's earliest video pts is {restarted}, in order at {in_order}"
+    );
+    // A player playing on through a restart keeps the init it already has.
+    let kept = first_video_pts(e, &b, &init, k).await;
+    assert!(
+        (in_order - kept).abs() < RESTART_SLACK_SECS,
+        "seg_{k}: with the first run's init the restart reads {kept}, in order at {in_order}"
     );
 }
 
@@ -828,9 +834,9 @@ async fn transcode_cpu_h264() {
     let seg0 = e.hls(&sid, "seg_0.m4s").await;
     let seg2 = e.hls(&sid, "seg_2.m4s").await;
     let (track_id, timescale) = video_timescale(&init);
-    assert_eq!(video_tfdt(&seg0, track_id), 0);
-    let t2 = video_tfdt(&seg2, track_id) as f64 / f64::from(timescale);
-    assert!((t2 - 12.0).abs() < 0.001, "{t2}");
+    let spacing =
+        (video_tfdt(&seg2, track_id) - video_tfdt(&seg0, track_id)) as f64 / f64::from(timescale);
+    assert!((spacing - 12.0).abs() < 0.001, "{spacing}");
 
     let joined = e.root.join("joined.mp4");
     std::fs::write(&joined, [init, seg0].concat()).unwrap();
