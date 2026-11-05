@@ -99,6 +99,12 @@ async fn patch_session(
 }
 
 #[tauri::command]
+async fn session_info(api: tauri::State<'_, Api>, id: String) -> Result<Value, String> {
+    api.call(reqwest::Method::GET, &format!("/sessions/{id}"), None)
+        .await
+}
+
+#[tauri::command]
 async fn stop_session(api: tauri::State<'_, Api>, id: String) -> Result<(), String> {
     api.call(reqwest::Method::DELETE, &format!("/sessions/{id}"), None)
         .await
@@ -133,6 +139,7 @@ pub fn run() {
             subtitle_text,
             start_session,
             patch_session,
+            session_info,
             stop_session,
             heartbeat
         ])

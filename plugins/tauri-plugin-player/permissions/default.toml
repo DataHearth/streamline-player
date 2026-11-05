@@ -8,6 +8,8 @@ permissions = [
   "allow-play",
   "allow-pause",
   "allow-seek",
+  "allow-speed",
+  "allow-stats",
   "allow-subtitle",
   "allow-timing",
   "allow-registerListener",

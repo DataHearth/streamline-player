@@ -9,6 +9,8 @@ Allows controlling the native player and listening to its events
 - `allow-play`
 - `allow-pause`
 - `allow-seek`
+- `allow-speed`
+- `allow-stats`
 - `allow-subtitle`
 - `allow-timing`
 - `allow-registerListener`
@@ -201,6 +203,58 @@ Enables the seek command without any pre-configured scope.
 <td>
 
 Denies the seek command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-speed`
+
+</td>
+<td>
+
+Enables the speed command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-speed`
+
+</td>
+<td>
+
+Denies the speed command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-stats`
+
+</td>
+<td>
+
+Enables the stats command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-stats`
+
+</td>
+<td>
+
+Denies the stats command without any pre-configured scope.
 
 </td>
 </tr>

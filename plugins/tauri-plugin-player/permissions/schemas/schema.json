@@ -379,6 +379,30 @@
           "markdownDescription": "Denies the seek command without any pre-configured scope."
         },
         {
+          "description": "Enables the speed command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-speed",
+          "markdownDescription": "Enables the speed command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the speed command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-speed",
+          "markdownDescription": "Denies the speed command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the stats command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-stats",
+          "markdownDescription": "Enables the stats command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the stats command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-stats",
+          "markdownDescription": "Denies the stats command without any pre-configured scope."
+        },
+        {
           "description": "Enables the subtitle command without any pre-configured scope.",
           "type": "string",
           "const": "allow-subtitle",
@@ -403,10 +427,10 @@
           "markdownDescription": "Denies the timing command without any pre-configured scope."
         },
         {
-          "description": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-registerListener`\n- `allow-removeListener`",
+          "description": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-registerListener`\n- `allow-removeListener`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-registerListener`\n- `allow-removeListener`"
+          "markdownDescription": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-registerListener`\n- `allow-removeListener`"
         }
       ]
     }

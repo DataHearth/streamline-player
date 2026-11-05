@@ -14,12 +14,15 @@ import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaLibraryInfo
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -42,6 +45,11 @@ class LoadArgs {
 @InvokeArg
 class SeekArgs {
     var seconds: Double = 0.0
+}
+
+@InvokeArg
+class SpeedArgs {
+    var speed: Double = 1.0
 }
 
 @InvokeArg
@@ -89,6 +97,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     private var overlay: SubtitleOverlay? = null
     @Volatile private var audioDelayUs = 0L
     private var resumeOnForeground = false
+    private val bandwidth by lazy { DefaultBandwidthMeter.getSingletonInstance(activity) }
 
     private val positionTicker = object : Runnable {
         override fun run() {
@@ -125,7 +134,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         overlay = subtitles
         content.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitVideo() }
 
-        val p = ExoPlayer.Builder(activity, renderers()).build()
+        val p = ExoPlayer.Builder(activity, renderers()).setBandwidthMeter(bandwidth).build()
         p.setVideoSurfaceView(surface)
         p.addListener(object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) = fitVideo()
@@ -277,6 +286,35 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         onPlayer(invoke) {
             it.seekTo((args.seconds * 1000).toLong().coerceAtLeast(0))
             emitPosition()
+        }
+    }
+
+    @Command
+    fun speed(invoke: Invoke) {
+        val args = invoke.parseArgs(SpeedArgs::class.java)
+        onPlayer(invoke) { it.playbackParameters = PlaybackParameters(args.speed.toFloat()) }
+    }
+
+    @androidx.annotation.OptIn(UnstableApi::class)
+    @Command
+    fun stats(invoke: Invoke) {
+        main.post {
+            val p = player
+            if (p == null) {
+                invoke.reject("player not attached")
+                return@post
+            }
+            val frames = p.videoDecoderCounters?.also { it.ensureUpdated() }
+            invoke.resolve(JSObject().apply {
+                put("version", MediaLibraryInfo.VERSION)
+                put("buffer", (p.bufferedPosition - p.currentPosition).coerceAtLeast(0) / 1000.0)
+                put("throughput", bandwidth.bitrateEstimate)
+                put("videoBitrate", p.videoFormat?.bitrate ?: -1)
+                put("audioBitrate", p.audioFormat?.bitrate ?: -1)
+                put("rendered", frames?.renderedOutputBufferCount ?: 0)
+                put("dropped", frames?.droppedBufferCount ?: 0)
+                put("displayHz", activity.windowManager.defaultDisplay.refreshRate.toDouble())
+            })
         }
     }
 

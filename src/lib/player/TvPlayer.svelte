@@ -6,12 +6,14 @@
 	import "#lib/design/typography.css";
 	import { addPluginListener, invoke } from "@tauri-apps/api/core";
 	import {
+		Activity,
 		AudioLines,
 		Captions,
 		CaptionsOff,
 		Check,
 		ChevronDown,
 		Cpu,
+		Gauge,
 		LoaderCircle,
 		Minus,
 		Moon,
@@ -36,12 +38,15 @@
 		audio: { action: string; codec: string };
 		video_reasons: Reason[];
 		audio_reasons: Reason[];
+		hw: string;
 	};
 	type Quality = "auto" | "original" | number;
-	type Tab = "subs" | "audio" | "quality";
+	type Tab = "subs" | "audio" | "quality" | "speed";
+	type Stats = { version: string; buffer: number; throughput: number; videoBitrate: number; audioBitrate: number; rendered: number; dropped: number; displayHz: number };
 	type AudioTrack = { index: number; codec: string; channels: number; language: string; default: boolean };
 	type SubTrack = { index: number; codec: string; language: string; forced: boolean; sdh: boolean; files: Record<string, string> };
-	type Tracks = { preparing: boolean; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
+	type Tracks = { preparing: boolean; container: string; video: { codec: string; width: number; height: number } | null; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
+	type StatRow = { k: string; v: string; c?: string; why?: boolean };
 	type SubKind = "text" | "styled" | "image";
 	type Cue = { start: number; end: number; text: string };
 	type Tone = "ok" | "conv" | "warn";
@@ -60,7 +65,7 @@
 	const HEARTBEAT_MS = 10_000;
 	const SEEK_STEP = 10;
 	const PLAYER_NAME = "ExoPlayer";
-	const TAB_NAMES: Record<Tab, string> = { audio: "Audio", subs: "Subtitles", quality: "Quality" };
+	const TAB_NAMES: Record<Tab, string> = { audio: "Audio", subs: "Subtitles", quality: "Quality", speed: "Speed" };
 	const CODEC_NAMES: Record<string, string> = {
 		aac: "AAC",
 		ac3: "AC-3",
@@ -78,6 +83,9 @@
 	const DEFAULT_SIZE_PX = 26;
 	const TV_CUE_SCALE = 1.7;
 	const OSD_MS = 900;
+	const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+	const STATS_MS = 1000;
+	const SLOW_THROUGHPUT = 4_000_000;
 	const SUB_OFFSET_LIMIT = 10;
 	const AUDIO_DELAY_LIMIT = 500;
 	const RECOVERY_WINDOW_MS = 30_000;
@@ -108,6 +116,12 @@
 	let prefs = $state(loadPrefs());
 	let osd = $state<string | null>(null);
 	let quality = $state<Quality>("auto");
+	let speed = $state(1);
+	let stats = $state(false);
+	let live = $state<Stats | null>(null);
+	let ended = $state(false);
+	let encodeSpeed = $state<number | null>(null);
+	let subTouched = false;
 	let halt = $state<Halt | null>(null);
 	let zoom = $state(1);
 	let skL = $state<Flash>({ ph: "idle", amt: 0, rot: 0 });
@@ -267,6 +281,66 @@
 		flashOsd(`Audio ${fmtOffset(audioDelay, false)}`);
 	}
 
+	const mbit = (bits: number) => `${(bits / 1_000_000).toFixed(bits < 1_000_000 ? 2 : 1)} Mbit/s`;
+	const videoName = (codec: string, height: number) => `${CODEC_NAMES[codec] ?? codec.toUpperCase()} ${height >= 2160 ? "4K" : `${height}p`}`;
+
+	const statRows = $derived.by(() => {
+		if (!session) return [];
+		const copy = session.video.action === "copy";
+		const direct = session.mode === "direct";
+		const box = tracks?.container.toUpperCase() ?? "";
+		const inName = tracks?.video ? videoName(tracks.video.codec, tracks.video.height) : "";
+		const outName = videoName(session.video.codec, session.video.height);
+		const audioIn = selectedAudio ? audioName(selectedAudio) : "";
+		const audioOut = CODEC_NAMES[session.audio.codec] ?? session.audio.codec;
+		const why = (list: Reason[]): StatRow[] => (list.length ? [{ k: "why", v: list.map((r) => r.text).join(" \u00B7 "), why: true }] : []);
+		const known = [live && live.videoBitrate > 0 && `${mbit(live.videoBitrate)} video`, live && live.audioBitrate > 0 && `${mbit(live.audioBitrate)} audio`].filter(Boolean);
+		const rows: StatRow[] = [
+			{ k: "Mode", v: `${MODE_LABEL[session.mode]}${direct ? " \u00B7 the original file" : session.mode === "remux" ? " \u00B7 nothing converted" : ""}`, c: full ? "var(--status-available)" : "var(--status-downloading)" },
+			{ k: "Player", v: `${PLAYER_NAME} \u00B7 Media3 ${live?.version ?? ""} \u00B7 Android TV` },
+			{ k: "Video", v: copy ? `${outName} \u00B7 as-is` : `${inName} \u2192 ${outName}`, c: "var(--player-ink)" },
+			...(copy ? [] : why(session.video_reasons)),
+			{ k: "Audio", v: session.audio.action === "copy" ? `${audioIn} \u00B7 as-is` : `${audioIn} \u2192 ${audioOut}`, c: "var(--player-ink)" },
+			...(session.audio.action === "copy" ? [] : why(session.audio_reasons)),
+			{ k: "Container", v: direct ? `${box} \u00B7 the file itself` : `${box} \u2192 fMP4 \u00B7 HLS` },
+			...(encodeSpeed === null
+				? []
+				: [{ k: "Encode", v: `${encodeSpeed.toFixed(1)}\u00D7 realtime \u00B7 ${copy ? "audio only" : session.hw.toUpperCase()}`, c: encodeSpeed >= 1.2 ? "var(--status-available)" : encodeSpeed >= 1 ? "var(--status-warning)" : "var(--status-failed)" }]),
+			{ k: "Subtitles", v: tracks?.preparing ? "Preparing\u2026" : selectedSub ? `${subName(selectedSub)} \u00B7 ${subInfo(selectedSub).fmt} \u00B7 ${burn ? "burned in by the server" : subRenderer(subInfo(selectedSub).kind)}` : "Off" },
+			...(subOffset || audioDelay ? [{ k: "Offsets", v: `subtitles ${fmtOffset(subOffset, true)} \u00B7 audio ${fmtOffset(audioDelay, false)}` }] : []),
+			...(known.length ? [{ k: "Bitrate", v: known.join(" \u00B7 ") }] : []),
+		];
+		if (live) {
+			rows.push(
+				{ k: "Throughput", v: mbit(live.throughput), c: live.throughput < SLOW_THROUGHPUT ? "var(--status-warning)" : undefined },
+				{ k: "Buffer", v: `${live.buffer.toFixed(1)} s ahead` },
+				{ k: "Frames", v: `${live.dropped.toLocaleString("en-US")} dropped / ${live.rendered.toLocaleString("en-US")}` },
+				{ k: "Display", v: `${Math.round(live.displayHz * 1000) / 1000} Hz \u00B7 not matched` },
+			);
+		}
+		rows.push({ k: "Speed", v: `${speed}\u00D7` }, { k: "Server", v: `${new URL(session.url).host} \u00B7 ${direct ? "/file" : "/hls"}` });
+		return rows;
+	});
+
+	const subRenderer = (kind: SubKind) => (kind === "styled" ? "libass" : kind === "image" ? "Media3" : "web view");
+
+	$effect(() => {
+		if (!stats) return;
+		const poll = async () => {
+			live = await (player("stats") as Promise<Stats>).catch(() => live);
+			const id = session?.session_id;
+			encodeSpeed = id && session?.mode !== "direct" && session?.mode !== "remux" ? await invoke<{ speed: number | null }>("session_info", { id }).then((i) => i.speed, () => null) : null;
+		};
+		poll();
+		const timer = setInterval(poll, STATS_MS);
+		return () => clearInterval(timer);
+	});
+
+	const pop = (_: Element, { y = 6, scale = 0.98 } = {}) => ({
+		duration: 220,
+		css: (t: number) => `opacity:${t};transform:translateY(${(1 - t) * y}px) scale(${scale + (1 - scale) * t})`,
+	});
+
 	const parseStamp = (t: string) => t.split(":").reduce((acc, part) => acc * 60 + Number(part.replace(",", ".")), 0);
 
 	function parseCues(raw: string): Cue[] {
@@ -288,12 +362,22 @@
 			if (cueText) cueText = "";
 			return;
 		}
-		const now = (playing ? position + (performance.now() - positionAt) / 1000 : position) - subOffset;
+		const now = (playing ? position + ((performance.now() - positionAt) / 1000) * speed : position) - subOffset;
 		const text = cues.filter((c) => c.start <= now && now < c.end).map((c) => c.text).join("\n");
 		if (text !== cueText) cueText = text;
 	}
 
-	async function pickSub(t: SubTrack | null) {
+	// A forced track translates the foreign passages of the audio it goes with. Never burned in on
+	// its own: that would convert the video without the viewer asking.
+	function autoForced() {
+		if (subTouched || !tracks || tracks.preparing) return;
+		const audio = selectedAudio && language(selectedAudio.language);
+		const want = tracks.subtitles.find((t) => t.forced && !subInfo(t).burnOnly && language(t.language) === audio) ?? null;
+		if ((want?.index ?? null) !== subPick) pickSub(want, false);
+	}
+
+	async function pickSub(t: SubTrack | null, byViewer = true) {
+		subTouched ||= byViewer;
 		const info = t && subInfo(t);
 		const wantsBurn = !!info?.burnOnly;
 		const changedBurn = wantsBurn !== burn || (wantsBurn && subPick !== t?.index);
@@ -323,6 +407,7 @@
 		if (t.index === selectedAudio?.index) return;
 		audioPick = t.index;
 		await repatch({ audio_index: t.index });
+		autoForced();
 	}
 
 	function sessionTracks() {
@@ -335,6 +420,7 @@
 
 	async function refreshTracks() {
 		tracks = await invoke<Tracks>("media_tracks", { mediaId: title }).catch(() => tracks);
+		autoForced();
 	}
 
 	const fmt = (s: number) => {
@@ -473,11 +559,37 @@
 		burn = false;
 		subOffset = 0;
 		audioDelay = 0;
+		subTouched = false;
 		cues = [];
 		player("subtitle", {}).catch(() => {});
 		syncTiming();
 		duration = 0;
+		ended = false;
+		stats = false;
+		pickSpeed(1);
 		await start();
+	}
+
+	function finish() {
+		if (ended) return;
+		ended = true;
+		menu = false;
+		stats = false;
+		buffering = false;
+		stop();
+		focusDefault();
+	}
+
+	function replay() {
+		ended = false;
+		paused = false;
+		position = 0;
+		start(0);
+	}
+
+	function pickSpeed(x: number) {
+		speed = x;
+		player("speed", { speed: x }).catch(() => {});
 	}
 
 	function togglePlay() {
@@ -557,9 +669,13 @@
 	}
 
 	function back() {
-		if (halt) return exit();
+		if (halt || ended) return exit();
 		if (menu) {
 			menu = false;
+			return focusDefault();
+		}
+		if (stats) {
+			stats = false;
 			return focusDefault();
 		}
 		if (controls && playing) {
@@ -600,7 +716,7 @@
 		}
 		const arrow = k.startsWith("Arrow");
 		if (!arrow && k !== "Enter") return;
-		if (halt || menu) {
+		if (halt || menu || ended) {
 			if (arrow) {
 				e.preventDefault();
 				moveFocus(k);
@@ -647,6 +763,7 @@
 			addPluginListener<{ state: string }>("player", "state", (e) => {
 				buffering = e.state === "buffering";
 				playing = e.state === "playing";
+				if (e.state === "ended") finish();
 			}),
 			addPluginListener<{ code: string; message: string }>("player", "error", (e) => {
 				if (e.code.startsWith("ERROR_CODE_IO_") && Date.now() - lastRecovery > RECOVERY_WINDOW_MS) {
@@ -770,7 +887,7 @@
 	{@render flash(skR, "right")}
 
 	<div class="chrome" style:opacity={controlsOn ? 1 : 0}>
-		{#if controlsOn}
+		{#if controlsOn && !ended}
 			<div class="controls">
 				<div class="head">
 					<span class="tv-title">{title}</span>
@@ -790,6 +907,8 @@
 					</button>
 					<button data-tv="1" class="pill" onclick={() => openMenu("audio")}><AudioLines size={28} strokeWidth={1.9} />Audio</button>
 					<button data-tv="1" class="pill" onclick={() => openMenu("quality")}><Settings size={28} strokeWidth={1.9} />{qualText}</button>
+					<button data-tv="1" class="pill" onclick={() => openMenu("speed")}><Gauge size={28} strokeWidth={1.9} />{speed}&times;</button>
+					<button data-tv="1" class="pill" onclick={() => (stats = !stats)}><Activity size={28} strokeWidth={1.9} />Stats</button>
 				</div>
 			</div>
 		{/if}
@@ -809,6 +928,8 @@
 					{@render option("Auto", quality === "auto", () => pickQuality("auto"))}
 					{@render option("Original", quality === "original", () => pickQuality("original"))}
 					{#each [20, 8, 4, 2, 1] as n}{@render option(`${n} Mbit/s`, quality === n, () => pickQuality(n))}{/each}
+				{:else if tab === "speed"}
+					{#each SPEEDS as x}{@render option(x === 1 ? "Normal" : `${x}\u00D7`, speed === x, () => pickSpeed(x))}{/each}
 				{:else if tab === "audio"}
 					<div class="note"><span class="note-dot" style:background={session?.audio.action === "copy" ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{audioNote}</span></div>
 					{#each tracks?.audio ?? [] as t, i}
@@ -879,6 +1000,36 @@
 						{/if}
 					</div>
 				{/if}
+			</div>
+		</div>
+	{/if}
+
+	{#if stats}
+		<div class="sl-stats" style:bottom="{controlsOn ? 220 : 50}px" transition:pop>
+			<div class="stats-head">
+				<span>Playback stats</span>
+				<button data-tv="1" class="stats-close" aria-label="Close stats" onclick={() => { stats = false; focusDefault(); }}><X size={14} strokeWidth={2} /></button>
+			</div>
+			{#each statRows as r}
+				<div class="stats-row">
+					<span>{r.k}</span><span class:why={r.why} style:color={r.why ? "var(--fg-subtle)" : (r.c ?? "var(--player-ink-muted)")}>{r.v}</span>
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	{#if ended}
+		<div class="end" data-tv-trap="1">
+			<div class="halt-scrim end-scrim"></div>
+			<div class="halt-zoom">
+				<div class="halt-col end-col">
+					<span class="eyebrow" style:color="var(--player-accent-text)">Finished</span>
+					<span class="halt-title">{title}</span>
+					<div class="actions">
+						<button data-tv="1" data-tv-default="1" class="primary end-done" onclick={exit}>Done</button>
+						<button data-tv="1" class="secondary end-again" onclick={replay}><RotateCcw size={16} strokeWidth={2} />Watch again</button>
+					</div>
+				</div>
 			</div>
 		</div>
 	{/if}
@@ -1644,6 +1795,119 @@
 
 	.opt-label {
 		font-size: 14px;
+	}
+
+	.sl-stats {
+		position: absolute;
+		right: 70px;
+		zoom: 1.75;
+		width: 440px;
+		box-sizing: border-box;
+		padding: 14px 16px;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: var(--radius-player-controls);
+		background: rgba(5, 5, 8, 0.78);
+		backdrop-filter: blur(14px);
+		font: 400 11.5px/1.65 var(--font-mono);
+		color: var(--player-ink-muted);
+		transform-origin: 100% 100%;
+		transition: bottom 240ms var(--ease);
+	}
+
+	.stats-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 8px;
+		font-size: 10.5px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--player-ink);
+	}
+
+	.stats-close {
+		width: 26px;
+		height: 26px;
+		display: grid;
+		place-items: center;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--fg-subtle);
+		cursor: pointer;
+		outline: none;
+	}
+
+	.stats-close:focus {
+		background: var(--player-ink);
+		color: var(--fg-on-accent);
+	}
+
+	.stats-row {
+		display: grid;
+		grid-template-columns: 96px minmax(0, 1fr);
+		gap: 10px;
+	}
+
+	.stats-row > span:first-child {
+		color: #5a5a68;
+	}
+
+	.stats-row > span:last-child {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.stats-row > span.why {
+		white-space: normal;
+		text-wrap: pretty;
+	}
+
+	.end {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+		background: var(--bg-deep);
+		animation: slp-fade 320ms ease-out;
+	}
+
+	.end-scrim {
+		background: linear-gradient(90deg, var(--hero-scrim) 0%, color-mix(in srgb, var(--bg-deep) 72%, transparent) 50%, color-mix(in srgb, var(--bg-deep) 40%, transparent) 100%);
+	}
+
+	.end-col {
+		gap: 12px;
+		animation: slp-rise 360ms var(--ease);
+	}
+
+	.end-col .actions {
+		margin-top: 10px;
+	}
+
+	.end-done {
+		padding: 0 26px;
+	}
+
+	.end-again {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 0 20px 0 16px;
+	}
+
+	@keyframes slp-fade {
+		from {
+			opacity: 0;
+		}
+	}
+
+	@keyframes slp-rise {
+		from {
+			opacity: 0;
+			transform: translateY(10px);
+		}
 	}
 
 	.halt {

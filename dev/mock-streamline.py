@@ -83,6 +83,8 @@ def tracks(media_id, path, base):
     files = {t["index"]: {f.rsplit(".", 1)[1]: url(f) for f in t["files"]} for t in result["tracks"]}
     return {
         "preparing": job is None,
+        "container": analysis.get("container", ""),
+        "video": next(iter(analysis.get("video", [])), None),
         "audio": analysis.get("audio", []),
         "subtitles": [{**s, "files": files.get(s["index"], {})} for s in analysis.get("subtitles", [])],
         "fonts": [url(f) for f in result["fonts"]],
@@ -130,6 +132,11 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
             return None
+        m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})", self.path)
+        if m:
+            _, resp = engine("GET", "/v1/sessions")
+            found = next((i for i in resp["sessions"] if i["session_id"] == m[1]), None)
+            return self.reply(200, found) if found else self.reply(404, {"error": {"code": "not_found"}})
         self.reply(404, {"error": {"code": "not_found"}})
 
     def do_POST(self):
