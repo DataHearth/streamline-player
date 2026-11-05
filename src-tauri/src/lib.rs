@@ -75,6 +75,11 @@ impl Api {
 }
 
 #[tauri::command]
+fn server_host() -> &'static str {
+    SERVER.split_once("://").map_or(SERVER, |(_, host)| host)
+}
+
+#[tauri::command]
 async fn library(api: tauri::State<'_, Api>, kind: Kind) -> Result<Value, String> {
     api.call(reqwest::Method::GET, kind.path(), None).await
 }
@@ -217,6 +222,7 @@ pub fn run() {
             });
         })
         .invoke_handler(tauri::generate_handler![
+            server_host,
             library,
             title,
             watch_state,

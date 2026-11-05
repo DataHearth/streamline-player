@@ -2,9 +2,9 @@
 	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import TvPlayer from "#lib/player/TvPlayer.svelte";
-	import { artwork, episodesOf, library, stillPos, title as fetchTitle, watchState, type Kind, type Title } from "#lib/tv/api.ts";
+	import { artwork, episodesOf, everything, stillPos, title as fetchTitle, watchState, type Kind, type Title } from "#lib/tv/api.ts";
 
-	type Play = { key: string; mediaId: string; heading: string; eyebrow: string; frame: string; framePos: string; start: number; next: { code: string; title: string; overview: string; still: string; stillPos: string; label: string; href: string } | null; more: { title: string; poster: string; href: string }[] };
+	type Play = { key: string; mediaId: string; titleName: string; heading: string; eyebrow: string; frame: string; poster: string; framePos: string; start: number; next: { code: string; title: string; overview: string; still: string; stillPos: string; label: string; href: string } | null; more: { title: string; poster: string; href: string }[] };
 
 	const kind = $derived(page.params.kind as Kind);
 	const id = $derived(Number(page.params.id));
@@ -12,6 +12,7 @@
 	const resume = $derived(page.url.searchParams.has("resume"));
 	let play = $state.raw<Play | null>(null);
 	let fromDetail = false;
+	let season: number | null = null;
 
 	afterNavigate(({ from }) => {
 		if (from?.route.id?.startsWith("/detail")) fromDetail = true;
@@ -24,39 +25,48 @@
 		const at = eps.findIndex((e) => e.id === ep);
 		const e = eps[at];
 		if (!e) throw new Error(`no episode ${ep}`);
-		const following = eps[at + 1];
+		const following = eps[at + 1]?.has_file ? eps[at + 1] : undefined;
 		const still = artwork("series", i, "backdrop");
+		season = e.season;
 		return {
 			key: e.media_file_id,
 			mediaId: e.media_file_id,
+			titleName: t.title,
 			heading: e.title,
 			eyebrow: `${t.title} · S${e.season} E${e.number}`,
 			frame: still,
-			framePos: stillPos(e.number),
+			poster: artwork("series", i, "poster"),
+			framePos: stillPos(e.number, e.season),
 			start: wantsResume ? (watch.find((w) => w.media_id === e.media_file_id)?.position_seconds ?? 0) : 0,
 			next: following
-				? { code: `S${following.season} · E${following.number}`, title: following.title, overview: following.overview, still, stillPos: stillPos(following.number), label: `Play S${following.season} E${following.number}`, href: `/player/series/${i}?ep=${following.id}` }
+				? { code: `S${following.season} · E${following.number}`, title: following.title, overview: following.overview, still, stillPos: stillPos(following.number, following.season), label: `Play S${following.season} E${following.number}`, href: `/player/series/${i}?ep=${following.id}` }
 				: null,
-			more: [],
+			more: following ? [] : await moreLike(k, t),
 		};
 	}
 
+	async function moreLike(k: Kind, t: Title) {
+		const g = t.genres[0] ?? "";
+		const pool = (await everything()).filter((x) => !(x.kind === k && x.id === t.id));
+		const more = [...pool.filter((x) => x.genres[0] === g), ...pool.filter((x) => x.genres[0] !== g && x.genres.includes(g)), ...pool.filter((x) => !x.genres.includes(g))].slice(0, 6);
+		return more.map((x) => ({ title: x.title, poster: artwork(x.kind, x.id, "poster"), href: `/detail/${x.kind}/${x.id}` }));
+	}
+
 	async function movie(t: Title, start: number): Promise<Play> {
-		const all = await library("movies");
 		const mediaId = t.media_files?.[0]?.id ?? "";
 		const g = t.genres[0] ?? "";
-		const pool = all.filter((x) => x.id !== t.id);
-		const more = [...pool.filter((x) => x.genres[0] === g), ...pool.filter((x) => x.genres[0] !== g && x.genres.includes(g)), ...pool.filter((x) => !x.genres.includes(g))].slice(0, 6);
 		return {
 			key: mediaId,
 			mediaId,
+			titleName: t.title,
 			heading: t.title,
 			eyebrow: `${t.year} · ${g}`,
 			frame: artwork("movies", t.id, "backdrop"),
+			poster: artwork("movies", t.id, "poster"),
 			framePos: "50% 40%",
 			start,
 			next: null,
-			more: more.map((x) => ({ title: x.title, poster: artwork("movies", x.id, "poster"), href: `/detail/movies/${x.id}` })),
+			more: await moreLike("movies", t),
 		};
 	}
 
@@ -73,7 +83,7 @@
 	const detail = $derived(`/detail/${kind}/${id}`);
 	function exit() {
 		if (fromDetail) history.back();
-		else goto(detail, { replaceState: true });
+		else goto(season ? `${detail}?s=${season}` : detail, { replaceState: true });
 	}
 </script>
 

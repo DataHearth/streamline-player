@@ -70,4 +70,18 @@ export const meta = (kind: Kind, t: Title) =>
 export const episodesOf = (t: Title) => (t.seasons ?? []).flatMap((s) => s.episodes.map((e) => ({ ...e, season: s.number })));
 
 const STILL_POS = ["50% 45%", "22% 40%", "78% 55%", "35% 30%", "64% 70%", "12% 60%", "88% 35%"];
-export const stillPos = (n: number) => STILL_POS[n % STILL_POS.length] ?? "50% 50%";
+export const stillPos = (episode: number, season: number) => STILL_POS[(episode + season) % STILL_POS.length] ?? "50% 50%";
+
+/** Movies and shows together; ids are only unique within a kind. */
+export const everything = async () => {
+	const [movies, shows] = await Promise.all([library("movies"), library("series")]);
+	return [...movies.map((t) => ({ ...t, kind: "movies" as Kind })), ...shows.map((t) => ({ ...t, kind: "series" as Kind }))];
+};
+
+/** Titles without a backdrop fall back to their poster. A failing poster stops here: the src no longer changes. */
+export const orPoster = (poster: string, position?: string) => (e: Event) => {
+	const img = e.currentTarget as HTMLImageElement;
+	if (img.src === poster) return;
+	img.src = poster;
+	if (position) img.style.objectPosition = position;
+};

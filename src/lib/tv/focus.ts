@@ -10,7 +10,7 @@ function scopeOf(root: HTMLElement) {
 function focusable(root: HTMLElement) {
 	return [...scopeOf(root).querySelectorAll<HTMLButtonElement>("[data-tv]")].filter((el) => {
 		const r = el.getBoundingClientRect();
-		return r.width > 0 && r.height > 0 && !el.disabled;
+		return r.width > 0 && r.height > 0 && !el.disabled && !el.closest("[inert]");
 	});
 }
 
@@ -31,7 +31,7 @@ function layoutRect(el: HTMLElement) {
 
 function reveal(el: HTMLElement, root: HTMLElement) {
 	const k = zoom();
-	for (let p = el.parentElement; p && p !== root.parentElement; p = p.parentElement) {
+	for (let p = el.parentElement; p && p !== root; p = p.parentElement) {
 		if (p.hasAttribute("data-tv-noscroll")) continue;
 		const cs = getComputedStyle(p);
 		const canX = /(auto|scroll|hidden)/.test(cs.overflowX) && p.scrollWidth > p.clientWidth + 1;
@@ -51,6 +51,9 @@ function reveal(el: HTMLElement, root: HTMLElement) {
 		}
 	}
 }
+
+/** Only Back returns to the remembered card; arriving any other way starts at the screen's default. */
+export const forgetFocus = () => remembered.delete(location.pathname);
 
 export function focus(el: HTMLElement | null | undefined, root: HTMLElement) {
 	if (!el) return;

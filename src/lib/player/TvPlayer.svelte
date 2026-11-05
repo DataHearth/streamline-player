@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { orPoster } from "#lib/tv/api.ts";
 	import { focusDefault as focusStageDefault, move } from "#lib/tv/focus.ts";
+	import { toast } from "#lib/tv/toast.svelte.ts";
 	import { addPluginListener, invoke } from "@tauri-apps/api/core";
 	import {
 		Activity,
@@ -9,7 +11,9 @@
 		Check,
 		ChevronDown,
 		ChevronsRight,
+		CircleAlert,
 		Cpu,
+		Folder,
 		Gauge,
 		LoaderCircle,
 		Minus,
@@ -22,18 +26,20 @@
 		Server,
 		Settings,
 		SkipForward,
-		TriangleAlert,
+		WifiOff,
 		X,
 	} from "@lucide/svelte";
-	import { onMount, tick } from "svelte";
+	import { onMount, tick, type Component } from "svelte";
 
 	type Next = { code: string; title: string; overview: string; still: string; stillPos: string; label: string; href: string };
 	type More = { title: string; poster: string; href: string };
 	let {
 		mediaId,
+		titleName,
 		heading,
 		eyebrow,
 		frame,
+		poster,
 		framePos,
 		start: startAt,
 		next,
@@ -43,9 +49,11 @@
 		onopen,
 	}: {
 		mediaId: string;
+		titleName: string;
 		heading: string;
 		eyebrow: string;
 		frame: string;
+		poster: string;
 		framePos: string;
 		start: number;
 		next: Next | null;
@@ -60,8 +68,8 @@
 		session_id: string;
 		mode: "direct" | "remux" | "audio_transcode" | "transcode";
 		url: string;
-		video: { action: string; codec: string; width: number; height: number };
-		audio: { action: string; codec: string };
+		video: { action: string; codec: string; width: number; height: number; hdr: string; dv_profile?: number };
+		audio: { action: string; codec: string; channels: number };
 		video_reasons: Reason[];
 		audio_reasons: Reason[];
 		hw: string;
@@ -71,17 +79,23 @@
 	type Stats = { version: string; buffer: number; throughput: number; videoBitrate: number; audioBitrate: number; rendered: number; dropped: number; displayHz: number };
 	type AudioTrack = { index: number; codec: string; channels: number; language: string; default: boolean };
 	type SubTrack = { index: number; codec: string; language: string; forced: boolean; sdh: boolean; files: Record<string, string> };
-	type Tracks = { preparing: boolean; container: string; video: { codec: string; width: number; height: number } | null; chapters: { start: number; end: number; title: string }[]; markers: { intro: [number, number] | null; credits: [number, number] | null }; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
+	type Tracks = { preparing: boolean; container: string; video: { codec: string; width: number; height: number; hdr?: string; dv?: unknown } | null; chapters: { start: number; end: number; title: string }[]; markers: { intro: [number, number] | null; credits: [number, number] | null }; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
 	type StatRow = { k: string; v: string; c?: string; why?: boolean };
 	type SubKind = "text" | "styled" | "image";
 	type Cue = { start: number; end: number; text: string };
 	type Tone = "ok" | "conv" | "warn";
 	type Halt = {
+		kind: "busy" | "unreachable" | "offline" | "nocodec" | "missing" | "error";
 		eyebrow: string;
+		icon: Component<{ size?: number; strokeWidth?: number }>;
 		title: string;
 		body?: string;
 		mono?: string;
+		note?: string;
+		wait?: string;
+		count?: (left: number) => string;
 		failed: boolean;
+		retryLabel?: string;
 		left?: number;
 		total?: number;
 	};
@@ -93,9 +107,13 @@
 	const PLAYER_NAME = "ExoPlayer";
 	const TAB_NAMES: Record<Tab, string> = { audio: "Audio", subs: "Subtitles", quality: "Quality", speed: "Speed" };
 	const CODEC_NAMES: Record<string, string> = {
+		h264: "H.264",
+		hevc: "HEVC",
+		av1: "AV1",
+		vp9: "VP9",
 		aac: "AAC",
-		ac3: "AC-3",
-		eac3: "E-AC-3",
+		ac3: "AC3",
+		eac3: "EAC3",
 		dts: "DTS",
 		truehd: "TrueHD",
 		flac: "FLAC",
@@ -117,7 +135,10 @@
 	const AUDIO_DELAY_LIMIT = 500;
 	const RECOVERY_WINDOW_MS = 30_000;
 	const RETRY_SECS = 10;
-	const MODE_LABEL = { direct: "Direct play", remux: "Remux", audio_transcode: "Audio conversion", transcode: "Transcode" };
+	const OFFLINE_CHECK_SECS = 5;
+	const MENU_EXIT_MS = 240;
+	const SEEK_RUN_MS = 900;
+	const MODE_LABEL = { direct: "Direct", remux: "Remux", audio_transcode: "Audio converted", transcode: "Converted" };
 
 	let session = $state<Session | null>(null);
 	// svelte-ignore state_referenced_locally
@@ -127,6 +148,11 @@
 	let buffering = $state(true);
 	let controls = $state(true);
 	let menu = $state(false);
+	let menuMounted = $state(false);
+	let menuVis = $state(false);
+	let host = $state("");
+	let buffered = $state(0);
+	let pfPause = $state(false);
 	let tab = $state<Tab>("quality");
 	let tracks = $state<Tracks | null>(null);
 	let audioPick = $state<number | null>(null);
@@ -140,7 +166,7 @@
 	let styleOpen = $state(false);
 	let prefs = $state(loadPrefs());
 	let osd = $state<string | null>(null);
-	let quality = $state<Quality>("auto");
+	let quality = $state<Quality>("original");
 	let speed = $state(1);
 	let stats = $state(false);
 	let live = $state<Stats | null>(null);
@@ -164,6 +190,9 @@
 	let pfTimer: ReturnType<typeof setTimeout> | undefined;
 	let osdTimer: ReturnType<typeof setTimeout> | undefined;
 	let positionAt = 0;
+	let menuTimer: ReturnType<typeof setTimeout> | undefined;
+	let seekLeft: boolean | null = null;
+	let seekAt = 0;
 
 	const introOn = $derived(!!tracks?.markers.intro && position >= tracks.markers.intro[0] && position < tracks.markers.intro[1]);
 	// Without a marker the card shows for the very end only, so no episode ending gets cut.
@@ -174,11 +203,12 @@
 	const upNextFrac = $derived(creditsAt === null ? 0 : Math.min(1, Math.max(0, (position - creditsAt) / UP_NEXT_SECS)));
 	const segs = $derived.by(() => {
 		const list = tracks?.chapters ?? [];
-		if (list.length < 2 || duration <= 0) return [{ flex: 1, fill: pct }];
+		if (list.length < 2 || duration <= 0) return [{ flex: 1, fill: pct, buf: duration > 0 ? (buffered / duration) * 100 : 0 }];
 		return list.map((c, i) => {
 			const end = list[i + 1]?.start ?? duration;
 			const len = Math.max(1, end - c.start);
-			return { flex: len, fill: Math.max(0, Math.min(100, ((position - c.start) / len) * 100)) };
+			const within = (at: number) => Math.max(0, Math.min(100, ((at - c.start) / len) * 100));
+			return { flex: len, fill: within(position), buf: within(buffered) };
 		});
 	});
 	const chapterName = $derived(tracks?.chapters.findLast((c) => position >= c.start)?.title ?? "");
@@ -189,9 +219,12 @@
 	const full = $derived(session?.mode === "direct" || session?.mode === "remux");
 	const modeLabel = $derived.by(() => {
 		if (!session) return "";
-		const h = session.video.height;
-		return `${MODE_LABEL[session.mode]} · ${h >= 2160 ? "4K" : `${h}p`}`;
+		const { height, hdr, dv_profile } = session.video;
+		const range = dv_profile !== undefined ? " \u00B7 Dolby Vision" : hdr === "sdr" ? "" : " \u00B7 HDR";
+		return `${height >= 2160 ? "4K" : `${height}p`}${range}`;
 	});
+	const modeBadge = $derived(session ? MODE_LABEL[session.mode].toLowerCase() : "");
+	const modeTone = $derived<Tone>(full ? "ok" : "conv");
 	const qualText = $derived(
 		quality === "auto" ? "Auto" : quality === "original" ? "Original" : `${quality} Mbit/s`,
 	);
@@ -202,11 +235,11 @@
 			case "direct":
 				return "Playing the original file as-is. Nothing is converted.";
 			case "remux":
-				return "Original video and audio, repackaged for this device. Nothing is converted.";
+				return `Original video and audio, repackaged for ${PLAYER_NAME} (${tracks?.container.toUpperCase() ?? ""} \u2192 fMP4). Nothing is converted.`;
 			case "audio_transcode":
-				return `Original video. The server converts the audio to ${session.audio.codec} (${why(session.audio_reasons)}).`;
+				return `Original video. The server converts the audio to ${audioOutName(session)} (${why(session.audio_reasons)}).`;
 			case "transcode":
-				return `The server converts the video to ${session.video.codec} (${why(session.video_reasons)}).`;
+				return `The server converts the video to ${videoOutName(session)} (${why(session.video_reasons)}).`;
 		}
 	});
 
@@ -265,7 +298,7 @@
 	function audioTarget(t: AudioTrack) {
 		const caps = capabilities as { audio?: { codecs: string[] } } | null;
 		const has = (c: string) => caps?.audio?.codecs.includes(c);
-		return t.channels > 2 && has("eac3") ? "E-AC-3" : t.channels > 2 && has("ac3") ? "AC-3" : "AAC";
+		return t.channels > 2 && has("eac3") ? "EAC3 5.1" : t.channels > 2 && has("ac3") ? "AC3 5.1" : "AAC 2.0";
 	}
 
 	const audioNote = $derived.by(() => {
@@ -273,7 +306,7 @@
 		const name = audioName(selectedAudio);
 		return session.audio.action === "copy"
 			? `${PLAYER_NAME} plays ${name} as-is.`
-			: `${PLAYER_NAME} can\u2019t decode ${name}, so the server converts it to ${CODEC_NAMES[session.audio.codec] ?? session.audio.codec}.`;
+			: `${PLAYER_NAME} can\u2019t decode ${name}, so the server converts it to ${audioOutName(session)}.`;
 	});
 
 	const styleNote = $derived(
@@ -325,17 +358,26 @@
 	}
 
 	const mbit = (bits: number) => `${(bits / 1_000_000).toFixed(bits < 1_000_000 ? 2 : 1)} Mbit/s`;
-	const videoName = (codec: string, height: number) => `${CODEC_NAMES[codec] ?? codec.toUpperCase()} ${height >= 2160 ? "4K" : `${height}p`}`;
+	const videoName = (codec: string, height: number) => `${CODEC_NAMES[codec] ?? codec.toUpperCase()} ${height}p`;
+	const HDR_NAMES: Record<string, string> = { hdr10: "HDR10", hlg: "HLG" };
+	const rangeName = (hdr?: string, dv?: boolean) => (dv ? " Dolby Vision" : hdr && HDR_NAMES[hdr] ? ` ${HDR_NAMES[hdr]}` : "");
+	function videoOutName(s: Session) {
+		const name = videoName(s.video.codec, s.video.height);
+		if (s.video.action === "copy") return `${name}${rangeName(s.video.hdr, s.video.dv_profile !== undefined)}`;
+		return `${name} ${HDR_NAMES[s.video.hdr] ?? "SDR"}`;
+	}
+	const originalSub = $derived(tracks?.video ? `${tracks.video.height}p ${CODEC_NAMES[tracks.video.codec] ?? tracks.video.codec}${rangeName(tracks.video.hdr, !!tracks.video.dv)}` : "");
+	const audioOutName = (s: Session) => `${CODEC_NAMES[s.audio.codec] ?? s.audio.codec} ${channelLayout(s.audio.channels)}`;
 
 	const statRows = $derived.by(() => {
 		if (!session) return [];
 		const copy = session.video.action === "copy";
 		const direct = session.mode === "direct";
 		const box = tracks?.container.toUpperCase() ?? "";
-		const inName = tracks?.video ? videoName(tracks.video.codec, tracks.video.height) : "";
-		const outName = videoName(session.video.codec, session.video.height);
+		const inName = tracks?.video ? `${videoName(tracks.video.codec, tracks.video.height)}${rangeName(tracks.video.hdr, !!tracks.video.dv)}` : "";
+		const outName = videoOutName(session);
 		const audioIn = selectedAudio ? audioName(selectedAudio) : "";
-		const audioOut = CODEC_NAMES[session.audio.codec] ?? session.audio.codec;
+		const audioOut = audioOutName(session);
 		const why = (list: Reason[]): StatRow[] => (list.length ? [{ k: "why", v: list.map((r) => r.text).join(" \u00B7 "), why: true }] : []);
 		const known = [live && live.videoBitrate > 0 && `${mbit(live.videoBitrate)} video`, live && live.audioBitrate > 0 && `${mbit(live.audioBitrate)} audio`].filter(Boolean);
 		const rows: StatRow[] = [
@@ -346,6 +388,7 @@
 			{ k: "Audio", v: session.audio.action === "copy" ? `${audioIn} \u00B7 as-is` : `${audioIn} \u2192 ${audioOut}`, c: "var(--player-ink)" },
 			...(session.audio.action === "copy" ? [] : why(session.audio_reasons)),
 			{ k: "Container", v: direct ? `${box} \u00B7 the file itself` : `${box} \u2192 fMP4 \u00B7 HLS` },
+			...(session.mode === "remux" ? [{ k: "why", v: `${box} not playable by ${PLAYER_NAME}`, why: true }] : []),
 			...(encodeSpeed === null
 				? []
 				: [{ k: "Encode", v: `${encodeSpeed.toFixed(1)}\u00D7 realtime \u00B7 ${copy ? "audio only" : session.hw.toUpperCase()}`, c: encodeSpeed >= 1.2 ? "var(--status-available)" : encodeSpeed >= 1 ? "var(--status-warning)" : "var(--status-failed)" }]),
@@ -499,20 +542,44 @@
 		halt = null;
 	}
 
+	function closeMenu() {
+		menu = false;
+		menuVis = false;
+		clearTimeout(menuTimer);
+		menuTimer = setTimeout(() => {
+			if (!menu) menuMounted = false;
+		}, MENU_EXIT_MS);
+		focusDefault();
+	}
+
+	function showHalt(h: Halt) {
+		if (menu) closeMenu();
+		player("pause").catch(() => {});
+		halt = h;
+		focusDefault();
+	}
+
 	function haltWithRetry(h: Halt, secs: number) {
+		showHalt({ ...h, left: secs, total: secs });
 		clearInterval(retryTimer);
-		halt = { ...h, left: secs, total: secs };
 		retryTimer = setInterval(() => {
 			if (!halt?.left) return;
 			if (halt.left <= 1) start();
 			else halt = { ...halt, left: halt.left - 1 };
 		}, 1000);
-		focusDefault();
+	}
+
+	function resumedToast(after: Halt["kind"] | undefined, s: Session) {
+		if (after === "unreachable") toast("Reconnected \u00B7 playback resumed");
+		else if (after === "offline") toast("Back online \u00B7 playback resumed", { icon: "wifi" });
+		else if (after === "busy") toast("Conversion started", { icon: "cpu", text: s.video.action === "copy" ? `Audio \u2192 ${audioOutName(s)}` : `${s.video.height}p ${CODEC_NAMES[s.video.codec] ?? s.video.codec}` });
 	}
 
 	async function start(at = position) {
 		const id = ++startId;
+		const after = halt?.kind;
 		clearHalt();
+		stop();
 		buffering = true;
 		try {
 			capabilities ??= await player("capabilities");
@@ -528,6 +595,7 @@
 			if (at > 0) await player("seek", { seconds: at });
 			if (!paused) await player("play");
 			showControls(true);
+			resumedToast(after, started);
 		} catch (e) {
 			if (id !== startId) return;
 			buffering = false;
@@ -543,6 +611,7 @@
 		const at = position;
 		await stop();
 		await start(at);
+		if (session && !halt) toast("Reconnected \u00B7 playback resumed");
 	}
 
 	const sessionGone = (raw: string) => raw.includes('"not_found"');
@@ -554,31 +623,78 @@
 		} catch {
 			// Not JSON: the request never got an answer from the server.
 		}
+		const at = fmt(position);
 		if (error?.code === "transcode_limit") {
 			haltWithRetry(
 				{
+					kind: "busy",
 					eyebrow: "Server busy",
+					icon: Cpu,
 					title: "Waiting for a free slot",
-					body: "All conversions on the server are in use, and this stream needs one.",
+					body: `All conversions on ${host} are in use, and this stream needs one.`,
+					count: (left) => `Trying again in ${left} s`,
+					note: `You\u2019re at ${at}. Playback starts as soon as a slot frees up.`,
 					failed: false,
+					retryLabel: "Try now",
 				},
 				error.retry_after ?? RETRY_SECS,
 			);
+		} else if (error?.code === "file_not_found" || error?.code === "media_not_found") {
+			showHalt({
+				kind: "missing",
+				eyebrow: "File missing",
+				icon: Folder,
+				title: "This file isn\u2019t on the server",
+				body: "Streamline can\u2019t find it where the library expects it. It may have been moved, renamed or deleted.",
+				mono: error.message,
+				note: "Let your admin know. If it was moved, a library scan finds it again.",
+				failed: true,
+			});
+		} else if (error?.code === "transcode_unavailable" || error?.code === "ffmpeg_unavailable") {
+			showHalt({
+				kind: "nocodec",
+				eyebrow: "Can\u2019t play here",
+				icon: CircleAlert,
+				title: `${titleName} can\u2019t play on this device`,
+				body: `${PLAYER_NAME} can\u2019t decode this file\u2019s video, and the server can\u2019t convert it: ${error.message}.`,
+				note: "Play it on another device, or ask your admin to turn on software conversion.",
+				failed: true,
+			});
 		} else if (error) {
-			halt = {
+			showHalt({
+				kind: "error",
 				eyebrow: "Playback error",
-				title: "This can't play right now",
+				icon: CircleAlert,
+				title: "This can\u2019t play right now",
 				mono: error.message ?? error.code ?? raw,
 				failed: true,
-			};
-			focusDefault();
+				retryLabel: "Try now",
+			});
+		} else if (navigator.onLine === false) {
+			haltWithRetry(
+				{
+					kind: "offline",
+					eyebrow: "Offline",
+					icon: WifiOff,
+					title: "This device lost its connection",
+					body: `Playback picks up at ${at} as soon as it\u2019s back.`,
+					wait: "Waiting for a network \u00B7 checking every 5 s",
+					failed: false,
+					retryLabel: "Try again",
+				},
+				OFFLINE_CHECK_SECS,
+			);
 		} else {
 			haltWithRetry(
 				{
-					eyebrow: "Can't reach the server",
-					title: "The server isn't answering",
+					kind: "unreachable",
+					eyebrow: "Can\u2019t reach the server",
+					icon: Server,
+					title: `${host} isn\u2019t answering`,
 					body: "The server may be off or restarting, or this device is away from your home network without the VPN.",
+					count: (left) => `Trying again in ${left} s \u00B7 your place is saved at ${at}`,
 					failed: true,
+					retryLabel: "Try now",
 				},
 				RETRY_SECS,
 			);
@@ -611,7 +727,9 @@
 	function finish() {
 		if (ended) return;
 		ended = true;
-		menu = false;
+		clearHalt();
+		startId++;
+		if (menu) closeMenu();
 		stats = false;
 		buffering = false;
 		leave();
@@ -630,7 +748,6 @@
 		if (end === undefined) return finish();
 		position = end;
 		player("seek", { seconds: end });
-		showControls();
 	}
 
 	function pickSpeed(x: number) {
@@ -642,6 +759,7 @@
 		const wasPlaying = playing;
 		paused = wasPlaying;
 		player(wasPlaying ? "pause" : "play");
+		pfPause = wasPlaying;
 		clearTimeout(pfTimer);
 		pf = "in";
 		pfTimer = setTimeout(() => {
@@ -654,37 +772,38 @@
 		const target = Math.max(0, duration > 0 ? Math.min(duration - 1, position + delta) : position + delta);
 		position = target;
 		player("seek", { seconds: target });
-		const dir = delta < 0;
-		const cur = dir ? skL : skR;
-		const next: Flash = {
-			ph: "in",
-			amt: (cur.ph === "idle" ? 0 : cur.amt) + Math.abs(delta),
-			rot: (cur.ph === "idle" ? 0 : cur.rot) + (dir ? -360 : 360),
-		};
-		if (dir) skL = next;
-		else skR = next;
+		const left = delta < 0;
+		const cur = left ? skL : skR;
+		const now = Date.now();
+		const run = seekLeft === left && now - seekAt < SEEK_RUN_MS && cur.ph !== "idle";
+		seekLeft = left;
+		seekAt = now;
+		const flash: Flash = { ph: "in", amt: (run ? cur.amt : 0) + Math.abs(delta), rot: (run ? cur.rot : 0) + (left ? -360 : 360) };
+		if (left) {
+			skL = flash;
+			if (skR.ph === "in") skR = { ...skR, ph: "out" };
+		} else {
+			skR = flash;
+			if (skL.ph === "in") skL = { ...skL, ph: "out" };
+		}
 		clearTimeout(seekTimer);
 		seekTimer = setTimeout(() => {
-			skL = { ...skL, ph: skL.ph === "idle" ? "idle" : "out" };
-			skR = { ...skR, ph: skR.ph === "idle" ? "idle" : "out" };
+			if (left) skL = { ...skL, ph: "out" };
+			else skR = { ...skR, ph: "out" };
 			seekTimer = setTimeout(() => {
-				skL = { ph: "idle", amt: 0, rot: 0 };
-				skR = { ph: "idle", amt: 0, rot: 0 };
+				skL = { ...skL, ph: "idle", rot: 0 };
+				skR = { ...skR, ph: "idle", rot: 0 };
 			}, 220);
 		}, 720);
 	}
 
 	async function pickQuality(q: Quality) {
-		if (q === quality || !session) {
-			menu = false;
-			return;
-		}
+		if (q === quality || !session) return;
 		quality = q;
 		await repatch({ max_bitrate: typeof q === "number" ? q * 1_000_000 : null });
 	}
 
 	async function repatch(changes: Record<string, unknown>) {
-		menu = false;
 		if (!session) return;
 		const at = position;
 		buffering = true;
@@ -704,27 +823,31 @@
 				failedToStart(String(e));
 			}
 		}
-		focusDefault();
+		if (!menu) focusDefault();
 	}
 
 	function openMenu(next: Tab) {
 		tab = next;
 		menu = true;
+		menuMounted = true;
+		clearTimeout(menuTimer);
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => {
+				if (menu) menuVis = true;
+			}),
+		);
 		refreshTracks();
 		focusDefault();
 	}
 
 	function back() {
 		if (halt || ended) return exit();
-		if (menu) {
-			menu = false;
-			return focusDefault();
-		}
+		if (menu) return closeMenu();
 		if (stats) {
 			stats = false;
 			return focusDefault();
 		}
-		if (controls && (playing || buffering)) {
+		if (controls) {
 			controls = false;
 			return;
 		}
@@ -778,13 +901,18 @@
 		} else if (arrow) {
 			e.preventDefault();
 			move(k, stage);
+		} else if (!document.activeElement?.hasAttribute("data-tv")) {
+			e.preventDefault();
+			focusDefault();
 		}
 	}
 
 	onMount(() => {
+		invoke<string>("server_host").then((h) => (host = h));
 		const listeners = [
-			addPluginListener<{ position: number; duration: number }>("player", "position", (e) => {
+			addPluginListener<{ position: number; buffered: number; duration: number }>("player", "position", (e) => {
 				position = e.position;
+				buffered = e.buffered;
 				positionAt = performance.now();
 				duration = e.duration;
 			}),
@@ -802,8 +930,7 @@
 					return;
 				}
 				buffering = false;
-				halt = { eyebrow: "Playback error", title: "This stream stopped", mono: `${e.code}: ${e.message}`, failed: true };
-				focusDefault();
+				showHalt({ kind: "error", eyebrow: "Playback error", icon: CircleAlert, title: "This stream stopped", mono: `${e.code}: ${e.message}`, failed: true, retryLabel: "Try now" });
 			}),
 			addPluginListener("player", "back", back),
 			addPluginListener("player", "subtitleFailed", () => flashOsd("Subtitles unavailable")),
@@ -821,6 +948,7 @@
 			clearInterval(beat);
 			clearInterval(hide);
 			clearInterval(retryTimer);
+			clearTimeout(menuTimer);
 			listeners.forEach((l) => l.then((h) => h.unregister()));
 			startId++;
 			leave();
@@ -832,7 +960,7 @@
 
 {#snippet flash(f: Flash, side: "left" | "right")}
 	<div class="sk {side}" aria-hidden="true">
-		<div class="sk-disc" class:on={f.ph === "in"} style:--dir={side === "left" ? -14 : 14}>
+		<div class="sk-disc {f.ph}" style:--dir={side === "left" ? -14 : 14}>
 			<span class="sk-ico" style:transform="rotate({f.rot}deg)" style:transition={f.ph === "idle" ? "none" : "transform 450ms var(--ease)"}>
 				{#if side === "left"}<RotateCcw size={46} strokeWidth={1.5} />{:else}<RotateCw size={46} strokeWidth={1.5} />{/if}
 			</span>
@@ -841,11 +969,11 @@
 	</div>
 {/snippet}
 
-{#snippet option(label: string, selected: boolean, onclick: () => void, sub = "", badge = "", tone: Tone = "ok", busy = false)}
+{#snippet option(label: string, selected: boolean, onclick: () => void, sub = "", badge = "", tone: Tone = "ok", busy = false, pill = "")}
 	<button data-tv="1" data-tv-default={selected ? "1" : undefined} class="opt" class:sel={selected} disabled={busy} style:opacity={busy ? 0.62 : 1} {onclick}>
 		<span class="opt-check" style:opacity={selected ? 1 : 0}><Check size={16} strokeWidth={2.5} /></span>
 		<span class="opt-text">
-			<span class="opt-label" style:font-weight={selected ? 600 : 500}>{label}</span>
+			<span class="opt-label" style:font-weight={selected ? 600 : 500}>{label}{#if pill}<span class="opt-pill">{pill}</span>{/if}</span>
 			{#if sub}<span class="opt-sub">{#if busy}<span class="opt-spin"><LoaderCircle size={11} strokeWidth={2} /></span>{/if}{sub}</span>{/if}
 		</span>
 		{#if badge}<span class="badge {tone}">{badge}</span>{/if}
@@ -859,9 +987,9 @@
 			{#if !zero}<span class="stepper-desc">{desc}</span>{/if}
 		</span>
 		<div class="stepper-box" style:pointer-events={disabled ? "none" : "auto"}>
-			<button data-tv="1" disabled={disabled} class="step" aria-label="{what} earlier" onclick={dec}><Minus size={14} strokeWidth={2} /></button>
+			<button data-tv="1" disabled={disabled} class="step" aria-label="{what} earlier" onclick={dec}><Minus size={14} strokeWidth={2.25} /></button>
 			<span class="stepper-value" style:color={zero ? "var(--player-ink-muted)" : "var(--player-accent-text)"}>{value}</span>
-			<button data-tv="1" disabled={disabled} class="step" aria-label="{what} later" onclick={inc}><Plus size={14} strokeWidth={2} /></button>
+			<button data-tv="1" disabled={disabled} class="step" aria-label="{what} later" onclick={inc}><Plus size={14} strokeWidth={2.25} /></button>
 		</div>
 		<button data-tv="1" disabled={zero} class="reset" style:opacity={zero ? 0 : 1} aria-label="Reset {what.toLowerCase()} timing" onclick={reset}>Reset</button>
 	</div>
@@ -910,8 +1038,8 @@
 	{/if}
 
 	<div class="pf" aria-hidden="true">
-		<div class="pf-disc" class:on={pf === "in"}>
-			{#if playing}<Pause size={36} fill="currentColor" />{:else}<Play size={36} fill="currentColor" />{/if}
+		<div class="pf-disc {pf}">
+			{#if pfPause}<Pause size={36} fill="currentColor" />{:else}<Play size={36} fill="currentColor" />{/if}
 		</div>
 	</div>
 	{@render flash(skL, "left")}
@@ -922,10 +1050,10 @@
 			<div class="controls">
 				<div class="head">
 					<span class="tv-heading"><span class="tv-eyebrow">{eyebrow}</span><span class="tv-title">{heading}</span></span>
-					<span class="mode"><span class="dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"}></span>{modeLabel}</span>
+					<span class="mode">{modeLabel}</span>
 				</div>
 				<button data-tv="1" data-scrub="1" class="scrub" aria-label="Seek">
-					<div class="track">{#each segs as g}<div class="seg" style:flex={g.flex}><div class="fill" style:width="{g.fill}%"></div></div>{/each}</div>
+					<div class="track">{#each segs as g}<div class="seg" style:flex={g.flex}><div class="buf" style:width="{g.buf}%"></div><div class="fill" style:width="{g.fill}%"></div></div>{/each}</div>
 					<div class="thumb" style:left="{pct}%"></div>
 				</button>
 				<div class="times"><span class="cur">{fmt(position)}</span><span>{chapterName}</span><span>-{fmt(duration - position)}</span></div>
@@ -946,20 +1074,24 @@
 		{/if}
 	</div>
 
-	{#if menu}
-		<div class="menu-scrim"></div>
-		<div class="menu" data-tv-trap="1">
+	{#if menuMounted}
+		<div class="menu-scrim" class:vis={menuVis}></div>
+		<div class="menu" class:vis={menuVis} data-tv-trap={menu ? "1" : undefined} inert={!menu}>
 			<div class="menu-head">
 				<span class="menu-title">{TAB_NAMES[tab]}</span>
 				<div class="grow"></div>
-				<button data-tv="1" class="close" aria-label="Close" onclick={() => { menu = false; focusDefault(); }}><X size={16} strokeWidth={2} /></button>
+				<button data-tv="1" class="close" aria-label="Close" onclick={closeMenu}><X size={16} strokeWidth={2} /></button>
 			</div>
 			<div class="menu-body">
 				{#if tab === "quality"}
 					<div class="note"><span class="note-dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{menuNote}</span></div>
-					{@render option("Auto", quality === "auto", () => pickQuality("auto"))}
-					{@render option("Original", quality === "original", () => pickQuality("original"))}
-					{#each [20, 8, 4, 2, 1] as n}{@render option(`${n} Mbit/s`, quality === n, () => pickQuality(n))}{/each}
+					{@render option("Auto", quality === "auto", () => pickQuality("auto"), "Now Original", quality === "auto" ? modeBadge : "", modeTone)}
+					{@render option("Original", quality === "original", () => pickQuality("original"), originalSub, quality === "original" ? modeBadge : "", modeTone)}
+					{#each [20, 8, 4, 2, 1] as n}
+						{@const on = quality === n}
+						{@const same = on && session?.video.action === "copy"}
+						{@render option(`${n} Mbit/s`, on, () => pickQuality(n), same ? "Same as Original" : on && session ? `${session.video.height}p ${CODEC_NAMES[session.video.codec] ?? session.video.codec}` : "", on ? modeBadge : "", modeTone, false, on && !same && session?.video.hdr !== "sdr" ? "HDR" : "")}
+					{/each}
 				{:else if tab === "speed"}
 					{#each SPEEDS as x}{@render option(x === 1 ? "Normal" : `${x}\u00D7`, speed === x, () => pickSpeed(x))}{/each}
 				{:else if tab === "audio"}
@@ -996,7 +1128,7 @@
 					{:else if burn && selectedSub}
 						<div class="note"><span class="note-dot" style:background="var(--status-warning)"></span><span>{PLAYER_NAME} can&rsquo;t draw {subInfo(selectedSub).fmt} subtitles, so the server burns {subName(selectedSub)} into the picture. That converts the video; any other track goes back to {burnBack}.</span></div>
 					{/if}
-					{@render option("Off", subPick === null, () => { menu = false; pickSub(null); focusDefault(); })}
+					{@render option("Off", subPick === null, () => pickSub(null))}
 					{#each tracks?.subtitles ?? [] as t}
 						{@const info = subInfo(t)}
 						{#if tracks?.preparing && !info.burnOnly}
@@ -1004,7 +1136,7 @@
 						{:else if info.burnOnly}
 							{@render option(subName(t), subPick === t.index, () => pickSub(t), `${info.label} \u00B7 burn in`, "converts the video", "warn")}
 						{:else}
-							{@render option(subName(t), subPick === t.index, () => { menu = false; pickSub(t); focusDefault(); }, `${info.label}${t.sdh ? " \u00B7 sound descriptions" : ""}`)}
+							{@render option(subName(t), subPick === t.index, () => pickSub(t), `${info.label}${t.sdh ? " \u00B7 sound descriptions" : ""}`)}
 						{/if}
 					{/each}
 					{@render stepper(
@@ -1016,7 +1148,7 @@
 						() => nudgeSub(-0.1),
 						() => nudgeSub(0.1),
 						() => nudgeSub(0),
-						subPick === null,
+						subPick === null || !!tracks?.preparing,
 					)}
 					<div class="style-box">
 						<button data-tv="1" class="style-head" aria-expanded={styleOpen} onclick={() => (styleOpen = !styleOpen)}>
@@ -1037,7 +1169,7 @@
 	{/if}
 
 	{#if skipOn}
-		<div class="card-slot" style:bottom="{cardBottom}px" transition:pop={{ y: 10, scale: 0.96 }}>
+		<div class="card-slot skip-slot" style:bottom="{cardBottom}px" transition:pop={{ y: 10, scale: 0.96 }}>
 			<button data-tv="1" class="sl-skip" onclick={skip}><ChevronsRight size={18} strokeWidth={2} />{introOn ? "Skip intro" : "Skip credits"}</button>
 		</div>
 	{/if}
@@ -1045,7 +1177,7 @@
 	{#if upNextOn && next}
 		<div class="card-slot sl-upnext" style:bottom="{cardBottom}px">
 			<div class="upnext-art">
-				<img src={next.still} alt="" style:object-position={next.stillPos} />
+				<img src={next.still} alt="" style:object-position={next.stillPos} onerror={orPoster(poster)} />
 				<div class="upnext-fade"></div>
 				<div class="upnext-cap">
 					<span class="upnext-code">UP NEXT &middot; {next.code}</span>
@@ -1055,7 +1187,7 @@
 					<div style:transform="scaleX({upNextFrac})"></div>
 				</div>
 			</div>
-			<div class="upnext-row" data-tv-row="1">
+			<div class="upnext-row">
 				<button data-tv="1" data-tv-default="1" class="btn-ink" onclick={() => leave().then(onnext)}><Play size={15} fill="currentColor" /><span>Play now</span></button>
 				<button data-tv="1" class="btn-outline" onclick={() => { upNextDismissed = true; focusDefault(); }}>Watch credits</button>
 			</div>
@@ -1078,7 +1210,7 @@
 
 	{#if ended}
 		<div class="end" data-tv-trap="1">
-			<img class="frame" src={frame} alt="" style:object-position={framePos} />
+			<img class="frame" src={frame} alt="" style:object-position={framePos} onerror={orPoster(poster)} />
 			<div class="halt-scrim end-scrim"></div>
 			<div class="halt-zoom">
 				{#if next}
@@ -1092,7 +1224,7 @@
 								<button data-tv="1" class="secondary" onclick={exit}>Done</button>
 							</div>
 						</div>
-						<div class="end-still"><img src={next.still} alt="" style:object-position={next.stillPos} /></div>
+						<div class="end-still"><img src={next.still} alt="" style:object-position={next.stillPos} onerror={orPoster(poster)} /></div>
 					</div>
 				{:else}
 					<div class="end-done-col">
@@ -1107,7 +1239,7 @@
 						{#if more.length}
 							<div class="end-more">
 								<span class="more-title">More like this</span>
-								<div class="more-row" data-tv-row="1">
+								<div class="more-row">
 									{#each more as it}
 										<button data-tv="1" class="more-card" aria-label={it.title} onclick={() => onopen(it.href)}><img src={it.poster} alt="" loading="lazy" /></button>
 									{/each}
@@ -1122,26 +1254,28 @@
 
 	{#if halt}
 		<div class="halt" role="alertdialog" aria-label={halt.eyebrow} data-tv-trap="1">
-			<img class="frame" src={frame} alt="" style:object-position={framePos} />
+			<img class="frame" src={frame} alt="" style:object-position={framePos} onerror={orPoster(poster)} />
 			<div class="halt-scrim"></div>
 			<div class="halt-zoom">
 				<div class="halt-col">
 					<span class="eyebrow" style:color={halt.failed ? "var(--status-failed)" : "var(--status-warning)"}>
-						{#if halt.failed}<Server size={14} strokeWidth={2} />{:else}<Cpu size={14} strokeWidth={2} />{/if}
+						<halt.icon size={14} strokeWidth={2} />
 						{halt.eyebrow}
 					</span>
 					<span class="halt-title">{halt.title}</span>
 					{#if halt.body}<span class="halt-body">{halt.body}</span>{/if}
-					{#if halt.mono}<span class="halt-mono"><TriangleAlert size={12} /> {halt.mono}</span>{/if}
-					{#if halt.left && halt.total}
+					{#if halt.mono}<span class="halt-mono">{halt.mono}</span>{/if}
+					{#if halt.count && halt.left && halt.total}
 						<div class="count">
 							<div class="count-track"><div class="count-fill" style:width="{(halt.left / halt.total) * 100}%" style:background={halt.failed ? "var(--player-ink-muted)" : "var(--status-warning)"}></div></div>
-							<span class="count-text">Trying again in {halt.left} s</span>
+							<span class="count-text">{halt.count(halt.left)}</span>
 						</div>
 					{/if}
+					{#if halt.wait}<span class="halt-wait"><span class="wait-dot"></span>{halt.wait}</span>{/if}
+					{#if halt.note}<span class="halt-note">{halt.note}</span>{/if}
 					<div class="actions">
-						<button data-tv="1" data-tv-default="1" class="primary" onclick={() => start()}><RotateCw size={18} strokeWidth={2} />Try now</button>
-						<button data-tv="1" class="secondary" onclick={exit}>Back</button>
+						{#if halt.retryLabel}<button data-tv="1" data-tv-default="1" class="primary" onclick={() => start()}><RotateCw size={16} strokeWidth={2} />{halt.retryLabel}</button>{/if}
+						<button data-tv="1" data-tv-default={halt.retryLabel ? undefined : "1"} class="secondary" onclick={exit}>Back to {titleName}</button>
 					</div>
 				</div>
 			</div>
@@ -1176,7 +1310,6 @@
 		width: 72px;
 		height: 72px;
 		margin: -36px 0 0 -36px;
-		box-sizing: border-box;
 		border: 3px solid rgba(255, 255, 255, 0.18);
 		border-top-color: var(--player-ink);
 		border-radius: 50%;
@@ -1210,22 +1343,31 @@
 		backdrop-filter: blur(12px);
 		color: var(--player-ink);
 		opacity: 0;
-		transition:
-			opacity var(--dur-exit),
-			transform var(--dur-exit);
+		transform: scale(0.85);
 	}
 
-	.pf-disc {
-		transform: scale(1.15);
-	}
-
-	.pf-disc.on,
-	.sk-disc.on {
+	.pf-disc.in,
+	.sk-disc.in {
 		opacity: 1;
 		transform: none;
 		transition:
-			opacity var(--dur-fast) var(--ease),
-			transform var(--dur-fast) var(--ease);
+			opacity 120ms var(--ease),
+			transform var(--dur-base) var(--ease);
+	}
+
+	.pf-disc.out,
+	.sk-disc.out {
+		transition:
+			opacity var(--dur-exit) var(--ease-in),
+			transform var(--dur-exit) var(--ease-in);
+	}
+
+	.pf-disc.out {
+		transform: scale(1.15);
+	}
+
+	.sk-disc.out {
+		transform: translateX(calc(var(--dir) * 1px));
 	}
 
 	.sk {
@@ -1244,10 +1386,6 @@
 
 	.sk.right {
 		right: 0;
-	}
-
-	.sk-disc {
-		transform: translateX(calc(var(--dir) * 1px));
 	}
 
 	.sk-ico {
@@ -1314,12 +1452,6 @@
 		color: var(--player-ink-muted);
 	}
 
-	.dot {
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
-	}
-
 	.scrub {
 		position: relative;
 		height: 44px;
@@ -1350,6 +1482,14 @@
 		overflow: hidden;
 	}
 
+	.buf {
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		background: var(--player-track);
+	}
+
 	.fill {
 		position: absolute;
 		left: 0;
@@ -1366,11 +1506,6 @@
 		margin: -14px 0 0 -14px;
 		border-radius: 50%;
 		background: var(--player-ink);
-		box-shadow: 0 0 0 0 transparent;
-		transition: box-shadow var(--dur-fast);
-	}
-
-	.scrub:focus .thumb {
 		box-shadow: 0 0 0 8px color-mix(in srgb, var(--player-accent) 45%, transparent);
 	}
 
@@ -1441,6 +1576,12 @@
 		position: absolute;
 		inset: 0;
 		background: rgba(0, 0, 0, 0.35);
+		opacity: 0;
+		transition: opacity var(--dur-base) var(--ease);
+	}
+
+	.menu-scrim.vis {
+		opacity: 1;
 	}
 
 	.menu {
@@ -1458,6 +1599,15 @@
 		border: 1px solid var(--border-strong);
 		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
 		overflow: hidden;
+		opacity: 0;
+		transform: translateX(24px);
+		transform-origin: 100% 100%;
+		transition: opacity 180ms var(--ease), transform 240ms var(--ease);
+	}
+
+	.menu.vis {
+		opacity: 1;
+		transform: none;
 	}
 
 	.menu-head {
@@ -1564,10 +1714,6 @@
 		gap: 5px;
 		font: 400 11px var(--font-mono);
 		color: var(--fg-subtle);
-	}
-
-	.opt:focus .opt-sub {
-		color: inherit;
 	}
 
 	.opt-spin {
@@ -1881,13 +2027,28 @@
 	}
 
 	.opt-label {
+		display: flex;
+		align-items: center;
+		gap: 7px;
 		font-size: 14px;
+	}
+
+	.opt-pill {
+		padding: 1px 5px;
+		border-radius: 4px;
+		border: 1px solid var(--border-strong);
+		font: 600 9.5px var(--font-mono);
+		letter-spacing: 0.06em;
+		color: var(--player-ink-muted);
 	}
 
 	.card-slot {
 		position: absolute;
 		right: 70px;
 		zoom: 1.75;
+	}
+
+	.skip-slot {
 		transition: bottom 250ms var(--ease);
 	}
 
@@ -2035,7 +2196,6 @@
 		right: 70px;
 		zoom: 1.75;
 		width: 440px;
-		box-sizing: border-box;
 		padding: 14px 16px;
 		border: 1px solid rgba(255, 255, 255, 0.1);
 		border-radius: var(--radius-player-controls);
@@ -2106,7 +2266,7 @@
 		animation: slp-fade 320ms ease-out;
 	}
 
-	.end-scrim {
+	.halt-scrim.end-scrim {
 		background: linear-gradient(90deg, var(--hero-scrim) 0%, color-mix(in srgb, var(--bg-deep) 72%, transparent) 50%, color-mix(in srgb, var(--bg-deep) 40%, transparent) 100%);
 	}
 
@@ -2207,7 +2367,7 @@
 		box-shadow: 0 0 0 1px var(--border);
 	}
 
-	.end-col {
+	.halt-col.end-col {
 		gap: 12px;
 		animation: slp-rise 360ms var(--ease);
 	}
@@ -2216,11 +2376,11 @@
 		margin-top: 10px;
 	}
 
-	.end-done {
+	.primary.end-done {
 		padding: 0 26px;
 	}
 
-	.end-again {
+	.secondary.end-again {
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -2245,6 +2405,7 @@
 		inset: 0;
 		overflow: hidden;
 		background: var(--bg-deep);
+		animation: slp-fade 260ms var(--ease);
 	}
 
 	.halt-scrim {
@@ -2268,6 +2429,44 @@
 		flex-direction: column;
 		gap: 14px;
 		max-width: 560px;
+		animation: halt-rise 320ms var(--ease);
+	}
+
+	@keyframes halt-rise {
+		from {
+			transform: translateY(10px);
+		}
+	}
+
+	.halt-note {
+		font-size: 14px;
+		line-height: 1.5;
+		color: var(--player-ink-muted);
+		text-wrap: pretty;
+	}
+
+	.halt-wait {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-top: 2px;
+		font: 400 12px var(--font-mono);
+		color: var(--player-ink-muted);
+	}
+
+	.wait-dot {
+		flex: none;
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--status-warning);
+		animation: slp-pulse 1.6s ease-in-out infinite;
+	}
+
+	@keyframes slp-pulse {
+		50% {
+			opacity: 0.3;
+		}
 	}
 
 	.eyebrow {

@@ -1147,7 +1147,7 @@
        "overview": "",
        "air_date": "2024-01-01",
        "status": "available",
-       "has_file": true,
+       "has_file": false,
        "runtime": 42,
        "media_file_id": "ep-4-2-6"
       }

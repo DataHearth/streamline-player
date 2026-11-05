@@ -1,13 +1,18 @@
+<script module>
+	let booted = false;
+</script>
+
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, badges, episodesOf, inProgress, left, library, meta, pct, stillPos, title as fetchTitle, watchState, type Kind, type Title } from "#lib/tv/api.ts";
+	import { artwork, badges, episodesOf, inProgress, left, library, meta, orPoster, pct, stillPos, title as fetchTitle, watchState, type Kind, type Title } from "#lib/tv/api.ts";
 	import { onMount } from "svelte";
 
 	type Item = { key: string; kind: Kind; t: Title; eyebrow: string; img?: string; pos?: string; code?: string; pct?: number; left?: string; href: string };
 	type Row = { title: string; wide: boolean; h: number; ch: number; items: Item[] };
 
 	const SCREEN_H = 1080;
+	let loaded = $state(booted);
 	let rows = $state.raw<Row[]>([]);
 	let fid = $state<string | null>(null);
 	let row = $state(0);
@@ -39,7 +44,14 @@
 
 	const poster = (kind: Kind, t: Title, label: string): Item => ({ key: `${label}:${t.id}`, kind, t, eyebrow: label, href: `/detail/${kind}/${t.id}` });
 
-	onMount(async () => {
+	onMount(() => {
+		load().finally(() => {
+			booted = true;
+			loaded = true;
+		});
+	});
+
+	async function load() {
 		const [movies, shows, watch] = await Promise.all([library("movies"), library("series"), watchState()]);
 		const seen = new Set<number>();
 		const going = watch.filter(inProgress);
@@ -52,7 +64,7 @@
 				const t = details.get(w.series_id);
 				const ep = t && episodesOf(t).find((e) => e.id === w.episode_id);
 				if (!t || !ep) continue;
-				cont.push({ key: `ep:${ep.id}`, kind: "series", t, eyebrow: `Continue · S${ep.season} E${ep.number} · ${ep.title}`, img: artwork("series", t.id, "backdrop"), pos: stillPos(ep.number), code: `S${ep.season} E${ep.number}`, pct: pct(w), left: left(w.duration_seconds - w.position_seconds), href: `/player/series/${t.id}?ep=${ep.id}&resume=1` });
+				cont.push({ key: `ep:${ep.id}`, kind: "series", t, eyebrow: `Continue · S${ep.season} E${ep.number} · ${ep.title}`, img: artwork("series", t.id, "backdrop"), pos: stillPos(ep.number, ep.season), code: `S${ep.season} E${ep.number}`, pct: pct(w), left: left(w.duration_seconds - w.position_seconds), href: `/player/series/${t.id}?ep=${ep.id}&resume=1` });
 			} else {
 				const t = movies.find((m) => m.id === w.movie_id);
 				if (t) cont.push({ key: `movie:${t.id}`, kind: "movies", t, eyebrow: "Continue watching", img: artwork("movies", t.id, "backdrop"), pos: "50% 35%", code: String(t.year), pct: pct(w), left: left(w.duration_seconds - w.position_seconds), href: `/player/movies/${t.id}?resume=1` });
@@ -68,7 +80,7 @@
 			{ title: "Recently added · Shows", wide: false, h: 400, ch: 294, items: recent(shows).slice(0, 12).map((t) => poster("series", t, "New episodes")) },
 			{ title: genre, wide: false, h: 400, ch: 294, items: [...movies.filter((t) => t.genres.includes(genre)).map((t) => poster("movies", t, genre)), ...shows.filter((t) => t.genres.includes(genre)).map((t) => poster("series", t, genre))] },
 		].filter((r) => r.items.length);
-	});
+	}
 
 	const onFocus = (it: Item, ri: number) => {
 		fid = it.key;
@@ -76,11 +88,12 @@
 	};
 </script>
 
-<TvScreen tab="home">
+<TvScreen tab={loaded ? "home" : undefined}>
+	{#if !loaded}<div class="boot"><img src="/streamline-mark.png" alt="" width="56" height="56" /></div>{/if}
 	{#each slots as slot, i}
 		{#if slot}
 			<div class="bg" style:opacity={i === front ? 1 : 0}>
-				<img src={artwork(slot.kind, slot.t.id, "backdrop")} alt="" onerror={(e) => ((e.currentTarget as HTMLImageElement).src = artwork(slot.kind, slot.t.id, "poster"))} />
+				<img src={artwork(slot.kind, slot.t.id, "backdrop")} alt="" onerror={orPoster(artwork(slot.kind, slot.t.id, "poster"), "50% 22%")} />
 			</div>
 		{/if}
 	{/each}
@@ -109,7 +122,7 @@
 						{#each r.items as it, ii}
 							{#if r.wide}
 								<button data-tv="1" data-tv-default={ri === 0 && ii === 0 ? "1" : undefined} data-fid={it.key} class="wide" onfocus={() => onFocus(it, ri)} onclick={() => goto(it.href)}>
-									<img src={it.img} alt="" loading="lazy" style:object-position={it.pos} />
+									<img src={it.img} alt="" loading="lazy" style:object-position={it.pos} onerror={orPoster(artwork(it.kind, it.t.id, "poster"))} />
 									<span class="wide-shade"></span>
 									<span class="cap"><span class="cap-title">{it.t.title}</span><span class="cap-code">{it.code}</span></span>
 									<span class="wide-bar"><span style:width="{it.pct}%"></span></span>
@@ -128,6 +141,17 @@
 </TvScreen>
 
 <style>
+	.boot {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+	}
+
+	.boot img {
+		border-radius: 14px;
+	}
+
 	.bg {
 		position: absolute;
 		inset: 0;

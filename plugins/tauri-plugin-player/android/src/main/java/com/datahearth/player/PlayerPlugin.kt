@@ -234,6 +234,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         val p = player ?: return
         trigger("position", JSObject().apply {
             put("position", p.currentPosition / 1000.0)
+            put("buffered", p.bufferedPosition / 1000.0)
             put("duration", if (p.duration > 0) p.duration / 1000.0 else 0.0)
         })
     }

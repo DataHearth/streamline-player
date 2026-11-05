@@ -5,6 +5,7 @@
 	import "#lib/design/motion.css";
 	import "#lib/design/shape.css";
 	import "#lib/design/typography.css";
+	import Toast from "#lib/tv/Toast.svelte";
 	import { onMount } from "svelte";
 
 	const STAGE_WIDTH = 1920;
@@ -19,8 +20,15 @@
 </script>
 
 {@render children()}
+<Toast />
 
 <style>
+	:global(*),
+	:global(*::before),
+	:global(*::after) {
+		box-sizing: border-box;
+	}
+
 	:global(html),
 	:global(body) {
 		margin: 0;
@@ -29,9 +37,13 @@
 		background: transparent;
 		color: var(--player-ink);
 		font-family: var(--font-sans);
+		font-size: 14px;
+		line-height: 1.5;
+		-webkit-font-smoothing: antialiased;
 	}
 
 	:global(button) {
-		font-family: inherit;
+		font: inherit;
+		color: inherit;
 	}
 </style>

@@ -2,24 +2,31 @@
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, badges, episodesOf, inProgress, left, library, meta, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
+	import { artwork, badges, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
+	import { toast } from "#lib/tv/toast.svelte.ts";
 	import { Check, CheckCheck, Eye, Play, RotateCcw } from "@lucide/svelte";
 
+	const MAX_SIMILAR = 10;
 	const kind = $derived(page.params.kind as Kind);
 	const id = $derived(Number(page.params.id));
 	let t = $state.raw<Title | null>(null);
 	let watch = $state.raw<Watch[]>([]);
-	let similar = $state.raw<Title[]>([]);
+	let similar = $state.raw<(Title & { kind: Kind })[]>([]);
 	let season = $state<number | null>(null);
+	let heroBlur = $state(false);
+	const seasonParam = $derived(Number(page.url.searchParams.get("s")) || null);
 
 	$effect(() => {
 		const [k, i] = [kind, id];
 		t = null;
 		season = null;
-		Promise.all([fetchTitle(k, i), watchState(), k === "movies" ? library("movies") : Promise.resolve([])]).then(([title, w, all]) => {
+		heroBlur = false;
+		Promise.all([fetchTitle(k, i), watchState(), k === "movies" ? everything() : Promise.resolve([])]).then(([title, w, all]) => {
 			t = title;
 			watch = w;
-			similar = all.filter((m) => m.id !== title.id && m.genres[0] === title.genres[0]).slice(0, 10);
+			const g = title.genres[0] ?? "";
+			const pool = all.filter((m) => !(m.kind === k && m.id === title.id));
+			similar = [...pool.filter((m) => m.genres[0] === g).slice(0, MAX_SIMILAR), ...pool.filter((m) => m.genres[0] !== g && m.genres.includes(g)).slice(0, 4)].slice(0, MAX_SIMILAR);
 		});
 	});
 
@@ -27,11 +34,12 @@
 	const movieMedia = $derived(t?.media_files?.[0]?.id);
 	const movieWatch = $derived(stateOf(movieMedia));
 	const eps = $derived(t ? episodesOf(t) : []);
+	const available = $derived(eps.filter((e) => e.has_file));
 	const progressEp = $derived(eps.find((e) => inProgress(stateOf(e.media_file_id))));
 	const nextEp = $derived(progressEp ?? eps.find((e) => e.has_file && !stateOf(e.media_file_id)?.watched) ?? eps[0]);
-	const curSeason = $derived(season ?? progressEp?.season ?? t?.seasons?.at(-1)?.number ?? 1);
+	const curSeason = $derived(season ?? seasonParam ?? progressEp?.season ?? t?.seasons?.at(-1)?.number ?? 1);
 	const shown = $derived(t?.seasons?.find((s) => s.number === curSeason)?.episodes ?? []);
-	const watched = $derived(kind === "series" ? eps.length > 0 && eps.every((e) => stateOf(e.media_file_id)?.watched) : !!movieWatch?.watched);
+	const watched = $derived(kind === "series" ? available.length > 0 && available.every((e) => stateOf(e.media_file_id)?.watched) : !!movieWatch?.watched);
 	const hasRestart = $derived(kind === "movies" && inProgress(movieWatch));
 	const primary = $derived.by(() => {
 		if (kind === "series") return nextEp ? `${progressEp ? "Resume" : "Play"} S${nextEp.season} · E${nextEp.number}` : "Play";
@@ -45,9 +53,11 @@
 	}
 
 	async function toggleWatched() {
-		const list = kind === "series" ? eps.map((e) => e.media_file_id) : movieMedia ? [movieMedia] : [];
-		await Promise.all(list.map((m) => setWatched(m, !watched)));
+		const list = kind === "series" ? available.map((e) => e.media_file_id) : movieMedia ? [movieMedia] : [];
+		const was = watched;
+		await Promise.all(list.map((m) => setWatched(m, !was)));
 		watch = await watchState();
+		toast(`${kind === "series" ? "Series marked" : "Marked"} as ${was ? "unwatched" : "watched"}`);
 	}
 </script>
 
@@ -55,7 +65,16 @@
 	{#if t}
 		<div class="page">
 			<div class="hero-img">
-				<img src={artwork(kind, t.id, "backdrop")} alt="" onerror={(e) => ((e.currentTarget as HTMLImageElement).src = artwork(kind, id, "poster"))} />
+				<img
+					src={artwork(kind, t.id, "backdrop")}
+					alt=""
+					style:filter={heroBlur ? "blur(36px) saturate(1.3)" : undefined}
+					style:transform={heroBlur ? "scale(1.25)" : undefined}
+					onerror={(e) => {
+						orPoster(artwork(kind, id, "poster"))(e);
+						heroBlur = true;
+					}}
+				/>
 				<div class="shade side"></div>
 				<div class="shade low"></div>
 			</div>
@@ -72,24 +91,24 @@
 					{#if hasRestart}
 						<button data-tv="1" class="act" onclick={() => goto(`/player/movies/${id}`)}><RotateCcw size={26} strokeWidth={2} />From the start</button>
 					{/if}
-					<button data-tv="1" class="act" style:color={watched ? "var(--status-available)" : "var(--fg)"} onclick={toggleWatched}>
+					<button data-tv="1" class="act mark" style:color={watched ? "var(--status-available)" : "var(--fg)"} onclick={toggleWatched}>
 						{#if watched}<CheckCheck size={26} strokeWidth={2.2} />Watched{:else}<Eye size={26} strokeWidth={2.2} />Mark watched{/if}
 					</button>
 				</div>
 			</div>
 			<div class="more">
 				{#if kind === "series"}
-					<div class="seasons" data-tv-row="1">
+					<div class="seasons">
 						{#each t.seasons ?? [] as s}
 							<button data-tv="1" class="season" class:on={s.number === curSeason} onclick={() => (season = s.number)} onfocus={() => (season = s.number)}>Season {s.number}</button>
 						{/each}
 					</div>
-					<div class="eps" data-tv-row="1">
+					<div class="eps">
 						{#each shown as e}
 							{@const w = stateOf(e.media_file_id)}
-							<button data-tv="1" class="ep" onclick={() => goto(`/player/series/${id}?ep=${e.id}${inProgress(w) ? "&resume=1" : ""}`)}>
+							<button data-tv="1" class="ep" style:opacity={e.has_file ? 1 : 0.55} style:cursor={e.has_file ? "pointer" : "default"} onclick={() => e.has_file && goto(`/player/series/${id}?ep=${e.id}${inProgress(w) ? "&resume=1" : ""}`)}>
 								<span class="still">
-									<img src={artwork("series", id, "backdrop")} alt="" loading="lazy" style:object-position={stillPos(e.number)} />
+									<img src={artwork("series", id, "backdrop")} alt="" loading="lazy" style:object-position={stillPos(e.number, curSeason)} style:filter={e.has_file ? "none" : "grayscale(1)"} onerror={orPoster(artwork("series", id, "poster"))} />
 									{#if inProgress(w)}<span class="bar"><span style:width="{pct(w)}%"></span></span>{/if}
 									{#if w?.watched}<span class="done"><Check size={22} strokeWidth={2.5} /></span>{/if}
 								</span>
@@ -100,11 +119,11 @@
 							</button>
 						{/each}
 					</div>
-				{:else if similar.length}
+				{:else}
 					<div class="more-title">More like this</div>
-					<div class="similar" data-tv-row="1">
+					<div class="similar">
 						{#each similar as it}
-							<button data-tv="1" class="sim" onclick={() => goto(`/detail/movies/${it.id}`)}><img src={artwork("movies", it.id, "poster")} alt={it.title} loading="lazy" /></button>
+							<button data-tv="1" class="sim" onclick={() => goto(`/detail/${it.kind}/${it.id}`)}><img src={artwork(it.kind, it.id, "poster")} alt={it.title} loading="lazy" /></button>
 						{/each}
 					</div>
 				{/if}
@@ -225,10 +244,15 @@
 		font-weight: 500;
 		cursor: pointer;
 		outline: none;
-		transition: transform var(--dur-fast), background var(--dur-fast);
+		transition: transform var(--dur-fast);
+	}
+
+	.act.mark {
+		padding: 0 30px;
 	}
 
 	.act.main {
+		transition: transform var(--dur-fast), background var(--dur-fast);
 		gap: 16px;
 		padding: 0 38px 0 32px;
 		background: rgba(255, 255, 255, 0.14);

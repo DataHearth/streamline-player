@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 	import { addPluginListener } from "@tauri-apps/api/core";
 	import { Film, House, TvMinimal } from "@lucide/svelte";
 	import { onMount, type Snippet } from "svelte";
-	import { focus, focusDefault, move } from "./focus";
+	import { focus, focusDefault, forgetFocus, move } from "./focus";
 
 	type Tab = "home" | "movies" | "series";
 	let { tab, scroll = false, onback, children }: { tab?: Tab; scroll?: boolean; onback?: () => void; children: Snippet } = $props();
@@ -14,7 +14,10 @@
 		{ id: "series", label: "Shows", href: "/library/series", icon: TvMinimal },
 	] as const;
 
+	const FOCUS_DELAY_MS = 120;
 	let stage: HTMLElement;
+	let scroller: HTMLElement;
+	let focusTimer: ReturnType<typeof setTimeout> | undefined;
 	let clock = $state("");
 
 	const tick = () => (clock = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }));
@@ -32,15 +35,25 @@
 		} else if (e.key.startsWith("Arrow")) {
 			e.preventDefault();
 			move(e.key, stage);
+		} else if (e.key === "Enter" && !document.activeElement?.hasAttribute("data-tv")) {
+			e.preventDefault();
+			focusDefault(stage);
 		}
 	}
+
+	afterNavigate(({ type }) => {
+		if (type !== "popstate") forgetFocus();
+		scroller.scrollTop = 0;
+		clearTimeout(focusTimer);
+		focusTimer = setTimeout(() => focusDefault(stage), FOCUS_DELAY_MS);
+	});
 
 	onMount(() => {
 		tick();
 		const timer = setInterval(tick, 10_000);
 		const listener = addPluginListener("player", "back", back);
-		focusDefault(stage);
 		return () => {
+			clearTimeout(focusTimer);
 			clearInterval(timer);
 			listener.then((h) => h.unregister());
 		};
@@ -49,8 +62,8 @@
 
 <svelte:window onkeydown={onKey} />
 
-<div class="stage" bind:this={stage} class:scroll>
-	{@render children()}
+<div class="stage" bind:this={stage}>
+	<div class="scroller" class:scroll bind:this={scroller}>{@render children()}</div>
 	{#if tab}
 		<div class="nav" data-tv-nav="1">
 			<div class="brand">
@@ -83,17 +96,22 @@
 		color: var(--fg);
 	}
 
-	.stage.scroll {
+	.scroller {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+	}
+
+	.scroller.scroll {
 		overflow: hidden auto;
 		scrollbar-width: none;
 	}
 
 	.nav {
-		position: fixed;
+		position: absolute;
 		left: 0;
 		top: 0;
 		width: 1920px;
-		box-sizing: border-box;
 		height: 136px;
 		z-index: 20;
 		display: flex;

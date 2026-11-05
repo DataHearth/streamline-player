@@ -2,7 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, inProgress, library, pct, watchState, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
+	import { artwork, episodesOf, inProgress, library, pct, title as fetchTitle, watchState, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
 	import { Check } from "@lucide/svelte";
 
 	type Flag = "unwatched" | "progress" | "uhd" | "hdr";
@@ -17,6 +17,7 @@
 	let titles = $state.raw<Title[]>([]);
 	let watch = $state.raw<Watch[]>([]);
 	let flags = $state<Flag[]>([]);
+	let doneShows = $state.raw(new Set<number>());
 
 	$effect(() => {
 		const current = kind;
@@ -24,12 +25,20 @@
 		Promise.all([library(current), watchState()]).then(([t, w]) => {
 			titles = [...t].sort((a, b) => b.added_at.localeCompare(a.added_at));
 			watch = w;
+			if (current === "series") markDoneShows(w);
 		});
 	});
 
+	async function markDoneShows(w: Watch[]) {
+		const started = [...new Set(w.filter((x) => x.watched).flatMap((x) => x.series_id ?? []))];
+		const shows = await Promise.all(started.map((id) => fetchTitle("series", id)));
+		const seen = new Set(w.filter((x) => x.watched).map((x) => x.media_id));
+		doneShows = new Set(shows.filter((s) => { const eps = episodesOf(s).filter((e) => e.has_file); return eps.length > 0 && eps.every((e) => seen.has(e.media_file_id)); }).map((s) => s.id));
+	}
+
 	const stateOf = (t: Title) => watch.filter((w) => (kind === "movies" ? w.movie_id === t.id : w.series_id === t.id));
 	const going = (t: Title) => stateOf(t).find(inProgress);
-	const watched = (t: Title) => kind === "movies" && stateOf(t).some((w) => w.watched);
+	const watched = (t: Title) => (kind === "movies" ? stateOf(t).some((w) => w.watched) : doneShows.has(t.id));
 
 	const test: Record<Flag, (t: Title) => boolean> = {
 		unwatched: (t) => !watched(t) && !going(t),
@@ -52,9 +61,9 @@
 				<h1>{kind === "series" ? "Shows" : "Movies"}</h1>
 				<span class="count">{items.length} of {titles.length} {kind === "series" ? "shows" : "movies"}</span>
 			</div>
-			<div class="filters" data-tv-row="1">
+			<div class="filters">
 				{#each FLAGS as [f, label]}
-					<button data-tv="1" class="filter" class:on={flags.includes(f)} onclick={() => toggle(f)}>{#if flags.includes(f)}<Check size={22} strokeWidth={2.5} />{/if}{label}</button>
+					<button data-tv="1" class="filter" class:on={flags.includes(f)} onclick={() => toggle(f)}>{label}</button>
 				{/each}
 			</div>
 			<div class="grid">
@@ -106,9 +115,6 @@
 
 	.filter {
 		height: 56px;
-		display: flex;
-		align-items: center;
-		gap: 10px;
 		padding: 0 26px;
 		border-radius: 28px;
 		border: 0;
