@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
+	import { autoCap, PRESETS, rememberedThroughput } from "#lib/player/auto.ts";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
 	import { artwork, badges, decisions, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Decision, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
@@ -60,8 +61,12 @@
 	$effect(() => {
 		const media = playMedia;
 		if (!media) return;
-		decisions(media, [{}]).then(
-			(r) => (playback = r.decisions[0] ?? null),
+		decisions(media, [{}, ...PRESETS.map((n) => ({ max_bitrate: n * 1_000_000 }))]).then(
+			(r) => {
+				const original = r.decisions[0];
+				const cap = autoCap(rememberedThroughput(), r.bit_rate / 1_000_000, !!original && !original.error && original.video.action === "copy");
+				playback = r.decisions[cap ? PRESETS.indexOf(cap) + 1 : 0] ?? null;
+			},
 			() => (playback = null),
 		);
 	});

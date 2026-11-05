@@ -2,6 +2,7 @@
 	import { decisions, orPoster, playerCapabilities, type Decision } from "#lib/tv/api.ts";
 	import { focusDefault as focusStageDefault, move } from "#lib/tv/focus.ts";
 	import HaltScreen from "./HaltScreen.svelte";
+	import { autoCap, PRESETS, rememberedThroughput, rememberThroughput, stepDown } from "./auto.ts";
 	import { haltFor, type Halt } from "./halt.ts";
 	import "./screen.css";
 	import { toast } from "#lib/tv/toast.svelte.ts";
@@ -68,6 +69,7 @@
 		session_id: string;
 		mode: "direct" | "remux" | "audio_transcode" | "transcode";
 		url: string;
+		bandwidth: number;
 		video: { action: string; codec: string; width: number; height: number; hdr: string; dv_profile?: number };
 		audio: { action: string; codec: string; channels: number };
 		video_reasons: Reason[];
@@ -76,7 +78,7 @@
 	};
 	type Quality = "auto" | "original" | number;
 	type Tab = "subs" | "audio" | "quality" | "speed";
-	type Stats = { version: string; buffer: number; throughput: number; videoBitrate: number; audioBitrate: number; rendered: number; dropped: number; displayHz: number };
+	type Stats = { version: string; buffer: number; videoBitrate: number; audioBitrate: number; rendered: number; dropped: number; displayHz: number };
 	type AudioTrack = { index: number; codec: string; channels: number; language: string; default: boolean };
 	type SubTrack = { index: number; codec: string; language: string; forced: boolean; sdh: boolean; files: Record<string, string> };
 	type Tracks = { preparing: boolean; container: string; video: { codec: string; width: number; height: number; hdr?: string; dv?: unknown } | null; chapters: { start: number; end: number; title: string }[]; markers: { intro: [number, number] | null; credits: [number, number] | null }; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
@@ -107,7 +109,12 @@
 		pcm_s16le: "PCM",
 		pcm_s24le: "PCM",
 	};
-	const PRESETS = [20, 8, 4, 2, 1];
+	const MBIT = 1_000_000;
+	const STALL_CHECK_MS = 4000;
+	const STALL_GUESS_MS = 12_000;
+	// Going up restarts the stream, and every step down makes the next try at going up wait twice as long.
+	const STEP_UP_HOLD_MS = 60_000;
+	const STEP_UP_HOLD_MAX_MS = 16 * 60_000;
 	const SIZE_PX: Record<string, number> = { S: 20, M: 26, L: 32, XL: 40 };
 	const DEFAULT_SIZE_PX = 26;
 	const TV_CUE_SCALE = 1.7;
@@ -149,7 +156,16 @@
 	let styleOpen = $state(false);
 	let prefs = $state(loadPrefs());
 	let osd = $state<string | null>(null);
-	let quality = $state<Quality>("original");
+	let quality = $state<Quality>("auto");
+	let autoPick = $state<number | null | undefined>(undefined);
+	let measured = $state<number | null>(null);
+	let measuredOnce = $state(rememberedThroughput() !== null);
+	let measuredInStall: number | null = null;
+	let stallSince = 0;
+	let stepUpHold = STEP_UP_HOLD_MS;
+	let betterSince: number | null = null;
+	let stallTimer: ReturnType<typeof setInterval> | undefined;
+	let stepping = false;
 	let preview = $state.raw<Preview | null>(null);
 	let speed = $state(1);
 	let stats = $state(false);
@@ -347,19 +363,28 @@
 		return d.video.action === "copy" ? `Same as Original \u00B7 the file is ${fileMbit}` : videoName(d.video.codec, d.video.height);
 	}
 
+	const autoDecision = $derived(autoPick ? preview?.presets[autoPick] : preview?.original);
 	const autoSub = $derived.by(() => {
 		const d = preview?.original;
-		if (!d || d.error || originalPlays) return "Now Original";
-		return `Now ${videoName(d.video.codec, d.video.height)} \u00B7 ${d.video_reasons[0]?.text ?? ""}`;
+		const why = d && !d.error && !originalPlays ? (d.video_reasons[0]?.text ?? "") : "based on your connection";
+		if (autoPick) return `Now ${autoPick} Mbit/s \u00B7 ${why}`;
+		if (!d || d.error || originalPlays) return measuredOnce ? "Now Original \u00B7 your connection allows it" : "Now Original";
+		return `Now ${videoName(d.video.codec, d.video.height)} \u00B7 ${why}`;
 	});
+
+	function currentCap() {
+		if (typeof quality === "number") return quality;
+		return qSel === "auto" ? (autoPick ?? null) : null;
+	}
 
 	async function refreshPreview() {
 		const id = ++previewId;
 		const list = tracks?.audio ?? [];
 		const base = { audio_index: audioPick, burn_in_subtitle: burn ? subPick : null };
-		const cap = typeof quality === "number" ? quality * 1_000_000 : null;
+		const capMbit = currentCap();
+		const cap = capMbit && capMbit * MBIT;
 		try {
-			const r = await decisions(mediaId, [base, ...PRESETS.map((n) => ({ ...base, max_bitrate: n * 1_000_000 })), ...list.map((t) => ({ ...base, audio_index: t.index, max_bitrate: cap }))]);
+			const r = await decisions(mediaId, [base, ...PRESETS.map((n) => ({ ...base, max_bitrate: n * MBIT })), ...list.map((t) => ({ ...base, audio_index: t.index, max_bitrate: cap }))]);
 			if (id !== previewId) return;
 			preview = {
 				bitRate: r.bit_rate,
@@ -375,7 +400,8 @@
 	async function offerAlternatives() {
 		await refreshPreview();
 		if (halt?.kind !== "busy" || !preview) return;
-		const wanted = typeof quality === "number" ? preview.presets[quality] : preview.original;
+		const cap = currentCap();
+		const wanted = cap ? preview.presets[cap] : preview.original;
 		const alts: NonNullable<Halt["alts"]> = [];
 		const orig = preview.original;
 		if (orig && !orig.error && !orig.needs_slot) {
@@ -441,8 +467,9 @@
 			...(known.length ? [{ k: "Bitrate", v: known.join(" \u00B7 ") }] : []),
 		];
 		if (live) {
+			const speed = measured ?? rememberedThroughput();
 			rows.push(
-				{ k: "Throughput", v: mbit(live.throughput), c: live.throughput < SLOW_THROUGHPUT ? "var(--status-warning)" : undefined },
+				{ k: "Throughput", v: speed === null ? "Measuring\u2026" : mbit(speed), c: speed !== null && speed < SLOW_THROUGHPUT ? "var(--status-warning)" : undefined },
 				{ k: "Buffer", v: `${live.buffer.toFixed(1)} s ahead` },
 				{ k: "Frames", v: `${live.dropped.toLocaleString("en-US")} dropped / ${live.rendered.toLocaleString("en-US")}` },
 				{ k: "Display", v: `${Math.round(live.displayHz * 1000) / 1000} Hz \u00B7 not matched` },
@@ -551,7 +578,7 @@
 
 	function sessionTracks() {
 		return {
-			max_bitrate: typeof quality === "number" ? quality * 1_000_000 : null,
+			max_bitrate: (currentCap() ?? 0) * MBIT || null,
 			audio_index: audioPick,
 			burn_in_subtitle: burn ? subPick : null,
 		};
@@ -560,7 +587,7 @@
 	async function refreshTracks() {
 		tracks = await invoke<Tracks>("media_tracks", { mediaId }).catch(() => tracks);
 		autoForced();
-		refreshPreview();
+		await refreshPreview();
 	}
 
 	const fmt = (s: number) => {
@@ -569,7 +596,15 @@
 		const ss = String(t % 60).padStart(2, "0");
 		return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 	};
-	const player = (cmd: string, args?: Record<string, unknown>) => invoke(`plugin:player|${cmd}`, args);
+	function newStallEvidence() {
+		stallSince = Date.now();
+		measuredInStall = null;
+	}
+
+	const player = (cmd: string, args?: Record<string, unknown>) => {
+		if (cmd === "seek" || cmd === "load") newStallEvidence();
+		return invoke(`plugin:player|${cmd}`, args);
+	};
 
 	function showControls(focus = false) {
 		lastMove = Date.now();
@@ -628,7 +663,9 @@
 		buffering = true;
 		try {
 			const capabilities = await playerCapabilities();
-			refreshTracks();
+			await refreshTracks();
+			if (id !== startId) return;
+			if (autoPick === undefined) autoPick = autoCap(rememberedThroughput(), preview && preview.bitRate / MBIT, originalPlays);
 			const started = await invoke<Session>("start_session", { mediaId, capabilities, position: at, tracks: sessionTracks() });
 			// The viewer left while the server was still answering.
 			if (id !== startId) {
@@ -766,32 +803,75 @@
 
 	async function pickQuality(q: Quality) {
 		if (q === quality || !session) return;
+		const before = currentCap();
 		quality = q;
-		await repatch({ max_bitrate: typeof q === "number" ? q * 1_000_000 : null });
+		const cap = currentCap();
+		if (cap !== before) await repatch({ max_bitrate: cap && cap * MBIT });
 	}
 
-	async function repatch(changes: Record<string, unknown>) {
-		if (!session) return;
+	// The stream keeps playing if the server can't convert right now: a stutter beats the busy screen.
+	async function moveAuto(pick: number | null) {
+		stepping = true;
+		const moved = await repatch({ max_bitrate: pick && pick * MBIT }, true);
+		if (moved) autoPick = pick;
+		betterSince = null;
+		stepping = false;
+		return moved;
+	}
+
+	async function autoStepDown() {
+		if (qSel !== "auto" || !session || paused || halt || stepping) return;
+		const guess = session.video.action === "copy" && Date.now() - stallSince >= STALL_GUESS_MS;
+		const target = stepDown(measuredInStall, session.bandwidth / MBIT, guess);
+		if (target === null || !(await moveAuto(target))) return;
+		stepUpHold = Math.min(stepUpHold * 2, STEP_UP_HOLD_MAX_MS);
+		toast(`Quality lowered to ${target} Mbit/s to stop buffering`, { icon: "gauge", warning: true, text: "Auto steps back up when your connection recovers." });
+	}
+
+	function considerStepUp() {
+		const target = autoCap(measured, preview && preview.bitRate / MBIT, originalPlays);
+		const steady = qSel === "auto" && session && !paused && !buffering && !halt;
+		if (!steady || bandwidthAt(target) <= session!.bandwidth) {
+			betterSince = null;
+			return;
+		}
+		betterSince ??= Date.now();
+		if (Date.now() - betterSince >= stepUpHold && !stepping) moveAuto(target);
+	}
+
+	// Presets above what a conversion aims for produce the same stream, so going there gains nothing.
+	function bandwidthAt(cap: number | null) {
+		const d = cap ? preview?.presets[cap] : preview?.original;
+		return d && !d.error ? d.bandwidth : (cap ?? Infinity) * MBIT;
+	}
+
+	async function repatch(changes: Record<string, unknown>, quiet = false) {
+		if (!session) return false;
 		const at = position;
 		buffering = true;
 		try {
+			const wasDirect = session.mode === "direct";
 			session = await invoke<Session>("patch_session", {
 				id: session.session_id,
 				changes: { ...changes, position: at },
 			});
+			if (wasDirect !== (session.mode === "direct")) measured = null;
 			await player("load", { url: session.url });
 			await player("seek", { seconds: at });
 			if (!paused) await player("play");
 		} catch (e) {
 			if (sessionGone(String(e))) {
 				await recoverSession();
+			} else if (quiet) {
+				return false;
 			} else {
 				buffering = false;
 				failedToStart(String(e));
 			}
 		}
 		refreshPreview();
-		if (!menu) focusDefault();
+		if (!menu && !quiet) focusDefault();
+		return true;
 	}
 
 	function openMenu(next: Tab) {
@@ -887,6 +967,13 @@
 			addPluginListener<{ state: string }>("player", "state", (e) => {
 				buffering = e.state === "buffering";
 				playing = e.state === "playing";
+				if (!buffering) {
+					clearInterval(stallTimer);
+					stallTimer = undefined;
+				} else if (stallTimer === undefined) {
+					newStallEvidence();
+					stallTimer = setInterval(autoStepDown, STALL_CHECK_MS);
+				}
 				if (e.state === "ended") {
 					if (next) leave().then(onnext);
 					else finish();
@@ -900,6 +987,16 @@
 				buffering = false;
 				showHalt({ kind: "error", eyebrow: "Playback error", icon: CircleAlert, title: "This stream stopped", mono: `${e.code}: ${e.message}`, failed: true, retryLabel: "Try now" });
 			}),
+			addPluginListener<{ bitrate: number; source: "meter" | "reads" }>("player", "bandwidth", (e) => {
+				// Reads stop at what a converted stream's encoder produces, so only the meter sees its link.
+				if (!session || (session.mode === "direct") !== (e.source === "reads")) return;
+				// One slow segment is common. Two in a row are a slow link.
+				measuredInStall = Math.max(e.bitrate, measured ?? 0);
+				measured = e.bitrate;
+				measuredOnce = true;
+				rememberThroughput(e.bitrate);
+				considerStepUp();
+			}),
 			addPluginListener("player", "back", back),
 			addPluginListener("player", "subtitleFailed", () => flashOsd("Subtitles unavailable")),
 		];
@@ -912,6 +1009,7 @@
 			if (controls && playing && !menu && Date.now() - lastMove > HIDE_MS) controls = false;
 		}, 250);
 		return () => {
+			clearInterval(stallTimer);
 			clearInterval(cueTimer);
 			clearInterval(beat);
 			clearInterval(hide);
@@ -1053,7 +1151,7 @@
 			<div class="menu-body">
 				{#if tab === "quality"}
 					<div class="note"><span class="note-dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{menuNote}</span></div>
-					{@render option("Auto", qSel === "auto", () => pickQuality("auto"), autoSub, modeBadge(preview?.original), modeTone(preview?.original))}
+					{@render option("Auto", qSel === "auto", () => pickQuality("auto"), autoSub, modeBadge(autoDecision), modeTone(autoDecision))}
 					{#if originalPlays}
 						{@render option("Original", qSel === "original", () => pickQuality("original"), `${originalSub}${fileMbit ? ` \u00B7 ${fileMbit}` : ""}`, modeBadge(preview?.original), modeTone(preview?.original))}
 					{:else}

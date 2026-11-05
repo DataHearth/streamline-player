@@ -11,6 +11,7 @@ import android.view.Gravity
 import android.view.SurfaceView
 import android.view.ViewGroup
 import android.webkit.WebView
+import java.util.concurrent.atomic.AtomicLong
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.media3.common.MediaItem
@@ -19,6 +20,10 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.TransferListener
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -30,6 +35,7 @@ import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
@@ -85,6 +91,11 @@ private class DelayableAudioRenderer(
 
 private const val TAG = "PlayerPlugin"
 private const val POSITION_INTERVAL_MS = 500L
+// DefaultBandwidthMeter answers with its built-in guess for the network type until it has seen this much.
+private const val METER_TRUSTED_BYTES = 512 * 1024L
+private const val READS_WINDOW_MS = 2000L
+// Replacing a direct stream closes its connection, and the meter counts all the time it sat open.
+private const val METER_QUIET_AFTER_LOAD_MS = 1000L
 
 @TauriPlugin
 class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
@@ -97,6 +108,34 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     private var overlay: SubtitleOverlay? = null
     @Volatile private var audioDelayUs = 0L
     private var resumeOnForeground = false
+    private var meteredBytes = 0L
+    private var meterQuietUntil = 0L
+    private val bytesRead = AtomicLong()
+    private var windowStart = 0L
+    private var loadedWholeWindow = false
+
+    // The meter only learns when a transfer closes, and a direct stream holds one connection open
+    // across its pauses. Bytes per window measure the link as long as loading never paused inside it.
+    @androidx.annotation.OptIn(UnstableApi::class)
+    private val reads = object : TransferListener {
+        override fun onTransferInitializing(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) {}
+        override fun onTransferStart(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) {}
+        override fun onTransferEnd(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) {}
+        override fun onBytesTransferred(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean, bytesTransferred: Int) {
+            if (isNetwork) bytesRead.addAndGet(bytesTransferred.toLong())
+        }
+    }
+
+    private val readsTicker = object : Runnable {
+        override fun run() {
+            val now = System.currentTimeMillis()
+            val bytes = bytesRead.getAndSet(0)
+            if (loadedWholeWindow && bytes > 0) emitBandwidth(bytes * 8000 / (now - windowStart), "reads")
+            windowStart = now
+            loadedWholeWindow = player?.isLoading == true
+            main.postDelayed(this, READS_WINDOW_MS)
+        }
+    }
     private val bandwidth by lazy { DefaultBandwidthMeter.getSingletonInstance(activity) }
 
     private val positionTicker = object : Runnable {
@@ -134,10 +173,16 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         overlay = subtitles
         content.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitVideo() }
 
-        val p = ExoPlayer.Builder(activity, renderers()).setBandwidthMeter(bandwidth).build()
+        val p = ExoPlayer.Builder(activity, renderers())
+            .setBandwidthMeter(bandwidth)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(activity).setTransferListener(reads)))
+            .build()
         p.setVideoSurfaceView(surface)
         p.addListener(object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) = fitVideo()
+            override fun onIsLoadingChanged(isLoading: Boolean) {
+                loadedWholeWindow = false
+            }
             override fun onPlaybackStateChanged(playbackState: Int) {
                 emitState()
                 if (playbackState == Player.STATE_ENDED) logDecoderCounters()
@@ -155,7 +200,9 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
             }
         })
         p.addAnalyticsListener(droppedFramesLogger)
+        p.addAnalyticsListener(bandwidthEvents)
         player = p
+        main.post(readsTicker)
         // The remote's Back belongs to the player's own stack: menu, controls, then leave.
         (activity as AppCompatActivity).onBackPressedDispatcher.addCallback(
             activity,
@@ -214,6 +261,14 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @androidx.annotation.OptIn(UnstableApi::class)
+    private val bandwidthEvents = object : AnalyticsListener {
+        override fun onBandwidthEstimate(eventTime: AnalyticsListener.EventTime, totalLoadTimeMs: Int, totalBytesLoaded: Long, bitrateEstimate: Long) {
+            meteredBytes += totalBytesLoaded
+            if (meteredBytes >= METER_TRUSTED_BYTES && System.currentTimeMillis() >= meterQuietUntil) emitBandwidth(bitrateEstimate, "meter")
+        }
+    }
+
+    @androidx.annotation.OptIn(UnstableApi::class)
     private fun logDecoderCounters() {
         val c = player?.videoDecoderCounters ?: return
         c.ensureUpdated()
@@ -228,6 +283,13 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     private fun stopTicker() {
         main.removeCallbacks(positionTicker)
         emitPosition()
+    }
+
+    private fun emitBandwidth(bitsPerSecond: Long, source: String) {
+        trigger("bandwidth", JSObject().apply {
+            put("bitrate", bitsPerSecond)
+            put("source", source)
+        })
     }
 
     private fun emitPosition() {
@@ -267,6 +329,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     fun load(invoke: Invoke) {
         val args = invoke.parseArgs(LoadArgs::class.java)
         onPlayer(invoke) {
+            meterQuietUntil = System.currentTimeMillis() + METER_QUIET_AFTER_LOAD_MS
             it.setMediaItem(MediaItem.fromUri(args.url))
             it.prepare()
         }
@@ -315,7 +378,6 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.resolve(JSObject().apply {
                 put("version", MediaLibraryInfo.VERSION)
                 put("buffer", (p.bufferedPosition - p.currentPosition).coerceAtLeast(0) / 1000.0)
-                put("throughput", bandwidth.bitrateEstimate)
                 put("videoBitrate", p.videoFormat?.bitrate ?: -1)
                 put("audioBitrate", p.audioFormat?.bitrate ?: -1)
                 put("rendered", frames?.renderedOutputBufferCount ?: 0)
@@ -371,6 +433,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     override fun onDestroy(activity: AppCompatActivity) {
         main.post {
             stopTicker()
+            main.removeCallbacks(readsTicker)
             player?.release()
             player = null
             overlay?.release()

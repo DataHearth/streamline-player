@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { CircleCheck, Cpu, Wifi } from "@lucide/svelte";
+	import { CircleCheck, Cpu, Gauge, Wifi } from "@lucide/svelte";
 	import { activeToast } from "./toast.svelte.ts";
 
-	const ICONS = { check: CircleCheck, wifi: Wifi, cpu: Cpu };
+	const ICONS = { check: CircleCheck, wifi: Wifi, cpu: Cpu, gauge: Gauge };
 	const t = $derived(activeToast());
 	const Icon = $derived(t ? ICONS[t.icon] : null);
 </script>
@@ -11,7 +11,7 @@
 	<div class="stage">
 		<div class="scale">
 			{#key t.title}
-				<div class="toast" class:leaving={t.leaving} role="status" aria-live="polite">
+				<div class="toast" class:leaving={t.leaving} style:--tone={t.warning ? "var(--status-warning)" : "var(--status-available)"} role="status" aria-live="polite">
 					<Icon size={16} strokeWidth={1.5} />
 					<div>
 						<div class="title">{t.title}</div>
@@ -64,13 +64,13 @@
 		position: absolute;
 		inset: 0 auto 0 0;
 		width: 3px;
-		background: var(--status-available);
+		background: var(--tone);
 	}
 
 	.toast :global(svg) {
 		flex: none;
 		margin-top: 2px;
-		color: var(--status-available);
+		color: var(--tone);
 	}
 
 	.toast.leaving {
