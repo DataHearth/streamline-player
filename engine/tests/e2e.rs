@@ -868,6 +868,80 @@ async fn hdr10_tonemapped_cpu() {
     assert_eq!(v["streams"][0]["color_transfer"], "bt709", "{v}");
 }
 
+/// A random tune per seed, a new note every third of a second: same seed, same audio. Steady
+/// noise won't do, its fingerprints all look alike. `segments` is (seed, seconds).
+fn make_episode(path: &Path, segments: &[(u32, u32)]) {
+    let mut cmd = std::process::Command::new("ffmpeg");
+    cmd.args(["-nostdin", "-y", "-hide_banner", "-loglevel", "error"]);
+    for (seed, secs) in segments {
+        let note = format!("floor(abs(mod(sin(floor(t*3+1)*{seed}*12.9898)*43758.5453\\,24)))");
+        cmd.args(["-f", "lavfi", "-i"]).arg(format!(
+            "aevalsrc=exprs=sin(2*PI*t*220*pow(2\\,{note}/12)):d={secs}:s=44100"
+        ));
+    }
+    let inputs: String = (0..segments.len()).map(|i| format!("[{i}:a]")).collect();
+    cmd.arg("-filter_complex")
+        .arg(format!("{inputs}concat=n={}:v=0:a=1[a]", segments.len()))
+        .args(["-map", "[a]", "-c:a", "flac"])
+        .arg(path);
+    assert!(cmd.status().unwrap().success());
+}
+
+#[tokio::test]
+async fn intro_job_finds_the_shared_intro_and_credits_of_a_season() {
+    if !have_ffmpeg() {
+        return;
+    }
+    let e = env().await;
+    let (a, b, broken) = (
+        e.root.join("a.mkv"),
+        e.root.join("b.mkv"),
+        e.root.join("gone.mkv"),
+    );
+    make_episode(&a, &[(11, 5), (1, 30), (12, 90), (2, 20), (13, 5)]);
+    make_episode(&b, &[(21, 20), (1, 30), (22, 80), (2, 20)]);
+    let paths: Vec<String> = [&a, &broken, &b]
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect();
+    let jid = id(7);
+    let (status, _) = e
+        .api(
+            "POST",
+            "/v1/jobs",
+            Some(json!({ "job_id": jid, "type": "intro", "priority": "interactive", "paths": paths })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+
+    let mut status = Value::Null;
+    for _ in 0..600 {
+        let (_, v) = e.api("GET", &format!("/v1/jobs/{jid}"), None).await;
+        if v["state"] == "done" || v["state"] == "failed" {
+            status = v;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    assert_eq!(status["state"], "done", "{status}");
+    let result = &status["result"];
+    let near = |v: &Value, want: f64| {
+        let got = v.as_f64().unwrap();
+        assert!(
+            (got - want).abs() < 3.0,
+            "{got} is not about {want}: {result}"
+        );
+    };
+    assert_eq!(result[0]["source"], "fingerprint", "{result}");
+    near(&result[0]["intro"][0], 5.0);
+    near(&result[0]["intro"][1], 35.0);
+    near(&result[0]["credits"][0], 125.0);
+    near(&result[0]["credits"][1], 145.0);
+    assert_eq!(result[1]["intro"], Value::Null, "{result}");
+    near(&result[2]["intro"][0], 20.0);
+    near(&result[2]["credits"][0], 130.0);
+}
+
 #[tokio::test]
 async fn analyze_job() {
     if !have_ffmpeg() {

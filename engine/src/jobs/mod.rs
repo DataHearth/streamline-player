@@ -1,3 +1,4 @@
+pub mod intro;
 pub mod subtitles;
 
 use std::collections::{HashMap, VecDeque};
@@ -33,6 +34,7 @@ pub enum Priority {
 pub enum JobSpec {
     Analyze { path: String },
     Subtitles { path: String },
+    Intro { paths: Vec<String> },
 }
 
 impl JobSpec {
@@ -40,11 +42,12 @@ impl JobSpec {
         match self {
             Self::Analyze { .. } => "analyze",
             Self::Subtitles { .. } => "subtitles",
+            Self::Intro { .. } => "intro",
         }
     }
 
     pub fn knows(kind: &str) -> bool {
-        serde_json::from_value::<Self>(serde_json::json!({"type": kind, "path": ""})).is_ok()
+        matches!(kind, "analyze" | "subtitles" | "intro")
     }
 }
 
@@ -306,6 +309,21 @@ async fn execute(cfg: &Config, spec: &JobSpec, dir: &Path) -> Result<Value, JobE
             let analysis = analyze(cfg, path).await?;
             subtitles::run(&cfg.ffmpeg(), &cfg.path_map.rewrite(path), &analysis, dir).await
         }
+        JobSpec::Intro { paths } => {
+            let mut analyses = Vec::with_capacity(paths.len());
+            for path in paths {
+                analyses.push(match analyze(cfg, path).await {
+                    Ok(a) => Some(a),
+                    Err(e) => {
+                        tracing::warn!(path, error = %e, "cannot analyze for markers");
+                        None
+                    }
+                });
+            }
+            Ok(serde_json::to_value(
+                intro::run(cfg, paths, &analyses).await,
+            )?)
+        }
     }
 }
 
@@ -494,6 +512,7 @@ mod kind_tests {
     fn job_kinds_come_from_the_enum() {
         assert!(JobSpec::knows("analyze"));
         assert!(JobSpec::knows("subtitles"));
+        assert!(JobSpec::knows("intro"));
         assert!(!JobSpec::knows("trickplay"));
         let spec = JobSpec::Analyze {
             path: String::new(),

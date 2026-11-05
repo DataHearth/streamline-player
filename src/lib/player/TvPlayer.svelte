@@ -8,6 +8,7 @@
 		CaptionsOff,
 		Check,
 		ChevronDown,
+		ChevronsRight,
 		Cpu,
 		Gauge,
 		LoaderCircle,
@@ -20,6 +21,7 @@
 		RotateCw,
 		Server,
 		Settings,
+		SkipForward,
 		TriangleAlert,
 		X,
 	} from "@lucide/svelte";
@@ -69,7 +71,7 @@
 	type Stats = { version: string; buffer: number; throughput: number; videoBitrate: number; audioBitrate: number; rendered: number; dropped: number; displayHz: number };
 	type AudioTrack = { index: number; codec: string; channels: number; language: string; default: boolean };
 	type SubTrack = { index: number; codec: string; language: string; forced: boolean; sdh: boolean; files: Record<string, string> };
-	type Tracks = { preparing: boolean; container: string; video: { codec: string; width: number; height: number } | null; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
+	type Tracks = { preparing: boolean; container: string; video: { codec: string; width: number; height: number } | null; chapters: { start: number; end: number; title: string }[]; markers: { intro: [number, number] | null; credits: [number, number] | null }; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
 	type StatRow = { k: string; v: string; c?: string; why?: boolean };
 	type SubKind = "text" | "styled" | "image";
 	type Cue = { start: number; end: number; text: string };
@@ -107,6 +109,7 @@
 	const DEFAULT_SIZE_PX = 26;
 	const TV_CUE_SCALE = 1.7;
 	const OSD_MS = 900;
+	const UP_NEXT_SECS = 10;
 	const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 	const STATS_MS = 1000;
 	const SLOW_THROUGHPUT = 4_000_000;
@@ -143,6 +146,7 @@
 	let live = $state<Stats | null>(null);
 	let ended = $state(false);
 	let encodeSpeed = $state<number | null>(null);
+	let upNextDismissed = $state(false);
 	let subTouched = false;
 	let halt = $state<Halt | null>(null);
 	let skL = $state<Flash>({ ph: "idle", amt: 0, rot: 0 });
@@ -161,8 +165,26 @@
 	let osdTimer: ReturnType<typeof setTimeout> | undefined;
 	let positionAt = 0;
 
+	const introOn = $derived(!!tracks?.markers.intro && position >= tracks.markers.intro[0] && position < tracks.markers.intro[1]);
+	// Without a marker the card shows for the very end only, so no episode ending gets cut.
+	const creditsAt = $derived(tracks?.markers.credits?.[0] ?? (next && duration > 0 ? duration - UP_NEXT_SECS : null));
+	const upNextOn = $derived(!!next && creditsAt !== null && position >= creditsAt && !upNextDismissed && !ended);
+	const creditsOn = $derived(!!tracks?.markers.credits && !upNextOn && creditsAt !== null && position >= creditsAt && position < duration - 1);
+	const skipOn = $derived((introOn || creditsOn) && !ended && !halt);
+	const upNextFrac = $derived(creditsAt === null ? 0 : Math.min(1, Math.max(0, (position - creditsAt) / UP_NEXT_SECS)));
+	const segs = $derived.by(() => {
+		const list = tracks?.chapters ?? [];
+		if (list.length < 2 || duration <= 0) return [{ flex: 1, fill: pct }];
+		return list.map((c, i) => {
+			const end = list[i + 1]?.start ?? duration;
+			const len = Math.max(1, end - c.start);
+			return { flex: len, fill: Math.max(0, Math.min(100, ((position - c.start) / len) * 100)) };
+		});
+	});
+	const chapterName = $derived(tracks?.chapters.findLast((c) => position >= c.start)?.title ?? "");
 	const isEpisode = $derived(/ S\d+ E\d+$/.test(eyebrow));
 	const controlsOn = $derived(controls || (!playing && !buffering) || menu);
+	const cardBottom = $derived(controlsOn ? 220 : 50);
 	const pct = $derived(duration > 0 ? (position / duration) * 100 : 0);
 	const full = $derived(session?.mode === "direct" || session?.mode === "remux");
 	const modeLabel = $derived.by(() => {
@@ -360,6 +382,15 @@
 	const pop = (_: Element, { y = 6, scale = 0.98 } = {}) => ({
 		duration: 220,
 		css: (t: number) => `opacity:${t};transform:translateY(${(1 - t) * y}px) scale(${scale + (1 - scale) * t})`,
+	});
+
+	$effect(() => {
+		if (next && upNextOn && creditsAt !== null && position >= creditsAt + UP_NEXT_SECS) leave().then(onnext);
+	});
+
+	// With the controls hidden, nothing else holds focus: OK must land on the card.
+	$effect(() => {
+		if ((skipOn || upNextOn) && !controlsOn) tick().then(() => stage?.querySelector<HTMLElement>(".sl-skip, .sl-upnext [data-tv-default]")?.focus());
 	});
 
 	const parseStamp = (t: string) => t.split(":").reduce((acc, part) => acc * 60 + Number(part.replace(",", ".")), 0);
@@ -594,6 +625,14 @@
 		start(0);
 	}
 
+	function skip() {
+		const end = introOn ? tracks?.markers.intro?.[1] : undefined;
+		if (end === undefined) return finish();
+		position = end;
+		player("seek", { seconds: end });
+		showControls();
+	}
+
 	function pickSpeed(x: number) {
 		speed = x;
 		player("speed", { speed: x }).catch(() => {});
@@ -709,6 +748,13 @@
 			return;
 		}
 		if (!controlsOn) {
+			const onCard = (document.activeElement as HTMLElement | null)?.closest(".sl-skip, .sl-upnext");
+			if (onCard && k === "Enter") return;
+			if (onCard && upNextOn && (k === "ArrowLeft" || k === "ArrowRight")) {
+				e.preventDefault();
+				move(k, stage);
+				return;
+			}
 			e.preventDefault();
 			if (k === "ArrowLeft") seek(-SEEK_STEP);
 			else if (k === "ArrowRight") seek(SEEK_STEP);
@@ -745,7 +791,10 @@
 			addPluginListener<{ state: string }>("player", "state", (e) => {
 				buffering = e.state === "buffering";
 				playing = e.state === "playing";
-				if (e.state === "ended") finish();
+				if (e.state === "ended") {
+					if (next) leave().then(onnext);
+					else finish();
+				}
 			}),
 			addPluginListener<{ code: string; message: string }>("player", "error", (e) => {
 				if (e.code.startsWith("ERROR_CODE_IO_") && Date.now() - lastRecovery > RECOVERY_WINDOW_MS) {
@@ -876,10 +925,10 @@
 					<span class="mode"><span class="dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"}></span>{modeLabel}</span>
 				</div>
 				<button data-tv="1" data-scrub="1" class="scrub" aria-label="Seek">
-					<div class="track"><div class="seg"><div class="fill" style:width="{pct}%"></div></div></div>
+					<div class="track">{#each segs as g}<div class="seg" style:flex={g.flex}><div class="fill" style:width="{g.fill}%"></div></div>{/each}</div>
 					<div class="thumb" style:left="{pct}%"></div>
 				</button>
-				<div class="times"><span class="cur">{fmt(position)}</span><span>-{fmt(duration - position)}</span></div>
+				<div class="times"><span class="cur">{fmt(position)}</span><span>{chapterName}</span><span>-{fmt(duration - position)}</span></div>
 				<div class="row">
 					<button data-tv="1" data-tv-default="1" class="play" aria-label={playing ? "Pause" : "Play"} onclick={togglePlay}>
 						{#if playing}<Pause size={36} fill="currentColor" />{:else}<Play size={36} fill="currentColor" />{/if}
@@ -891,6 +940,7 @@
 					<button data-tv="1" class="pill" onclick={() => openMenu("quality")}><Settings size={28} strokeWidth={1.9} />{qualText}</button>
 					<button data-tv="1" class="pill" onclick={() => openMenu("speed")}><Gauge size={28} strokeWidth={1.9} />{speed}&times;</button>
 					<button data-tv="1" class="pill" onclick={() => (stats = !stats)}><Activity size={28} strokeWidth={1.9} />Stats</button>
+					{#if next}<button data-tv="1" class="pill" onclick={() => leave().then(onnext)}><SkipForward size={28} strokeWidth={1.9} />Next episode</button>{/if}
 				</div>
 			</div>
 		{/if}
@@ -982,6 +1032,32 @@
 						{/if}
 					</div>
 				{/if}
+			</div>
+		</div>
+	{/if}
+
+	{#if skipOn}
+		<div class="card-slot" style:bottom="{cardBottom}px" transition:pop={{ y: 10, scale: 0.96 }}>
+			<button data-tv="1" class="sl-skip" onclick={skip}><ChevronsRight size={18} strokeWidth={2} />{introOn ? "Skip intro" : "Skip credits"}</button>
+		</div>
+	{/if}
+
+	{#if upNextOn && next}
+		<div class="card-slot sl-upnext" style:bottom="{cardBottom}px">
+			<div class="upnext-art">
+				<img src={next.still} alt="" style:object-position={next.stillPos} />
+				<div class="upnext-fade"></div>
+				<div class="upnext-cap">
+					<span class="upnext-code">UP NEXT &middot; {next.code}</span>
+					<span class="upnext-title">{next.title}</span>
+				</div>
+				<div class="upnext-timer" role="progressbar" aria-label="Next episode starts when this fills" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(upNextFrac * 100)}>
+					<div style:transform="scaleX({upNextFrac})"></div>
+				</div>
+			</div>
+			<div class="upnext-row" data-tv-row="1">
+				<button data-tv="1" data-tv-default="1" class="btn-ink" onclick={() => leave().then(onnext)}><Play size={15} fill="currentColor" /><span>Play now</span></button>
+				<button data-tv="1" class="btn-outline" onclick={() => { upNextDismissed = true; focusDefault(); }}>Watch credits</button>
 			</div>
 		</div>
 	{/if}
@@ -1806,6 +1882,152 @@
 
 	.opt-label {
 		font-size: 14px;
+	}
+
+	.card-slot {
+		position: absolute;
+		right: 70px;
+		zoom: 1.75;
+		transition: bottom 250ms var(--ease);
+	}
+
+	.sl-skip {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		height: 44px;
+		padding: 0 18px;
+		border: 1px solid rgba(255, 255, 255, 0.22);
+		border-radius: var(--radius-player-controls);
+		background: rgba(0, 0, 0, 0.45);
+		backdrop-filter: blur(12px);
+		color: var(--player-ink);
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+		outline: none;
+		transition: transform var(--dur-fast);
+	}
+
+	.sl-skip:focus {
+		background: var(--player-ink);
+		color: var(--fg-on-accent);
+		transform: scale(1.06);
+	}
+
+	.sl-upnext {
+		width: 340px;
+		overflow: hidden;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: var(--radius-lg);
+		background: var(--player-glass-strong);
+		backdrop-filter: blur(24px);
+		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+		color: var(--player-ink);
+		animation: slp-rise var(--dur-slow) var(--ease);
+	}
+
+	.upnext-art {
+		position: relative;
+		aspect-ratio: 16 / 8;
+		overflow: hidden;
+	}
+
+	.upnext-art img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.upnext-fade {
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(0deg, rgba(15, 15, 22, 0.95) 0%, rgba(15, 15, 22, 0) 60%);
+	}
+
+	.upnext-cap {
+		position: absolute;
+		left: 14px;
+		right: 14px;
+		bottom: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.upnext-code {
+		font: 500 11px var(--font-mono);
+		letter-spacing: 0.06em;
+		color: var(--player-accent-text);
+	}
+
+	.upnext-title {
+		font-size: 16px;
+		font-weight: 600;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.upnext-timer {
+		position: absolute;
+		inset: auto 0 0 0;
+		height: 3px;
+		background: rgba(255, 255, 255, 0.16);
+	}
+
+	.upnext-timer > div {
+		height: 100%;
+		background: var(--player-accent);
+		transform-origin: 0 50%;
+		transition: transform 250ms linear;
+		will-change: transform;
+	}
+
+	.upnext-row {
+		display: flex;
+		gap: 8px;
+		padding: 12px 14px 14px;
+	}
+
+	.btn-ink {
+		flex: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 9px;
+		height: 40px;
+		border: 0;
+		border-radius: var(--radius-md);
+		background: var(--player-ink);
+		color: #0b0b10;
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+		outline: none;
+	}
+
+	.btn-ink:focus {
+		box-shadow: 0 0 0 3px var(--player-accent);
+	}
+
+	.btn-outline {
+		height: 40px;
+		padding: 0 14px;
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: var(--player-ink);
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		outline: none;
+	}
+
+	.btn-outline:focus {
+		background: var(--player-ink);
+		color: var(--fg-on-accent);
 	}
 
 	.sl-stats {

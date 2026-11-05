@@ -41,12 +41,14 @@ p.add_argument("--public", default="http://10.0.2.2:8097", help="engine URL as t
 p.add_argument("--secret", required=True)
 p.add_argument("--media", action="append", default=[], help="id=path, repeatable")
 p.add_argument("--clip", action="append", default=[], help="file the library's titles play, repeatable")
+p.add_argument("--demo-markers", action="store_true", help="give episodes an intro and credits, to see the cards")
 p.add_argument("--art", default="", help="directory holding the artwork")
 args = p.parse_args()
 FILES = dict(m.split("=", 1) for m in args.media)
 MEDIA = dict(FILES)
 ANALYSIS = {}
 SUBTITLES = {}
+MARKERS = {}
 SESSIONS = {}
 WATCH = {}
 WATCHED_AT = 0.9
@@ -114,27 +116,41 @@ def engine(method, path, body=None):
         return e.code, json.loads(e.read() or b"null")
 
 
-def run_job(kind, path):
+def run_job(kind, **params):
     job = secrets.token_hex(16)
-    engine("POST", "/v1/jobs", {"job_id": job, "type": kind, "priority": "background", "path": path})
+    engine("POST", "/v1/jobs", {"job_id": job, "type": kind, "priority": "background", **params})
     while True:
         st, status = engine("GET", f"/v1/jobs/{job}")
         if st != 200 or status["state"] == "failed":
-            print(f"{kind} {path}: {status}", flush=True)
+            print(f"{kind} {params}: {status}", flush=True)
             return None
         if status["state"] == "done":
-            print(f"{kind} done: {path}", flush=True)
+            print(f"{kind} done: {params}", flush=True)
             return job, status["result"]
         time.sleep(1)
 
 
 def prepare(path):
-    done = run_job("analyze", path)
+    done = run_job("analyze", path=path)
     if done:
         ANALYSIS[path] = done[1]
-    done = run_job("subtitles", path)
+    done = run_job("subtitles", path=path)
     if done:
         SUBTITLES[path] = done
+
+
+def prepare_season(paths):
+    done = run_job("intro", paths=paths)
+    for found in done[1] if done else []:
+        MARKERS[found["path"]] = found
+
+
+def markers(media_id, path):
+    if args.demo_markers and "episode_id" in REFS.get(media_id, {}):
+        duration = ANALYSIS.get(path, {}).get("duration", 0)
+        return {"intro": [2, 7], "credits": [duration - 8, duration]}
+    found = MARKERS.get(path, {})
+    return {"intro": found.get("intro"), "credits": found.get("credits")}
 
 
 def tracks(media_id, path, base):
@@ -147,6 +163,7 @@ def tracks(media_id, path, base):
         "container": analysis.get("container", ""),
         "video": next(iter(analysis.get("video", [])), None),
         "chapters": analysis.get("chapters", []),
+        "markers": markers(media_id, path),
         "audio": analysis.get("audio", []),
         "subtitles": [{**s, "files": files.get(s["index"], {})} for s in analysis.get("subtitles", [])],
         "fonts": [url(f) for f in result["fonts"]],
@@ -270,6 +287,13 @@ class Handler(BaseHTTPRequestHandler):
 
 for media_path in set(MEDIA.values()):
     threading.Thread(target=prepare, args=(media_path,), daemon=True).start()
+
+for show in SERIES:
+    for season in show["seasons"]:
+        season_paths = sorted({MEDIA[e["media_file_id"]] for e in season["episodes"]})
+        threading.Thread(target=prepare_season, args=(season_paths,), daemon=True).start()
+        break
+    break
 
 host, port = args.listen.rsplit(":", 1)
 print(f"mock streamline on {args.listen}, engine {args.engine}, media {sorted(MEDIA)}", flush=True)
