@@ -70,7 +70,7 @@ export const pct = (w?: Watch) => (w && w.duration_seconds > 0 ? Math.round((w.p
 
 export function badges(q?: FileSummary) {
 	if (!q) return [];
-	const res = q.resolution === "2160p" ? "4K" : q.resolution === "1080p" ? "HD" : q.resolution;
+	const res = q.resolution === "4320p" ? "8K" : q.resolution === "2160p" ? "4K" : q.resolution === "1080p" ? "HD" : q.resolution;
 	const hdr = q.hdr === "Dolby Vision" ? "Dolby Vision" : q.hdr ? "HDR" : null;
 	return [res, hdr, q.audio && /Atmos/.test(q.audio) ? "Dolby Atmos" : q.channels].filter((b): b is string => !!b);
 }

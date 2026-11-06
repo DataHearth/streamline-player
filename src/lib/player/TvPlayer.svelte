@@ -219,9 +219,11 @@
 	const full = $derived(session?.mode === "direct" || session?.mode === "remux");
 	const modeLabel = $derived.by(() => {
 		if (!session) return "";
-		const { height, hdr, dv_profile } = session.video;
+		const { width, height, hdr, dv_profile } = session.video;
 		const range = dv_profile !== undefined ? " \u00B7 Dolby Vision" : hdr === "sdr" ? "" : " \u00B7 HDR";
-		return `${height >= 2160 ? "4K" : `${height}p`}${range}`;
+		// Wide films are cropped (3840\u00D71608, 3816\u00D71592), so height alone would call them 1608p.
+		const size = width >= 7000 || height >= 4000 ? "8K" : width >= 3400 || height >= 2000 ? "4K" : `${height}p`;
+		return `${size}${range}`;
 	});
 	const originalPlays = $derived(!preview?.original || (!preview.original.error && preview.original.video.action === "copy"));
 	// A file this device can't play as-is has no Original to pick.
