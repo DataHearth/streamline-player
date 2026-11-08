@@ -221,9 +221,9 @@ async fn playback_status(api: tauri::State<'_, Api>) -> Result<Value, String> {
         .await
 }
 
-/// The session this device has open, on disk so that a launch after a crash can stop it:
-/// a crash skips `stop_session`, and the dead session would hold its conversion slot until
-/// Streamline's heartbeat timeout.
+/// The session this device has open, on disk so that a launch after a crash, or a page reload,
+/// can stop it: both skip `stop_session`, and the dead session would hold its conversion slot
+/// until Streamline's heartbeat timeout.
 fn open_session_file(app: &AppHandle) -> Option<PathBuf> {
     app.path()
         .app_data_dir()
@@ -398,7 +398,6 @@ pub fn run() {
                 conn: RwLock::default(),
                 pairing: Mutex::default(),
             });
-            stop_left_over_session(app.handle());
             #[cfg(target_os = "linux")]
             // WebKitGTK (seen on 2.54.1) zooms pages by gtk-xft-dpi / 96, and GTK reports -1
             // when no XSETTINGS daemon runs (Hyprland, sway): pages get a zoom of -1/96, a
@@ -411,6 +410,13 @@ pub fn run() {
                 }
             }
             Ok(())
+        })
+        // On each load, not only at launch: a reload drops the page without `stop_session`
+        // while this process, and the file naming the session, live on.
+        .on_page_load(|webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Started {
+                stop_left_over_session(webview.app_handle());
+            }
         })
         .register_asynchronous_uri_scheme_protocol("artwork", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
