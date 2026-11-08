@@ -78,7 +78,7 @@
 	};
 	type Quality = "auto" | "original" | number;
 	type Tab = "subs" | "audio" | "quality" | "speed";
-	type Stats = { version: string; buffer: number; videoBitrate: number; audioBitrate: number; rendered: number; dropped: number; displayHz: number };
+	type Stats = { player?: string; version: string; buffer: number; videoBitrate: number; audioBitrate: number; rendered: number; dropped: number; displayHz: number };
 	type AudioTrack = { index: number; codec: string; channels: number; language: string; default: boolean };
 	type SubTrack = { index: number; codec: string; language: string; forced: boolean; sdh: boolean; files: Record<string, string> };
 	type Tracks = { preparing: boolean; container: string; video: { codec: string; width: number; height: number; hdr?: string; dv?: unknown } | null; chapters: { start: number; end: number; title: string }[]; markers: { intro: [number, number] | null; credits: [number, number] | null }; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
@@ -90,6 +90,8 @@
 
 	const HIDE_MS = 3200;
 	const HEARTBEAT_MS = 10_000;
+	// Seconds the bar may run ahead of the last report, should reports stop.
+	const MAX_EXTRAPOLATION = 1;
 	const SEEK_STEP = 10;
 	const PLAYER_NAME = "ExoPlayer";
 	const TAB_NAMES: Record<Tab, string> = { audio: "Audio", subs: "Subtitles", quality: "Quality", speed: "Speed" };
@@ -201,6 +203,11 @@
 	const creditsOn = $derived(!!tracks?.markers.credits && !upNextOn && creditsAt !== null && position >= creditsAt && position < duration - 1);
 	const skipOn = $derived((introOn || creditsOn) && !ended && !halt);
 	const upNextFrac = $derived(creditsAt === null ? 0 : Math.min(1, Math.max(0, (position - creditsAt) / UP_NEXT_SECS)));
+	// The player reports every 500 ms; between reports the bar moves on each frame at the playback speed.
+	let frameAt = $state(0);
+	const shownPosition = $derived(
+		playing ? Math.min(duration || Infinity, position + Math.min(MAX_EXTRAPOLATION, Math.max(0, ((frameAt - positionAt) / 1000) * speed))) : position,
+	);
 	const segs = $derived.by(() => {
 		const list = tracks?.chapters ?? [];
 		if (list.length < 2 || duration <= 0) return [{ flex: 1, fill: pct, buf: duration > 0 ? (buffered / duration) * 100 : 0 }];
@@ -208,14 +215,22 @@
 			const end = list[i + 1]?.start ?? duration;
 			const len = Math.max(1, end - c.start);
 			const within = (at: number) => Math.max(0, Math.min(100, ((at - c.start) / len) * 100));
-			return { flex: len, fill: within(position), buf: within(buffered) };
+			return { flex: len, fill: within(shownPosition), buf: within(buffered) };
 		});
 	});
 	const chapterName = $derived(tracks?.chapters.findLast((c) => position >= c.start)?.title ?? "");
 	const isEpisode = $derived(/ S\d+ E\d+$/.test(eyebrow));
 	const controlsOn = $derived(controls || (!playing && !buffering) || menu);
 	const cardBottom = $derived(controlsOn ? 220 : 50);
-	const pct = $derived(duration > 0 ? (position / duration) * 100 : 0);
+	const pct = $derived(duration > 0 ? (shownPosition / duration) * 100 : 0);
+	$effect(() => {
+		if (!playing || !controlsOn) return;
+		let raf = requestAnimationFrame(function tick(t) {
+			frameAt = t;
+			raf = requestAnimationFrame(tick);
+		});
+		return () => cancelAnimationFrame(raf);
+	});
 	const full = $derived(session?.mode === "direct" || session?.mode === "remux");
 	const modeLabel = $derived.by(() => {
 		if (!session) return "";
@@ -454,7 +469,7 @@
 		const known = [live && live.videoBitrate > 0 && `${mbit(live.videoBitrate)} video`, live && live.audioBitrate > 0 && `${mbit(live.audioBitrate)} audio`].filter(Boolean);
 		const rows: StatRow[] = [
 			{ k: "Mode", v: `${MODE_LABEL[session.mode]}${direct ? " \u00B7 the original file" : session.mode === "remux" ? " \u00B7 nothing converted" : ""}`, c: full ? "var(--status-available)" : "var(--status-downloading)" },
-			{ k: "Player", v: `${PLAYER_NAME} \u00B7 Media3 ${live?.version ?? ""} \u00B7 Android TV` },
+			{ k: "Player", v: live?.player ?? `${PLAYER_NAME} \u00B7 Media3 ${live?.version ?? ""} \u00B7 Android TV` },
 			{ k: "Video", v: copy ? `${outName} \u00B7 as-is` : `${inName} \u2192 ${outName}`, c: "var(--player-ink)" },
 			...(copy ? [] : why(session.video_reasons)),
 			{ k: "Audio", v: session.audio.action === "copy" ? `${audioIn} \u00B7 as-is` : `${audioIn} \u2192 ${audioOut}`, c: "var(--player-ink)" },
@@ -909,6 +924,12 @@
 		if (k === "Escape" || k === "Backspace" || k === "GoBack") {
 			e.preventDefault();
 			back();
+			return;
+		}
+		// A keyboard's Space, as in every desktop player; a remote has none.
+		if (k === " " && !halt && !ended) {
+			e.preventDefault();
+			togglePlay();
 			return;
 		}
 		const arrow = k.startsWith("Arrow");
