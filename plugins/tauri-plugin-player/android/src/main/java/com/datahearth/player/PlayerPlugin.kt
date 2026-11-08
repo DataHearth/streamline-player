@@ -69,6 +69,12 @@ class CapabilitiesArgs {
 }
 
 @InvokeArg
+class VaultArgs {
+    lateinit var name: String
+    var value: String? = null
+}
+
+@InvokeArg
 class FrameRateArgs {
     var mode: String = "off"
 }
@@ -447,6 +453,31 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun deviceInfo(invoke: Invoke) = invoke.resolve(Capabilities.deviceInfo(activity))
+
+    // Called from Rust only: left out of build.rs COMMANDS, so the webview has no permission for them.
+    private val vault by lazy { Vault(activity) }
+
+    @Command
+    fun vaultGet(invoke: Invoke) {
+        val args = invoke.parseArgs(VaultArgs::class.java)
+        runCatching { vault.get(args.name) }
+            .onSuccess { invoke.resolve(JSObject().apply { put("value", it) }) }
+            .onFailure { invoke.reject(it.toString()) }
+    }
+
+    @Command
+    fun vaultSet(invoke: Invoke) {
+        val args = invoke.parseArgs(VaultArgs::class.java)
+        runCatching { vault.set(args.name, args.value ?: "") }
+            .onSuccess { invoke.resolve() }
+            .onFailure { invoke.reject(it.toString()) }
+    }
+
+    @Command
+    fun vaultDelete(invoke: Invoke) {
+        vault.delete(invoke.parseArgs(VaultArgs::class.java).name)
+        invoke.resolve()
+    }
 
     @Command
     fun frameRate(invoke: Invoke) {

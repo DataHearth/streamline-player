@@ -1,8 +1,10 @@
 """Stands in for Streamline's playback API until the server side lands.
 
 Proxies /api/v1/playback/* to the engine's control plane and mints the HLS
-token like Streamline will (HMAC-SHA256 over "hls|<id>|<exp>"). No auth; watch
-state lives in memory. Files are analyzed and their subtitles extracted at start,
+token like Streamline will (HMAC-SHA256 over "hls|<id>|<exp>"). Pairing hands out
+device keys; a request with an unknown key gets 401, one with no key passes (the
+headless harness sends none). Approve, deny and revoke from the command line:
+POST /dev/approve, /dev/deny, /dev/revoke. Watch state lives in memory. Files are analyzed and their subtitles extracted at start,
 as Streamline does at import; a session opened before that finishes probes instead,
 and its tracks read as still preparing.
 
@@ -57,6 +59,12 @@ LAST_BEAT = {}
 STOPPED = {}
 RESTART = {"until": 0.0, "by": "", "message": ""}
 ADMIN = "Antoine Langlois"
+PAIRINGS = {}
+KEYS = {}
+PAIR_TTL = 600
+PAIR_INTERVAL = 5
+# The design's codes: 6 characters shown as XXX-XXX, no vowels, no 0/O or 1/I.
+CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ23456789"
 WATCH = {}
 WATCHED_AT = 0.9
 
@@ -197,7 +205,23 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}")
 
+    def refused(self):
+        key = self.headers.get("X-API-Key")
+        if key is None or key in KEYS:
+            return False
+        self.reply(401, {"error": {"code": "unauthorized"}})
+        return True
+
+    def pairing(self, code):
+        """The pairing a /dev route names, or the newest one still waiting."""
+        waiting = [p for p in PAIRINGS.values() if p["status"] == "pending" and (code is None or p["user_code"] == code)]
+        return max(waiting, key=lambda p: p["expires"], default=None)
+
     def do_GET(self):
+        if self.refused():
+            return
+        if self.path == "/health":
+            return self.reply(200, {"status": "ok"})
         if self.path == "/api/v1/movies":
             return self.reply(200, {"items": [summary(m) for m in MOVIES], "total": len(MOVIES)})
         if self.path == "/api/v1/series":
@@ -229,8 +253,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/v1/devices":
             now = time.time()
             ago = lambda s: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - s))
+            me = KEYS.get(self.headers.get("X-API-Key"), {"name": "Living room", "platform": "android-tv"})
             return self.reply(200, {"items": [
-                {"id": "dev-self", "name": "Living room", "platform": "Android TV", "last_seen": ago(0), "streaming": False, "current": True},
+                {"id": "dev-self", "name": me["name"], "platform": me["platform"], "last_seen": ago(0), "streaming": False, "current": True},
                 {"id": "dev-phone", "name": "Pixel 9", "platform": "Android", "last_seen": ago(120), "streaming": True, "current": False},
                 {"id": "dev-laptop", "name": "framework-13", "platform": "Linux", "last_seen": ago(3 * 86400), "streaming": False, "current": False},
                 {"id": "dev-parents", "name": "Parents' TV", "platform": "Android TV", "last_seen": ago(9 * 86400), "streaming": False, "current": False},
@@ -260,6 +285,8 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404, {"error": {"code": "not_found"}})
 
     def do_POST(self):
+        if self.refused():
+            return
         # Dev only: what an admin does from Streamline's web app. Both answer the next heartbeat.
         m = re.fullmatch(r"/dev/stop(?:/([0-9a-f]{32}))?", self.path)
         if m:
@@ -269,6 +296,41 @@ class Handler(BaseHTTPRequestHandler):
                 LAST_BEAT.pop(sid, None)
                 engine("DELETE", f"/v1/sessions/{sid}")
             return self.reply(204)
+        m = re.fullmatch(r"/dev/(approve|deny)(?:/([A-Z0-9-]+))?", self.path)
+        if m:
+            found = self.pairing(m[2])
+            if not found:
+                return self.reply(404, {"error": {"code": "no_pending_pairing"}})
+            found["status"] = "approved" if m[1] == "approve" else "denied"
+            return self.reply(200, {"user_code": found["user_code"], "name": found["name"]})
+        if self.path == "/dev/revoke":
+            KEYS.clear()
+            return self.reply(204)
+        if self.path == "/api/v1/auth/device/code":
+            b = self.body()
+            code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(6))
+            code = f"{code[:3]}-{code[3:]}"
+            device_code = secrets.token_urlsafe(32)
+            PAIRINGS[device_code] = {"user_code": code, "expires": time.monotonic() + PAIR_TTL, "status": "pending",
+                                     "client_id": b.get("client_id"), "name": b.get("name", "")[:64], "platform": b.get("platform", "")}
+            base = f"http://{self.headers['Host']}"
+            return self.reply(200, {"device_code": device_code, "user_code": code, "verification_uri": f"{base}/pair",
+                                    "verification_uri_complete": f"{base}/pair?code={code}", "expires_in": PAIR_TTL, "interval": PAIR_INTERVAL})
+        if self.path == "/api/v1/auth/device/token":
+            found = PAIRINGS.get(self.body().get("device_code", ""))
+            if not found or time.monotonic() > found["expires"]:
+                return self.reply(400, {"error": {"code": "expired_token"}})
+            if found["status"] == "pending":
+                return self.reply(400, {"error": {"code": "authorization_pending"}})
+            if found["status"] == "denied":
+                return self.reply(400, {"error": {"code": "access_denied"}})
+            for k, v in list(KEYS.items()):
+                if v["client_id"] == found["client_id"]:
+                    del KEYS[k]
+            key = secrets.token_hex(24)
+            KEYS[key] = found
+            PAIRINGS.pop(next(d for d, p in PAIRINGS.items() if p is found))
+            return self.reply(200, {"api_key": key, "key_id": len(KEYS)})
         if self.path == "/dev/restart":
             b = self.body()
             RESTART.update(until=time.monotonic() + b.get("seconds", 10), message=b.get("message", ""))
@@ -310,6 +372,8 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404, {"error": {"code": "not_found"}})
 
     def do_PUT(self):
+        if self.refused():
+            return
         m = re.fullmatch(r"/api/v1/watchstate/(.+)", self.path)
         if not m or m[1] not in MEDIA:
             return self.reply(404, {"error": {"code": "not_found"}})
@@ -320,6 +384,8 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(200, WATCH[m[1]])
 
     def do_PATCH(self):
+        if self.refused():
+            return
         m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})", self.path)
         if not m:
             return self.reply(404, {"error": {"code": "not_found"}})
@@ -327,6 +393,11 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(st, with_url(m[1], resp) if st < 300 else resp)
 
     def do_DELETE(self):
+        if self.refused():
+            return
+        if self.path == "/api/v1/devices/current":
+            KEYS.pop(self.headers.get("X-API-Key"), None)
+            return self.reply(204)
         m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})", self.path)
         if not m:
             return self.reply(404, {"error": {"code": "not_found"}})

@@ -96,7 +96,7 @@
 	const detail = $derived(`/detail/${kind}/${id}`);
 	function exit() {
 		if (fromDetail) history.back();
-		else goto(season ? `${detail}?s=${season}` : detail, { replaceState: true });
+		else goto(season ? `${detail}?s=${season}` : detail, { replace: true });
 	}
 </script>
 
@@ -111,6 +111,6 @@
 	</TvScreen>
 {:else if play}
 	{#key play.key}
-		<TvPlayer {...play} onexit={exit} onnext={() => play?.next && goto(play.next.href, { replaceState: true })} onopen={(href: string) => goto(href, { replaceState: true })} />
+		<TvPlayer {...play} onexit={exit} onnext={() => play?.next && goto(play.next.href, { replace: true })} onopen={(href: string) => goto(href, { replace: true })} />
 	{/key}
 {/if}

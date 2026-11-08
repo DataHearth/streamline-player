@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
 	import { playerCapabilities } from "#lib/tv/api.ts";
@@ -22,6 +23,7 @@
 	let me = $state.raw<Me | null>(null);
 	let devices = $state.raw<Device[]>([]);
 	let host = $state("");
+	let keystore = $state("");
 	let info = $state.raw<DeviceInfo | null>(null);
 	let caps = $state.raw<Caps | null>(null);
 	let failed = $state<string | null>(null);
@@ -29,12 +31,22 @@
 	let pick = $state<ChoiceKey | null>(null);
 
 	async function load() {
-		[me, devices, host] = await Promise.all([invoke<Me>("me"), invoke<{ items: Device[] }>("devices").then((d) => d.items), invoke<string>("server_host")]);
+		[me, devices, host, keystore] = await Promise.all([
+			invoke<Me>("me"),
+			invoke<{ items: Device[] }>("devices").then((d) => d.items),
+			invoke<string>("server_host"),
+			invoke<{ keystore: string }>("auth_state").then((a) => a.keystore),
+		]);
 		// Only a native player can answer these; the rows show a dash without them.
 		invoke<DeviceInfo>("plugin:player|deviceInfo").then((i) => (info = i)).catch(() => {});
 		refreshCaps();
 	}
 	load().catch((e) => (failed = String(e)));
+
+	async function signOut() {
+		await invoke("sign_out");
+		goto("/welcome", { replace: true });
+	}
 
 	const refreshCaps = () => playerCapabilities().then((c) => (caps = c as Caps)).catch(() => {});
 
@@ -103,7 +115,7 @@
 				show("Name", info?.name ?? "—"),
 				show("Platform", info?.platform ?? "—"),
 				show("Video player", info?.player ?? "—"),
-				show("Device key", "Android Keystore", "Created when you paired. It never leaves secure storage and is never shown to the app’s web layer."),
+				show("Device key", keystore, "Created when you paired. It never leaves secure storage and is never shown to the app’s web layer."),
 				show("What this device can play", caps ? `${playable(caps)} of ${PLAYABLE}` : "—", `Reported by ${info?.player.split(" ")[0] ?? "the player"}. Files in these formats play as-is; the server converts the rest.`),
 				choice("Match frame rate", "frameRate", ["Off", "On start", "Always"], "Switches the TV to the video’s frame rate so motion doesn’t judder; the picture goes dark for a moment. On start switches when a video starts and back when it stops. Always also follows rate changes between episodes."),
 				choice("E-AC-3 and Atmos output", "passEAC3", ["Pass through", "Decode here"], "Pass through sends the original audio to your TV or receiver, Atmos included. Decode here turns it into PCM on this device."),
@@ -118,8 +130,7 @@
 			{ key: "account", title: "Account", icon: User, rows: [
 				show("Signed in as", me?.email ?? ""),
 				show("Server", host),
-				// ponytail: inert until pairing exists; then it removes the device key and opens pairing.
-				show("Sign out of this device", "Sign out", "Removes the device key. You’ll need to pair again."),
+				{ ...show("Sign out of this device", "Sign out", "Removes the device key. You’ll need to pair again."), act: signOut },
 			] },
 		];
 	});

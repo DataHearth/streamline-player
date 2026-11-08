@@ -10,10 +10,19 @@ mod mpv;
 #[cfg(target_os = "linux")]
 mod view;
 
+/// The Kotlin side, for the commands only Rust may call (the device key vault).
+#[cfg(target_os = "android")]
+pub struct Android<R: Runtime>(pub tauri::plugin::PluginHandle<R>);
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     let builder = Builder::new("player").setup(|_app, _api| {
         #[cfg(target_os = "android")]
-        _api.register_android_plugin("com.datahearth.player", "PlayerPlugin")?;
+        {
+            use tauri::Manager;
+            _app.manage(Android(
+                _api.register_android_plugin("com.datahearth.player", "PlayerPlugin")?,
+            ));
+        }
         #[cfg(target_os = "linux")]
         if let Err(e) = desktop::setup(_app) {
             // The rest of the app still works; playback fails with the page's error screen.

@@ -1,16 +1,33 @@
 use serde_json::{Value, json};
-use std::{fs, path::PathBuf};
-use tauri::{AppHandle, Manager};
-
-// ponytail: fixed dev server (dev/mock-streamline.py); device pairing replaces it.
-// 10.0.2.2 is the Android emulator's alias for the host.
-const SERVER: &str = match option_env!("STREAMLINE_URL") {
-    Some(url) => url,
-    None if cfg!(target_os = "android") => "http://10.0.2.2:8080",
-    None => "http://127.0.0.1:8080",
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{Mutex, RwLock},
 };
+use tauri::{AppHandle, Emitter, Manager};
 
-struct Api(reqwest::Client);
+mod auth;
+
+#[derive(Clone, Default)]
+struct Conn {
+    server: Option<String>,
+    key: Option<String>,
+    /// Why the key could not go into secure storage: it then lasts until the app closes.
+    store_error: Option<String>,
+    loaded: bool,
+}
+
+pub struct Api {
+    http: reqwest::Client,
+    app: AppHandle,
+    conn: RwLock<Conn>,
+    /// The device code of the pairing in progress: a credential, so it never reaches the page.
+    pairing: Mutex<Option<String>>,
+}
+
+fn host_of(url: &str) -> &str {
+    url.split_once("://").map_or(url, |(_, host)| host)
+}
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -29,14 +46,18 @@ impl Kind {
 }
 
 // Images load through <img>, which can't carry the device key, so they pass through here.
-async fn artwork(client: reqwest::Client, path: String) -> tauri::http::Response<Vec<u8>> {
+async fn artwork(app: AppHandle, path: String) -> tauri::http::Response<Vec<u8>> {
+    let api = app.state::<Api>();
+    let conn = api.conn().await;
     let fetched = async {
-        let resp = client
-            .get(format!("{SERVER}/api/v1/posters{path}"))
-            .send()
-            .await?
-            .error_for_status()?;
-        resp.bytes().await
+        let mut req = api.http.get(format!(
+            "{}/api/v1/posters{path}",
+            conn.server.unwrap_or_default()
+        ));
+        if let Some(key) = &conn.key {
+            req = req.header("X-API-Key", key);
+        }
+        req.send().await?.error_for_status()?.bytes().await
     };
     match fetched.await {
         Ok(bytes) => tauri::http::Response::builder()
@@ -50,13 +71,64 @@ async fn artwork(client: reqwest::Client, path: String) -> tauri::http::Response
 }
 
 impl Api {
+    /// Reads the server address and the key on first use: the key store can block, and on
+    /// Android it answers on the main thread, so never during setup.
+    async fn conn(&self) -> Conn {
+        let conn = self.conn.read().unwrap().clone();
+        if conn.loaded {
+            return conn;
+        }
+        let app = self.app.clone();
+        let (server, key) = tauri::async_runtime::spawn_blocking(move || {
+            (auth::read_server(&app), auth::load_key(&app))
+        })
+        .await
+        .expect("key store read panicked");
+        let mut c = self.conn.write().unwrap();
+        if !c.loaded {
+            *c = Conn {
+                server,
+                key: key.unwrap_or_else(|e| {
+                    eprintln!("device key unreadable: {e}");
+                    None
+                }),
+                store_error: None,
+                loaded: true,
+            };
+        }
+        c.clone()
+    }
+
+    fn set_server(&self, url: String) {
+        self.conn.write().unwrap().server = Some(url);
+    }
+
+    fn set_key(&self, key: String, store_error: Option<String>) {
+        let mut c = self.conn.write().unwrap();
+        c.key = Some(key);
+        c.store_error = store_error;
+    }
+
+    async fn forget_key(&self) {
+        self.conn.write().unwrap().key = None;
+        let app = self.app.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || auth::delete_key(&app)).await;
+    }
+
     async fn call(
         &self,
         method: reqwest::Method,
         path: &str,
         body: Option<Value>,
     ) -> Result<Value, String> {
-        let mut req = self.0.request(method, format!("{SERVER}/api/v1{path}"));
+        let conn = self.conn().await;
+        let Some(server) = conn.server else {
+            return Err(json!({ "error": { "code": "no_server" } }).to_string());
+        };
+        let mut req = self.http.request(method, format!("{server}/api/v1{path}"));
+        if let Some(key) = &conn.key {
+            req = req.header("X-API-Key", key);
+        }
         if let Some(b) = body {
             req = req.json(&b);
         }
@@ -68,6 +140,11 @@ impl Api {
         } else {
             serde_json::from_str(&text).map_err(|e| e.to_string())?
         };
+        // The key was revoked from the account page, or a password change dropped every key.
+        if status == reqwest::StatusCode::UNAUTHORIZED && conn.key.is_some() {
+            self.forget_key().await;
+            let _ = self.app.emit("signed-out", ());
+        }
         if status.is_success() {
             Ok(value)
         } else {
@@ -77,8 +154,15 @@ impl Api {
 }
 
 #[tauri::command]
-fn server_host() -> &'static str {
-    SERVER.split_once("://").map_or(SERVER, |(_, host)| host)
+async fn server_host(api: tauri::State<'_, Api>) -> Result<String, String> {
+    Ok(api
+        .conn()
+        .await
+        .server
+        .as_deref()
+        .map(host_of)
+        .unwrap_or_default()
+        .to_owned())
 }
 
 #[tauri::command]
@@ -228,7 +312,7 @@ async fn media_tracks(api: tauri::State<'_, Api>, media_id: String) -> Result<Va
 
 #[tauri::command]
 async fn subtitle_text(api: tauri::State<'_, Api>, url: String) -> Result<String, String> {
-    let resp = api.0.get(url).send().await.map_err(|e| e.to_string())?;
+    let resp = api.http.get(url).send().await.map_err(|e| e.to_string())?;
     resp.error_for_status()
         .map_err(|e| e.to_string())?
         .text()
@@ -295,12 +379,15 @@ async fn heartbeat(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let client = reqwest::Client::new();
-    let images = client.clone();
     tauri::Builder::default()
         .plugin(tauri_plugin_player::init())
-        .manage(Api(client))
         .setup(|app| {
+            app.manage(Api {
+                http: reqwest::Client::new(),
+                app: app.handle().clone(),
+                conn: RwLock::default(),
+                pairing: Mutex::default(),
+            });
             stop_left_over_session(app.handle());
             #[cfg(target_os = "linux")]
             // WebKitGTK (seen on 2.54.1) zooms pages by gtk-xft-dpi / 96, and GTK reports -1
@@ -315,14 +402,19 @@ pub fn run() {
             }
             Ok(())
         })
-        .register_asynchronous_uri_scheme_protocol("artwork", move |_ctx, request, responder| {
-            let client = images.clone();
+        .register_asynchronous_uri_scheme_protocol("artwork", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
             let path = request.uri().path().to_owned();
             tauri::async_runtime::spawn(async move {
-                responder.respond(artwork(client, path).await);
+                responder.respond(artwork(app, path).await);
             });
         })
         .invoke_handler(tauri::generate_handler![
+            auth::auth_state,
+            auth::connect,
+            auth::pair_start,
+            auth::pair_poll,
+            auth::sign_out,
             server_host,
             library,
             title,
