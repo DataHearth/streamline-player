@@ -33,7 +33,14 @@ pub fn boundaries(plan: &Plan, a: &Analysis) -> Vec<f64> {
     }
 }
 
-const SEEK_MARGIN_SECS: f64 = 1.0;
+/// ffmpeg 9.0.2's fftools/ffmpeg_demux.c pulls an input `-ss` back by 3/23 s ("dts_heuristic")
+/// when any stream has B-frames and the demuxer does not seek by pts (Matroska and MPEG-TS do
+/// not, MP4 does).
+const DTS_HEURISTIC_SECS: f64 = 3.0 / 23.0;
+/// Clear of the keyframe on the side the demuxer rounds from, so the seek cannot reach a neighbour.
+const KEYFRAME_SLACK_SECS: f64 = 0.001;
+/// Above AAC's 1024 samples at 22.05 kHz, the longest encoder priming the engine produces.
+const AUDIO_PRIMING_SECS: f64 = 0.05;
 
 fn container_start(a: &Analysis) -> f64 {
     let start = a
@@ -62,10 +69,11 @@ pub fn landing_pts(a: &Analysis, seek: f64) -> f64 {
 
 /// The `-ss` for a run starting at segment `i`. Playlist bounds are relative to
 /// the video's first frame, but ffmpeg seeks on the container timeline, which
-/// starts at its earliest stream. A copy seek also lands one GOP early when it
-/// targets the keyframe's own pts: the demuxer indexes B-frame streams by a
-/// later time (seen on HEVC mkv, 0.125 s late). Aiming into the GOP lands on
-/// its keyframe, since a copy run starts at the nearest keyframe before `-ss`.
+/// starts at its earliest stream. A copy run starts on the keyframe the demuxer
+/// seeks to, so the target makes up for ffmpeg's pull-back and lands on segment
+/// `i`'s keyframe whatever the GOP length: Matroska and MP4 take the last
+/// keyframe at or before the target pts, MPEG-TS the first whose dts is at or
+/// after it.
 pub fn seek_time(plan: &Plan, a: &Analysis, bounds: &[f64], i: u32) -> f64 {
     let start = bounds[i as usize];
     let container_start = container_start(a);
@@ -80,14 +88,33 @@ pub fn seek_time(plan: &Plan, a: &Analysis, bounds: &[f64], i: u32) -> f64 {
     let Some(video_start) = video_start else {
         return start;
     };
+    let pull_back = if pulls_seek_back(a) {
+        DTS_HEURISTIC_SECS
+    } else {
+        0.0
+    };
     let margin = match plan.video {
-        VideoAction::Copy { .. } => {
-            let end = bounds.get(i as usize + 1).copied().unwrap_or(a.duration);
-            ((end - start) / 2.0).clamp(0.0, SEEK_MARGIN_SECS)
+        VideoAction::Copy { .. } if a.container == "ts" => {
+            if let Some(dts) = a.keyframe_dts.get(i as usize) {
+                return round_micros(dts - KEYFRAME_SLACK_SECS + pull_back - container_start);
+            }
+            0.0
         }
+        // No keyframe precedes the first, so only the next one bounds the target. Staying past
+        // the audio encoder's priming keeps a transcoded track from starting below zero, which
+        // the muxer would make up for by shifting every stream.
+        VideoAction::Copy { .. } if i == 0 => {
+            let next = bounds.get(1).copied().unwrap_or(a.duration);
+            (next / 2.0).min(AUDIO_PRIMING_SECS)
+        }
+        VideoAction::Copy { .. } => pull_back + KEYFRAME_SLACK_SECS,
         VideoAction::Transcode { .. } => 0.0,
     };
     round_micros(start + margin + video_start - container_start)
+}
+
+fn pulls_seek_back(a: &Analysis) -> bool {
+    a.container != "mp4" && a.video.iter().any(|v| v.b_frames > 0)
 }
 
 pub fn segment_for(bounds: &[f64], t: f64) -> u32 {
@@ -375,13 +402,23 @@ mod tests {
     }
 
     #[test]
-    fn copy_seek_is_absolute_and_inside_the_gop() {
+    fn copy_seek_makes_up_for_the_demuxer() {
         let mut a = analysis(stream("hevc", "Main", 120, 1920, 1080, 8), "flac");
         a.video[0].start_time = 0.102;
         a.keyframes = vec![0.102, 10.529, 20.956];
+        a.keyframe_dts = vec![0.06, 10.487, 20.831];
         let plan = copy(CopyTag::Hvc1, DvHandling::Keep);
         let b = boundaries(&plan, &a);
-        assert_close(&[seek_time(&plan, &a, &b, 1)], &[11.529]);
+        let seek = |a: &Analysis| seek_time(&plan, a, &b, 1);
+
+        a.container = "mkv".into();
+        assert_close(&[seek(&a)], &[10.529 + 0.001]);
+        a.video[0].b_frames = 2;
+        assert_close(&[seek(&a)], &[10.529 + 3.0 / 23.0 + 0.001]);
+        a.container = "mp4".into();
+        assert_close(&[seek(&a)], &[10.529 + 0.001]);
+        a.container = "ts".into();
+        assert_close(&[seek(&a)], &[10.487 - 0.001 + 3.0 / 23.0]);
     }
 
     #[test]

@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub const ANALYSIS_VERSION: u32 = 2;
+pub const ANALYSIS_VERSION: u32 = 3;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
@@ -36,6 +36,9 @@ pub struct Analysis {
     pub chapters: Vec<Chapter>,
     #[serde(default)]
     pub keyframes: Vec<f64>,
+    /// The dts of each keyframe in `keyframes`, where MPEG-TS seeks (see playlist::seek_time).
+    #[serde(default)]
+    pub keyframe_dts: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -91,6 +94,9 @@ pub struct VideoStream {
     pub dv: Option<Dovi>,
     #[serde(default)]
     pub hdr10plus: bool,
+    /// ffprobe's has_b_frames: the stream reorders frames, which moves an input seek (see playlist::seek_time).
+    #[serde(default)]
+    pub b_frames: u32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -273,21 +279,27 @@ fn video_stream(s: &Value, first_frame: &Value) -> VideoStream {
             bl_compat_id: int(&d["dv_bl_signal_compatibility_id"]).unwrap_or(0) as u8,
         }),
         hdr10plus,
+        b_frames: int(&s["has_b_frames"]).unwrap_or(0).max(0) as u32,
     }
 }
 
-fn keyframes(packets_csv: &str) -> Vec<f64> {
-    let mut kf: Vec<f64> = packets_csv
+/// Keyframe pts in order, with their dts; rows are `pts,dts,flags` or `pts,flags`.
+fn keyframes(packets_csv: &str) -> (Vec<f64>, Vec<f64>) {
+    let mut kf: Vec<(f64, f64)> = packets_csv
         .lines()
         .filter_map(|line| {
-            let mut cols = line.split(',');
-            let pts = cols.next()?.trim().parse::<f64>().ok()?;
-            cols.next()?.contains('K').then_some(pts)
+            let cols: Vec<&str> = line.split(',').map(str::trim).collect();
+            let pts = cols.first()?.parse::<f64>().ok()?;
+            let dts = match cols.as_slice() {
+                [_, dts, _, ..] => dts.parse().unwrap_or(pts),
+                _ => pts,
+            };
+            cols.last()?.contains('K').then_some((pts, dts))
         })
         .collect();
-    kf.sort_by(f64::total_cmp);
-    kf.dedup();
-    kf
+    kf.sort_by(|a, b| a.0.total_cmp(&b.0));
+    kf.dedup_by(|a, b| a.0 == b.0);
+    kf.into_iter().unzip()
 }
 
 fn last_pts(packets_csv: &str) -> Option<f64> {
@@ -308,9 +320,9 @@ pub fn parse(
         container: container(probe["format"]["format_name"].as_str().unwrap_or_default()),
         duration: num(&probe["format"]["duration"]).unwrap_or(0.0),
         bit_rate: num(&probe["format"]["bit_rate"]).unwrap_or(0.0) as u64,
-        keyframes: keyframes(packets_csv),
         ..Analysis::default()
     };
+    (a.keyframes, a.keyframe_dts) = keyframes(packets_csv);
     // Audio can outlast the video, and a segment past the last frame cannot be produced: ffmpeg
     // fails with "received no packets". One frame short on purpose, so that every segment boundary
     // below `duration` has a frame at or after it.
@@ -437,7 +449,7 @@ pub async fn run_analyze_with(
             "-select_streams",
             "v:0",
             "-show_entries",
-            "packet=pts_time,flags",
+            "packet=pts_time,dts_time,flags",
             "-of",
             "csv=p=0",
         ],
@@ -469,10 +481,17 @@ mod tests {
 
     #[test]
     fn analysis_ignores_unknown_field() {
-        let a: Analysis = serde_json::from_str(r#"{"version": 2, "foo": 1, "video": []}"#).unwrap();
-        assert_eq!(a.version, 2);
+        let a: Analysis = serde_json::from_str(r#"{"version": 3, "foo": 1, "video": []}"#).unwrap();
+        assert_eq!(a.version, 3);
         assert!(is_current(&a));
         assert!(!is_current(&Analysis::default()));
+    }
+
+    #[test]
+    fn keyframes_keep_their_dts() {
+        let csv = "1.543,1.460,K__\n1.501,1.501,___\n0.042,0.000,K__\n0.042,0.000,K__\n";
+        assert_eq!(keyframes(csv), (vec![0.042, 1.543], vec![0.0, 1.46]));
+        assert_eq!(keyframes("2.0,K__\n"), (vec![2.0], vec![2.0]));
     }
 
     #[test]

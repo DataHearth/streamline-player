@@ -812,6 +812,35 @@ async fn audio_transcode_eac3_keeps_video_copy() {
 }
 
 #[tokio::test]
+async fn audio_transcode_restart_starts_audio_with_the_keyframe() {
+    if !have_ffmpeg() {
+        return;
+    }
+    let e = env().await;
+    let src = e.root.join("surround.mkv");
+    make_surround_flac_mkv(&src);
+    let mut caps = caps_json("h264", "mp4");
+    caps["audio"]["codecs"] = json!(["eac3"]);
+    let first = id(80);
+    e.start(&first, &src, caps.clone(), json!({})).await;
+    let bounds = e.bounds(&first).await;
+    e.api("DELETE", &format!("/v1/sessions/{first}"), None)
+        .await;
+
+    let sid = id(81);
+    e.start(&sid, &src, caps, json!({"position": bounds[2]}))
+        .await;
+    let init = e.hls(&sid, "init.mp4").await;
+    let joined = joined_segment(&e, &sid, &init, 2).await;
+    let (video, audio) = (min_pts(&joined, "v:0"), min_pts(&joined, "a:0"));
+    // The transcoded audio is cut at -ss: aiming deep into the GOP left it starting that late.
+    assert!(
+        (audio - video).abs() < 0.03,
+        "audio starts at {audio}, video at {video}"
+    );
+}
+
+#[tokio::test]
 async fn transcode_cpu_h264() {
     if !have_ffmpeg() {
         return;
