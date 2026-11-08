@@ -245,9 +245,11 @@ async fn probe_backend(ffmpeg: &Path, backend: Backend, device: &str) -> Encoder
         h264,
         hevc,
         av1,
-        // av1_vaapi on AMD VCN 4 writes 1082 rows for a 1080 request, with no crop in the bitstream.
         hevc_first: backend == Backend::Vaapi,
         dovi_tool: false,
+        // Mesa 26.2.6, AMD VCN 4: av1_vaapi's in-band sequence header carries the padded size and
+        // no render size, so 1080 rows decode as 1082 and 1430 columns as 1472.
+        av1_pads: backend == Backend::Vaapi,
     }
 }
 

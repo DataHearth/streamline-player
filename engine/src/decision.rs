@@ -94,6 +94,8 @@ pub enum VideoAction {
         bitrate: u64,
         hdr_out: HdrOut,
         deinterlace: bool,
+        /// (1, 1) unless the size was bent to fit the encoder.
+        sar: (u32, u32),
     },
 }
 
@@ -128,6 +130,8 @@ pub struct EncoderSet {
     pub hevc_first: bool,
     /// dovi_tool ran at boot; without it profile 7 cannot become 8.1.
     pub dovi_tool: bool,
+    /// The AV1 encoder pads to a width of 64 and a height of 16, as black edges in the picture.
+    pub av1_pads: bool,
 }
 
 impl EncoderSet {
@@ -137,6 +141,7 @@ impl EncoderSet {
         av1: true,
         hevc_first: false,
         dovi_tool: false,
+        av1_pads: false,
     };
 
     fn has(&self, codec: VideoCodec) -> bool {
@@ -476,6 +481,10 @@ fn transcode_video(
         width = even_down(cap.max_width);
         height = even_down((f64::from(width) / aspect).round() as u32);
     }
+    let mut sar = (1, 1);
+    if codec == VideoCodec::Av1 && enc.av1_pads {
+        (width, height, sar) = av1_unpadded(width, height, cap.max_width);
+    }
 
     // A probe can report no bitrate, and a target of 0 is not an encode.
     let source = match a.bit_rate {
@@ -508,7 +517,24 @@ fn transcode_video(
         bitrate,
         hdr_out,
         deinterlace,
+        sar,
     })
+}
+
+/// The nearest size the encoder writes without padding, with a sample aspect ratio that keeps
+/// the picture's shape.
+fn av1_unpadded(width: u32, height: u32, max_width: u32) -> (u32, u32, (u32, u32)) {
+    let h = (height & !15).max(16);
+    let shaped = u64::from(width) * u64::from(h);
+    let w = ((shaped as f64 / f64::from(height) / 64.0).round() as u32 * 64)
+        .clamp(64, (max_width & !63).max(64));
+    let (num, den) = (shaped, u64::from(w) * u64::from(height));
+    let g = gcd(num, den);
+    (w, h, ((num / g) as u32, (den / g) as u32))
+}
+
+fn gcd(a: u64, b: u64) -> u64 {
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 fn even_down(n: u32) -> u32 {
@@ -642,6 +668,7 @@ mod tests {
         av1: true,
         hevc_first: false,
         dovi_tool: true,
+        av1_pads: false,
     };
 
     fn plan(c: &Capabilities, a: &Analysis, p: &SessionParams) -> Plan {
@@ -749,6 +776,32 @@ mod tests {
             }),
             VideoCodec::Av1
         );
+    }
+
+    #[test]
+    fn padding_av1_encoder_gets_aligned_sizes_with_the_shape_kept() {
+        assert_eq!(av1_unpadded(1920, 1080, 3840), (1920, 1072, (134, 135)));
+        assert_eq!(av1_unpadded(1920, 804, 1920), (1920, 800, (200, 201)));
+        assert_eq!(av1_unpadded(854, 480, 3840), (832, 480, (427, 416)));
+        assert_eq!(av1_unpadded(3840, 2160, 3840), (3840, 2160, (1, 1)));
+
+        let a = fixture("hevc10_hdr10_truehd_pgs_ass_fonts");
+        let c = caps(vec![vcap("av1", &[])], &[], &["aac"], &["mkv"]);
+        let enc = EncoderSet {
+            av1_pads: true,
+            ..ALL
+        };
+        match decide(&c, &a, &capped(), &enc).unwrap().video {
+            VideoAction::Transcode {
+                width, height, sar, ..
+            } => {
+                assert_eq!((width % 64, height % 16), (0, 0));
+                let shown = f64::from(width * sar.0) / f64::from(sar.1 * height);
+                let source = f64::from(a.video[0].width) / f64::from(a.video[0].height);
+                assert!((shown - source).abs() < 0.005, "{shown} vs {source}");
+            }
+            other => panic!("{other:?}"),
+        }
     }
 
     fn capped() -> SessionParams {

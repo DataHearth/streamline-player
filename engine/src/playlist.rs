@@ -327,6 +327,7 @@ mod tests {
             bitrate: 8_000_000,
             hdr_out,
             deinterlace: false,
+            sar: (1, 1),
         })
     }
 

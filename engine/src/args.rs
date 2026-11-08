@@ -75,6 +75,7 @@ fn pipeline(plan: &Plan, a: &Analysis, hw: &Hw) -> Pipeline {
         height,
         hdr_out,
         deinterlace,
+        sar,
         ..
     } = plan.video
     else {
@@ -163,6 +164,10 @@ fn pipeline(plan: &Plan, a: &Analysis, hw: &Hw) -> Pipeline {
     }
     if !on_gpu && has_upload(b) {
         rest.push(upload(b, out_fmt));
+    }
+    if sar != (1, 1) {
+        // The default max of 100 rounds 134/135 to 99/100.
+        rest.push(format!("setsar={}/{}:max=1000", sar.0, sar.1));
     }
     let uploads = has_upload(b) && rest.iter().chain(&head).any(|f| f.contains("hwupload"));
     let init = if uploads {
@@ -550,6 +555,7 @@ mod tests {
             bitrate: 8_000_000,
             hdr_out,
             deinterlace,
+            sar: (1, 1),
         }
     }
 

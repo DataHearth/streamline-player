@@ -25,6 +25,7 @@ const ALL: EncoderSet = EncoderSet {
     av1: true,
     hevc_first: false,
     dovi_tool: true,
+    av1_pads: false,
 };
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -502,6 +503,7 @@ fn av1_gpu() -> Hw {
             av1: true,
             hevc_first: false,
             dovi_tool: true,
+            av1_pads: false,
         },
         false,
     );
@@ -511,6 +513,7 @@ fn av1_gpu() -> Hw {
         av1: false,
         hevc_first: false,
         dovi_tool: true,
+        av1_pads: false,
     };
     hw
 }
@@ -567,6 +570,7 @@ async fn cpu_fallback_keeps_the_advertised_codec() {
             av1: false,
             hevc_first: false,
             dovi_tool: true,
+            av1_pads: false,
         },
         false,
     );
@@ -576,6 +580,7 @@ async fn cpu_fallback_keeps_the_advertised_codec() {
         av1: true,
         hevc_first: false,
         dovi_tool: true,
+        av1_pads: false,
     };
     let e = env(Setup {
         fake_env: "FAKE_FAIL_RUNS=2",

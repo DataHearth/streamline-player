@@ -45,6 +45,7 @@ pub fn env() -> Env {
             av1: true,
             hevc_first: false,
             dovi_tool: true,
+            av1_pads: false,
         },
         false,
     ))
