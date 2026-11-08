@@ -43,6 +43,7 @@ p.add_argument("--media", action="append", default=[], help="id=path, repeatable
 p.add_argument("--clip", action="append", default=[], help="file the library's titles play, repeatable")
 p.add_argument("--demo-markers", action="store_true", help="give episodes an intro and credits, to see the cards")
 p.add_argument("--art", default="", help="directory holding the artwork")
+p.add_argument("--heartbeat-timeout", type=float, default=90, help="seconds without a heartbeat before a session is stopped")
 args = p.parse_args()
 FILES = dict(m.split("=", 1) for m in args.media)
 MEDIA = dict(FILES)
@@ -50,6 +51,7 @@ ANALYSIS = {}
 SUBTITLES = {}
 MARKERS = {}
 SESSIONS = {}
+LAST_BEAT = {}
 WATCH = {}
 WATCHED_AT = 0.9
 
@@ -262,9 +264,13 @@ class Handler(BaseHTTPRequestHandler):
                 b["analysis"] = ANALYSIS[path]
             SESSIONS[sid] = media_id
             st, resp = engine("POST", "/v1/sessions", {"session_id": sid, "path": path, **b})
+            if st < 300:
+                LAST_BEAT[sid] = time.monotonic()
             return self.reply(st, with_url(sid, resp) if st < 300 else resp)
         m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})/progress", self.path)
         if m:
+            if m[1] in LAST_BEAT:
+                LAST_BEAT[m[1]] = time.monotonic()
             note_progress(m[1], self.body().get("position", 0))
             return self.reply(204)
         self.reply(404, {"error": {"code": "not_found"}})
@@ -290,9 +296,23 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})", self.path)
         if not m:
             return self.reply(404, {"error": {"code": "not_found"}})
+        LAST_BEAT.pop(m[1], None)
         st, resp = engine("DELETE", f"/v1/sessions/{m[1]}")
         self.reply(st, resp)
 
+
+def reap_silent():
+    """Streamline stops a session whose client stopped heartbeating (a crash, a killed app)."""
+    while True:
+        time.sleep(5)
+        cutoff = time.monotonic() - args.heartbeat_timeout
+        for sid, beat in list(LAST_BEAT.items()):
+            if beat < cutoff and LAST_BEAT.pop(sid, None) is not None:
+                st, _ = engine("DELETE", f"/v1/sessions/{sid}")
+                print(f"stopped silent session {sid}: engine {st}", flush=True)
+
+
+threading.Thread(target=reap_silent, daemon=True).start()
 
 for media_path in set(MEDIA.values()):
     threading.Thread(target=prepare, args=(media_path,), daemon=True).start()
