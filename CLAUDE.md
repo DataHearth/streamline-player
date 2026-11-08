@@ -12,8 +12,10 @@ live in `../streamline/docs/superpowers/specs/`: `2026-07-07-player-design.md`
 (playback) and `2026-11-02-device-pairing-design.md` (login), with their plans
 in `../streamline/docs/superpowers/plans/`. The server side is specified, not
 built: code against those shapes, with a local mock server standing in until
-it lands. When this repo and a server spec disagree, the server spec wins:
-change it there first.
+it lands. Those server specs are outdated: this repo and the design are the
+source of truth for the whole player, pairing included. When they disagree
+with a server spec, build to ours and list the spec change for the user, who
+updates `../streamline`.
 
 ## Stack
 
