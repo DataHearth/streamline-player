@@ -55,6 +55,11 @@
 		return `last seen ${days} day${days === 1 ? "" : "s"} ago`;
 	}
 
+	const seenShort = (d: Device) => {
+		const s = seen(d).replace(/^last seen /, "");
+		return s.charAt(0).toUpperCase() + s.slice(1);
+	};
+
 	const choice = (label: string, key: ChoiceKey, vals: string[], desc?: string): Row => ({ label, desc, value: prefs[key], choice: key, vals });
 	const toggle = (label: string, key: ToggleKey, desc?: string): Row => ({ label, desc, value: prefs[key] ? "On" : "Off", act: () => setPref(key, !prefs[key]) });
 	const show = (label: string, value: string, desc?: string): Row => ({ label, desc, value });
@@ -91,8 +96,8 @@
 			] },
 			{ key: "devices", title: "Signed-in devices", icon: MonitorSmartphone, rows: [
 				...(self ? [show(self.name, "This device", `${self.platform} · this device`)] : []),
-				// ponytail: the design gives other devices no TV action yet; signing one out needs a confirmation drawn for TV.
-				...devices.filter((x) => !x.current).map((x) => show(x.name, "Sign out", `${x.platform} · ${seen(x)}`)),
+				// The TV only manages itself: other devices are signed out from the web app.
+				...devices.filter((x) => !x.current).map((x) => show(x.name, seenShort(x), `${x.platform} · ${seen(x)}`)),
 			] },
 			{ key: "device", title: "This device", icon: Tv, rows: [
 				show("Name", info?.name ?? "—"),

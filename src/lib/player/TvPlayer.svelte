@@ -727,8 +727,7 @@
 			}
 			session = started;
 			await player("frameRate", { mode: FRAME_RATE_MODE[prefs.frameRate] ?? "off" }).catch(() => {});
-			await player("load", { url: session.url, decode: decodeHere() });
-			if (at > 0) await player("seek", { seconds: at });
+			await player("load", { url: session.url, decode: decodeHere(), at });
 			if (!paused) await player("play");
 			if (halt) unhalt();
 			showControls(true);
@@ -752,6 +751,16 @@
 	}
 
 	const sessionGone = (raw: string) => raw.includes('"not_found"');
+
+	// The heartbeat is where Streamline says an admin stopped this stream or is restarting the server.
+	function serverStopped(e: unknown) {
+		const raw = String(e);
+		if (!raw.includes('"session_stopped"') && !raw.includes('"server_restarting"')) return;
+		startId++;
+		session = null;
+		player("stop").catch(() => {});
+		failedToStart(raw);
+	}
 
 	function failedToStart(raw: string) {
 		let { halt: h, retryIn } = haltFor(raw, { host, at: fmt(position), titleName });
@@ -913,8 +922,7 @@
 				changes: { ...changes, position: at },
 			});
 			if (wasDirect !== (session.mode === "direct")) measured = null;
-			await player("load", { url: session.url });
-			await player("seek", { seconds: at });
+			await player("load", { url: session.url, decode: decodeHere(), at });
 			if (!paused) await player("play");
 		} catch (e) {
 			if (sessionGone(String(e))) {
@@ -1066,7 +1074,7 @@
 		start(startAt);
 		const cueTimer = setInterval(updateCue, 100);
 		const beat = setInterval(() => {
-			if (session) invoke("heartbeat", { id: session.session_id, position, paused: !playing }).catch(() => {});
+			if (session) invoke("heartbeat", { id: session.session_id, position, paused: !playing }).catch(serverStopped);
 		}, HEARTBEAT_MS);
 		const hide = setInterval(() => {
 			if (controls && playing && !menu && Date.now() - lastMove > HIDE_MS) controls = false;

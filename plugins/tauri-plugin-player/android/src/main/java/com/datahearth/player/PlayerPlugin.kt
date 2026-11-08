@@ -59,11 +59,13 @@ import app.tauri.plugin.Plugin
 class LoadArgs {
     lateinit var url: String
     var decode: Array<String> = emptyArray()
+    var at: Double = 0.0
 }
 
 @InvokeArg
 class CapabilitiesArgs {
     var decode: Array<String> = emptyArray()
+    var at: Double = 0.0
 }
 
 @InvokeArg
@@ -407,7 +409,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         onPlayer(invoke) {
             decodeHere = args.decode.toSet()
             meterQuietUntil = System.currentTimeMillis() + METER_QUIET_AFTER_LOAD_MS
-            it.setMediaItem(MediaItem.fromUri(args.url))
+            it.setMediaItem(MediaItem.fromUri(args.url), (args.at * 1000).toLong().coerceAtLeast(0))
             it.prepare()
         }
     }

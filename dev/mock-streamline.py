@@ -53,6 +53,10 @@ SUBTITLES = {}
 MARKERS = {}
 SESSIONS = {}
 LAST_BEAT = {}
+# What an admin did, for the next heartbeat to tell: sid -> (by, message), and a restart's end time.
+STOPPED = {}
+RESTART = {"until": 0.0, "by": "", "message": ""}
+ADMIN = "Antoine Langlois"
 WATCH = {}
 WATCHED_AT = 0.9
 
@@ -256,6 +260,22 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404, {"error": {"code": "not_found"}})
 
     def do_POST(self):
+        # Dev only: what an admin does from Streamline's web app. Both answer the next heartbeat.
+        m = re.fullmatch(r"/dev/stop(?:/([0-9a-f]{32}))?", self.path)
+        if m:
+            message = self.body().get("message", "")
+            for sid in [m[1]] if m[1] else list(LAST_BEAT):
+                STOPPED[sid] = message
+                LAST_BEAT.pop(sid, None)
+                engine("DELETE", f"/v1/sessions/{sid}")
+            return self.reply(204)
+        if self.path == "/dev/restart":
+            b = self.body()
+            RESTART.update(until=time.monotonic() + b.get("seconds", 10), message=b.get("message", ""))
+            return self.reply(204)
+        if time.monotonic() < RESTART["until"] and self.path.startswith("/api/v1/playback/sessions"):
+            left = max(1, round(RESTART["until"] - time.monotonic()))
+            return self.reply(503, {"error": {"code": "server_restarting", "message": RESTART["message"], "by": ADMIN, "retry_after": left}})
         if self.path == "/api/v1/playback/decisions":
             b = self.body()
             path = MEDIA.get(b.pop("media_id", None))
@@ -281,6 +301,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(st, with_url(sid, resp) if st < 300 else resp)
         m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})/progress", self.path)
         if m:
+            if m[1] in STOPPED:
+                return self.reply(410, {"error": {"code": "session_stopped", "message": STOPPED.pop(m[1]), "by": ADMIN}})
             if m[1] in LAST_BEAT:
                 LAST_BEAT[m[1]] = time.monotonic()
             note_progress(m[1], self.body().get("position", 0))

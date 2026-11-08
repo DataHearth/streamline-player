@@ -1,4 +1,4 @@
-import { CircleAlert, Cpu, Folder, Server, WifiOff } from "@lucide/svelte";
+import { Ban, CircleAlert, Cpu, Folder, RotateCw, Server, WifiOff } from "@lucide/svelte";
 import type { Component } from "svelte";
 import { PLAYER_NAME } from "#lib/tv/api.ts";
 
@@ -6,7 +6,7 @@ const RETRY_SECS = 10;
 const OFFLINE_CHECK_SECS = 5;
 
 export type Halt = {
-	kind: "busy" | "unreachable" | "offline" | "nocodec" | "missing" | "error";
+	kind: "stop" | "restart" | "busy" | "unreachable" | "offline" | "nocodec" | "missing" | "error";
 	eyebrow: string;
 	icon: Component<{ size?: number; strokeWidth?: number }>;
 	title: string;
@@ -17,6 +17,8 @@ export type Halt = {
 	count?: (left: number) => string;
 	failed: boolean;
 	retryLabel?: string;
+	/** What the admin wrote, and who; `by` without a message says no reason was given. */
+	message?: { by: string; text: string };
 	alts?: { icon: Component<{ size?: number; strokeWidth?: number }>; label: string; sub: string; run: () => void }[];
 	left?: number;
 	total?: number;
@@ -26,12 +28,40 @@ type Context = { host: string; at?: string; titleName?: string };
 
 /** `raw` is what Rust returned: the server's error as JSON, anything else means no answer at all. */
 export function haltFor(raw: string, { host, at, titleName }: Context): { halt: Halt; retryIn?: number } {
-	let error: { code?: string; message?: string; retry_after?: number } | null = null;
+	let error: { code?: string; message?: string; retry_after?: number; by?: string } | null = null;
 	try {
 		const parsed = JSON.parse(raw);
 		error = parsed.error ?? parsed;
 	} catch {
 		// Not JSON: the request never got an answer from the server.
+	}
+	if (error?.code === "session_stopped") {
+		return {
+			halt: {
+				kind: "stop",
+				eyebrow: "Playback stopped",
+				icon: Ban,
+				title: "An admin stopped this stream",
+				message: { by: error.by ?? "", text: error.message ?? "" },
+				note: at ? `You were at ${at}. Your place is saved.` : "Your place is saved.",
+				failed: true,
+				retryLabel: "Try again",
+			},
+		};
+	}
+	if (error?.code === "server_restarting") {
+		return {
+			retryIn: error.retry_after ?? RETRY_SECS,
+			halt: {
+				kind: "restart",
+				eyebrow: "Server restarting",
+				icon: RotateCw,
+				title: "Back in a few seconds",
+				message: error.message ? { by: error.by ?? "", text: error.message } : undefined,
+				count: (left) => `Reconnecting in ${left} s${at ? ` · picks up at ${at}` : ""}`,
+				failed: false,
+			},
+		};
 	}
 	if (error?.code === "transcode_limit") {
 		return {
