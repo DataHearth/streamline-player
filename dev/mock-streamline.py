@@ -10,7 +10,7 @@ and its tracks read as still preparing.
 
 The library is dev/mock-library.json, in Streamline's shapes, with its titles played
 by the --clip files in turn. A --media id shows up as a movie of that name, playing its
-own file. --art points at img/p/<slug>.jpg and img/b/<slug>.jpg artwork.
+own file. --art points at p/<slug>.jpg and b/<slug>.jpg artwork, and c/<person>.jpg headshots.
 
     python3 dev/mock-streamline.py --secret <engine secret> --art /path/to/img \
         --clip /path/to/clip.mkv [--clip ...] [--media film=/path/to/film.mkv ...]
@@ -29,6 +29,7 @@ import re
 import secrets
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -72,6 +73,7 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mock-library
     LIBRARY = json.load(f)
 MOVIES = LIBRARY["movies"]
 SERIES = LIBRARY["series"]
+PEOPLE = LIBRARY.get("people", {})
 REFS = {}
 clips = itertools.cycle(args.clip or list(FILES.values()))
 for number, media_id in enumerate(FILES):
@@ -93,7 +95,32 @@ for show in SERIES:
 
 
 def summary(item):
-    return {k: v for k, v in item.items() if k not in ("media_files", "seasons")}
+    return {k: v for k, v in item.items() if k not in ("media_files", "seasons", "cast")}
+
+
+def norm_title(s):
+    return re.sub(r"[^a-z0-9]+", "", unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode().lower())
+
+
+def person(pid):
+    """A person page: their credits on this server, and what they are known for (TMDB-style)."""
+    if pid not in PEOPLE:
+        return None
+    credits, here = [], {}
+    for kind, items in (("movies", MOVIES), ("series", SERIES)):
+        for t in items:
+            here[norm_title(t["title"])] = (kind, t["id"])
+            for c in t.get("cast", []):
+                if c["id"] == pid:
+                    credit = {"kind": kind, "id": t["id"], "title": t["title"], "year": t["year"], "character": c["character"]}
+                    if kind == "series":
+                        credit.update(seasons=c.get("seasons", []), total_seasons=t.get("total_seasons"))
+                    credits.append(credit)
+    known = []
+    for k in PEOPLE[pid]["known_for"]:
+        found = here.get(norm_title(k["title"]))
+        known.append({**k, **({"kind": found[0], "id": found[1]} if found else {})})
+    return {"id": pid, "name": PEOPLE[pid]["name"], "department": "Acting", "credits": credits, "known_for": known}
 
 
 def art(kind, item_id, name):
@@ -232,9 +259,19 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, found) if found else self.reply(404, {"error": {"code": "not_found"}})
         if self.path == "/api/v1/watchstate":
             return self.reply(200, {"items": sorted(WATCH.values(), key=lambda w: w["updated_at"], reverse=True)})
-        m = re.fullmatch(r"/api/v1/posters/(movies|series)/(\d+)/(poster|backdrop)\.jpg", self.path)
+        m = re.fullmatch(r"/api/v1/people/([a-z0-9-]+)", self.path)
         if m:
-            path = art(m[1], m[2], m[3])
+            found = person(m[1])
+            return self.reply(200, found) if found else self.reply(404, {"error": {"code": "not_found"}})
+        m = re.fullmatch(r"/api/v1/posters/(movies|series|people)/([\w-]+)/(poster|backdrop|photo)\.jpg", self.path)
+        if m:
+            if (m[1] == "people") != (m[3] == "photo"):
+                path = None
+            elif m[1] == "people":
+                path = os.path.join(args.art, "c", f"{m[2]}.jpg")
+                path = path if os.path.exists(path) else None
+            else:
+                path = art(m[1], m[2], m[3])
             if not path:
                 return self.reply(404, {"error": {"code": "not_found"}})
             with open(path, "rb") as image:

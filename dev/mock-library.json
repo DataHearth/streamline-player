@@ -30,6 +30,68 @@
     {
      "id": "movie-1"
     }
+   ],
+   "cast": [
+    {
+     "id": "timothee-chalamet",
+     "name": "Timothée Chalamet",
+     "character": "Paul Atreides"
+    },
+    {
+     "id": "zendaya",
+     "name": "Zendaya",
+     "character": "Chani"
+    },
+    {
+     "id": "rebecca-ferguson",
+     "name": "Rebecca Ferguson",
+     "character": "Lady Jessica"
+    },
+    {
+     "id": "javier-bardem",
+     "name": "Javier Bardem",
+     "character": "Stilgar"
+    },
+    {
+     "id": "josh-brolin",
+     "name": "Josh Brolin",
+     "character": "Gurney Halleck"
+    },
+    {
+     "id": "austin-butler",
+     "name": "Austin Butler",
+     "character": "Feyd-Rautha Harkonnen"
+    },
+    {
+     "id": "florence-pugh",
+     "name": "Florence Pugh",
+     "character": "Princess Irulan"
+    },
+    {
+     "id": "dave-bautista",
+     "name": "Dave Bautista",
+     "character": "Glossu Rabban"
+    },
+    {
+     "id": "christopher-walken",
+     "name": "Christopher Walken",
+     "character": "Emperor Shaddam IV"
+    },
+    {
+     "id": "lea-seydoux",
+     "name": "Léa Seydoux",
+     "character": "Lady Margot Fenring"
+    },
+    {
+     "id": "stellan-skarsgard",
+     "name": "Stellan Skarsgård",
+     "character": "Baron Vladimir Harkonnen"
+    },
+    {
+     "id": "charlotte-rampling",
+     "name": "Charlotte Rampling",
+     "character": "Gaius Helen Mohiam"
+    }
    ]
   },
   {
@@ -61,6 +123,43 @@
    "media_files": [
     {
      "id": "movie-2"
+    }
+   ],
+   "cast": [
+    {
+     "id": "anya-taylor-joy",
+     "name": "Anya Taylor-Joy",
+     "character": "Furiosa"
+    },
+    {
+     "id": "chris-hemsworth",
+     "name": "Chris Hemsworth",
+     "character": "Dementus"
+    },
+    {
+     "id": "tom-burke",
+     "name": "Tom Burke",
+     "character": "Praetorian Jack"
+    },
+    {
+     "id": "alyla-browne",
+     "name": "Alyla Browne",
+     "character": "Young Furiosa"
+    },
+    {
+     "id": "lachy-hulme",
+     "name": "Lachy Hulme",
+     "character": "Immortan Joe"
+    },
+    {
+     "id": "nathan-jones",
+     "name": "Nathan Jones",
+     "character": "Rictus Erectus"
+    },
+    {
+     "id": "angus-sampson",
+     "name": "Angus Sampson",
+     "character": "The Organic Mechanic"
     }
    ]
   },
@@ -94,6 +193,38 @@
     {
      "id": "movie-3"
     }
+   ],
+   "cast": [
+    {
+     "id": "cailee-spaeny",
+     "name": "Cailee Spaeny",
+     "character": "Rain Carradine"
+    },
+    {
+     "id": "david-jonsson",
+     "name": "David Jonsson",
+     "character": "Andy"
+    },
+    {
+     "id": "archie-renaux",
+     "name": "Archie Renaux",
+     "character": "Tyler"
+    },
+    {
+     "id": "isabela-merced",
+     "name": "Isabela Merced",
+     "character": "Kay"
+    },
+    {
+     "id": "spike-fearn",
+     "name": "Spike Fearn",
+     "character": "Bjorn"
+    },
+    {
+     "id": "aileen-wu",
+     "name": "Aileen Wu",
+     "character": "Navarro"
+    }
    ]
   },
   {
@@ -125,6 +256,43 @@
    "media_files": [
     {
      "id": "movie-4"
+    }
+   ],
+   "cast": [
+    {
+     "id": "lupita-nyong-o",
+     "name": "Lupita Nyong'o",
+     "character": "Roz (voice)"
+    },
+    {
+     "id": "pedro-pascal",
+     "name": "Pedro Pascal",
+     "character": "Fink (voice)"
+    },
+    {
+     "id": "kit-connor",
+     "name": "Kit Connor",
+     "character": "Brightbill (voice)"
+    },
+    {
+     "id": "bill-nighy",
+     "name": "Bill Nighy",
+     "character": "Longneck (voice)"
+    },
+    {
+     "id": "stephanie-hsu",
+     "name": "Stephanie Hsu",
+     "character": "Vontra (voice)"
+    },
+    {
+     "id": "catherine-o-hara",
+     "name": "Catherine O'Hara",
+     "character": "Pinktail (voice)"
+    },
+    {
+     "id": "ving-rhames",
+     "name": "Ving Rhames",
+     "character": "Thunderbolt (voice)"
     }
    ]
   },
@@ -158,6 +326,33 @@
     {
      "id": "movie-5"
     }
+   ],
+   "cast": [
+    {
+     "id": "kirsten-dunst",
+     "name": "Kirsten Dunst",
+     "character": "Lee Smith"
+    },
+    {
+     "id": "wagner-moura",
+     "name": "Wagner Moura",
+     "character": "Joel"
+    },
+    {
+     "id": "cailee-spaeny",
+     "name": "Cailee Spaeny",
+     "character": "Jessie Cullen"
+    },
+    {
+     "id": "stephen-mckinley-henderson",
+     "name": "Stephen McKinley Henderson",
+     "character": "Sammy"
+    },
+    {
+     "id": "nick-offerman",
+     "name": "Nick Offerman",
+     "character": "President"
+    }
    ]
   },
   {
@@ -189,6 +384,43 @@
    "media_files": [
     {
      "id": "movie-6"
+    }
+   ],
+   "cast": [
+    {
+     "id": "paul-mescal",
+     "name": "Paul Mescal",
+     "character": "Lucius"
+    },
+    {
+     "id": "pedro-pascal",
+     "name": "Pedro Pascal",
+     "character": "Marcus Acacius"
+    },
+    {
+     "id": "denzel-washington",
+     "name": "Denzel Washington",
+     "character": "Macrinus"
+    },
+    {
+     "id": "connie-nielsen",
+     "name": "Connie Nielsen",
+     "character": "Lucilla"
+    },
+    {
+     "id": "joseph-quinn",
+     "name": "Joseph Quinn",
+     "character": "Emperor Geta"
+    },
+    {
+     "id": "fred-hechinger",
+     "name": "Fred Hechinger",
+     "character": "Emperor Caracalla"
+    },
+    {
+     "id": "derek-jacobi",
+     "name": "Derek Jacobi",
+     "character": "Senator Gracchus"
     }
    ]
   },
@@ -222,6 +454,38 @@
     {
      "id": "movie-7"
     }
+   ],
+   "cast": [
+    {
+     "id": "ryunosuke-kamiki",
+     "name": "Ryunosuke Kamiki",
+     "character": "Koichi Shikishima"
+    },
+    {
+     "id": "minami-hamabe",
+     "name": "Minami Hamabe",
+     "character": "Noriko Oishi"
+    },
+    {
+     "id": "yuki-yamada",
+     "name": "Yuki Yamada",
+     "character": "Shiro Mizushima"
+    },
+    {
+     "id": "munetaka-aoki",
+     "name": "Munetaka Aoki",
+     "character": "Sosaku Tachibana"
+    },
+    {
+     "id": "hidetaka-yoshioka",
+     "name": "Hidetaka Yoshioka",
+     "character": "Kenji Noda"
+    },
+    {
+     "id": "sakura-ando",
+     "name": "Sakura Ando",
+     "character": "Sumiko Ota"
+    }
    ]
   },
   {
@@ -253,6 +517,38 @@
    "media_files": [
     {
      "id": "movie-8"
+    }
+   ],
+   "cast": [
+    {
+     "id": "emma-stone",
+     "name": "Emma Stone",
+     "character": "Bella Baxter"
+    },
+    {
+     "id": "mark-ruffalo",
+     "name": "Mark Ruffalo",
+     "character": "Duncan Wedderburn"
+    },
+    {
+     "id": "willem-dafoe",
+     "name": "Willem Dafoe",
+     "character": "Dr. Godwin Baxter"
+    },
+    {
+     "id": "ramy-youssef",
+     "name": "Ramy Youssef",
+     "character": "Max McCandles"
+    },
+    {
+     "id": "christopher-abbott",
+     "name": "Christopher Abbott",
+     "character": "Alfie Blessington"
+    },
+    {
+     "id": "jerrod-carmichael",
+     "name": "Jerrod Carmichael",
+     "character": "Harry Astley"
     }
    ]
   },
@@ -286,6 +582,33 @@
     {
      "id": "movie-9"
     }
+   ],
+   "cast": [
+    {
+     "id": "sandra-huller",
+     "name": "Sandra Hüller",
+     "character": "Sandra Voyter"
+    },
+    {
+     "id": "swann-arlaud",
+     "name": "Swann Arlaud",
+     "character": "Vincent Renzi"
+    },
+    {
+     "id": "milo-machado-graner",
+     "name": "Milo Machado-Graner",
+     "character": "Daniel Maleski"
+    },
+    {
+     "id": "antoine-reinartz",
+     "name": "Antoine Reinartz",
+     "character": "Prosecutor"
+    },
+    {
+     "id": "samuel-theis",
+     "name": "Samuel Theis",
+     "character": "Samuel Maleski"
+    }
    ]
   },
   {
@@ -317,6 +640,33 @@
    "media_files": [
     {
      "id": "movie-10"
+    }
+   ],
+   "cast": [
+    {
+     "id": "christian-friedel",
+     "name": "Christian Friedel",
+     "character": "Rudolf Höss"
+    },
+    {
+     "id": "sandra-huller",
+     "name": "Sandra Hüller",
+     "character": "Hedwig Höss"
+    },
+    {
+     "id": "johann-karthaus",
+     "name": "Johann Karthaus",
+     "character": "Claus Höss"
+    },
+    {
+     "id": "luis-noah-witte",
+     "name": "Luis Noah Witte",
+     "character": "Hans Höss"
+    },
+    {
+     "id": "imogen-kogge",
+     "name": "Imogen Kogge",
+     "character": "Linna Hensel"
     }
    ]
   },
@@ -350,6 +700,23 @@
     {
      "id": "movie-11"
     }
+   ],
+   "cast": [
+    {
+     "id": "greta-lee",
+     "name": "Greta Lee",
+     "character": "Nora"
+    },
+    {
+     "id": "teo-yoo",
+     "name": "Teo Yoo",
+     "character": "Hae Sung"
+    },
+    {
+     "id": "john-magaro",
+     "name": "John Magaro",
+     "character": "Arthur"
+    }
    ]
   },
   {
@@ -381,6 +748,63 @@
    "media_files": [
     {
      "id": "movie-12"
+    }
+   ],
+   "cast": [
+    {
+     "id": "cillian-murphy",
+     "name": "Cillian Murphy",
+     "character": "J. Robert Oppenheimer"
+    },
+    {
+     "id": "emily-blunt",
+     "name": "Emily Blunt",
+     "character": "Kitty Oppenheimer"
+    },
+    {
+     "id": "matt-damon",
+     "name": "Matt Damon",
+     "character": "Leslie Groves"
+    },
+    {
+     "id": "robert-downey-jr",
+     "name": "Robert Downey Jr.",
+     "character": "Lewis Strauss"
+    },
+    {
+     "id": "florence-pugh",
+     "name": "Florence Pugh",
+     "character": "Jean Tatlock"
+    },
+    {
+     "id": "josh-hartnett",
+     "name": "Josh Hartnett",
+     "character": "Ernest Lawrence"
+    },
+    {
+     "id": "casey-affleck",
+     "name": "Casey Affleck",
+     "character": "Boris Pash"
+    },
+    {
+     "id": "rami-malek",
+     "name": "Rami Malek",
+     "character": "David Hill"
+    },
+    {
+     "id": "kenneth-branagh",
+     "name": "Kenneth Branagh",
+     "character": "Niels Bohr"
+    },
+    {
+     "id": "benny-safdie",
+     "name": "Benny Safdie",
+     "character": "Edward Teller"
+    },
+    {
+     "id": "gary-oldman",
+     "name": "Gary Oldman",
+     "character": "Harry S. Truman"
     }
    ]
   },
@@ -414,6 +838,33 @@
     {
      "id": "movie-13"
     }
+   ],
+   "cast": [
+    {
+     "id": "amy-adams",
+     "name": "Amy Adams",
+     "character": "Louise Banks"
+    },
+    {
+     "id": "jeremy-renner",
+     "name": "Jeremy Renner",
+     "character": "Ian Donnelly"
+    },
+    {
+     "id": "forest-whitaker",
+     "name": "Forest Whitaker",
+     "character": "Colonel Weber"
+    },
+    {
+     "id": "michael-stuhlbarg",
+     "name": "Michael Stuhlbarg",
+     "character": "Agent Halpern"
+    },
+    {
+     "id": "tzi-ma",
+     "name": "Tzi Ma",
+     "character": "General Shang"
+    }
    ]
   },
   {
@@ -445,6 +896,53 @@
    "media_files": [
     {
      "id": "movie-14"
+    }
+   ],
+   "cast": [
+    {
+     "id": "matthew-mcconaughey",
+     "name": "Matthew McConaughey",
+     "character": "Cooper"
+    },
+    {
+     "id": "anne-hathaway",
+     "name": "Anne Hathaway",
+     "character": "Brand"
+    },
+    {
+     "id": "jessica-chastain",
+     "name": "Jessica Chastain",
+     "character": "Murph"
+    },
+    {
+     "id": "michael-caine",
+     "name": "Michael Caine",
+     "character": "Professor Brand"
+    },
+    {
+     "id": "casey-affleck",
+     "name": "Casey Affleck",
+     "character": "Tom"
+    },
+    {
+     "id": "matt-damon",
+     "name": "Matt Damon",
+     "character": "Dr. Mann"
+    },
+    {
+     "id": "mackenzie-foy",
+     "name": "Mackenzie Foy",
+     "character": "Young Murph"
+    },
+    {
+     "id": "timothee-chalamet",
+     "name": "Timothée Chalamet",
+     "character": "Young Tom"
+    },
+    {
+     "id": "john-lithgow",
+     "name": "John Lithgow",
+     "character": "Donald"
     }
    ]
   },
@@ -478,6 +976,53 @@
     {
      "id": "movie-15"
     }
+   ],
+   "cast": [
+    {
+     "id": "ryan-gosling",
+     "name": "Ryan Gosling",
+     "character": "K"
+    },
+    {
+     "id": "harrison-ford",
+     "name": "Harrison Ford",
+     "character": "Rick Deckard"
+    },
+    {
+     "id": "ana-de-armas",
+     "name": "Ana de Armas",
+     "character": "Joi"
+    },
+    {
+     "id": "sylvia-hoeks",
+     "name": "Sylvia Hoeks",
+     "character": "Luv"
+    },
+    {
+     "id": "robin-wright",
+     "name": "Robin Wright",
+     "character": "Lt. Joshi"
+    },
+    {
+     "id": "mackenzie-davis",
+     "name": "Mackenzie Davis",
+     "character": "Mariette"
+    },
+    {
+     "id": "dave-bautista",
+     "name": "Dave Bautista",
+     "character": "Sapper Morton"
+    },
+    {
+     "id": "jared-leto",
+     "name": "Jared Leto",
+     "character": "Niander Wallace"
+    },
+    {
+     "id": "carla-juri",
+     "name": "Carla Juri",
+     "character": "Dr. Ana Stelline"
+    }
    ]
   },
   {
@@ -510,6 +1055,48 @@
     {
      "id": "movie-16"
     }
+   ],
+   "cast": [
+    {
+     "id": "leonardo-dicaprio",
+     "name": "Leonardo DiCaprio",
+     "character": "Cobb"
+    },
+    {
+     "id": "joseph-gordon-levitt",
+     "name": "Joseph Gordon-Levitt",
+     "character": "Arthur"
+    },
+    {
+     "id": "elliot-page",
+     "name": "Elliot Page",
+     "character": "Ariadne"
+    },
+    {
+     "id": "tom-hardy",
+     "name": "Tom Hardy",
+     "character": "Eames"
+    },
+    {
+     "id": "ken-watanabe",
+     "name": "Ken Watanabe",
+     "character": "Saito"
+    },
+    {
+     "id": "cillian-murphy",
+     "name": "Cillian Murphy",
+     "character": "Robert Fischer"
+    },
+    {
+     "id": "marion-cotillard",
+     "name": "Marion Cotillard",
+     "character": "Mal"
+    },
+    {
+     "id": "michael-caine",
+     "name": "Michael Caine",
+     "character": "Miles"
+    }
    ]
   },
   {
@@ -541,6 +1128,38 @@
    "media_files": [
     {
      "id": "movie-17"
+    }
+   ],
+   "cast": [
+    {
+     "id": "keanu-reeves",
+     "name": "Keanu Reeves",
+     "character": "Neo"
+    },
+    {
+     "id": "laurence-fishburne",
+     "name": "Laurence Fishburne",
+     "character": "Morpheus"
+    },
+    {
+     "id": "carrie-anne-moss",
+     "name": "Carrie-Anne Moss",
+     "character": "Trinity"
+    },
+    {
+     "id": "hugo-weaving",
+     "name": "Hugo Weaving",
+     "character": "Agent Smith"
+    },
+    {
+     "id": "joe-pantoliano",
+     "name": "Joe Pantoliano",
+     "character": "Cypher"
+    },
+    {
+     "id": "gloria-foster",
+     "name": "Gloria Foster",
+     "character": "Oracle"
     }
    ]
   }
@@ -719,6 +1338,98 @@
       }
      ]
     }
+   ],
+   "cast": [
+    {
+     "id": "adam-scott",
+     "name": "Adam Scott",
+     "character": "Mark Scout",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "britt-lower",
+     "name": "Britt Lower",
+     "character": "Helly R.",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "zach-cherry",
+     "name": "Zach Cherry",
+     "character": "Dylan George",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "tramell-tillman",
+     "name": "Tramell Tillman",
+     "character": "Seth Milchick",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "jen-tullock",
+     "name": "Jen Tullock",
+     "character": "Devon Scout-Hale",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "dichen-lachman",
+     "name": "Dichen Lachman",
+     "character": "Gemma Scout",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "michael-chernus",
+     "name": "Michael Chernus",
+     "character": "Ricken Hale",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "john-turturro",
+     "name": "John Turturro",
+     "character": "Irving Bailiff",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "christopher-walken",
+     "name": "Christopher Walken",
+     "character": "Burt Goodman",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "patricia-arquette",
+     "name": "Patricia Arquette",
+     "character": "Harmony Cobel",
+     "seasons": [
+      1,
+      2
+     ]
+    }
    ]
   },
   {
@@ -818,6 +1529,88 @@
        "runtime": 61,
        "media_file_id": "ep-2-1-6"
       }
+     ]
+    }
+   ],
+   "cast": [
+    {
+     "id": "hiroyuki-sanada",
+     "name": "Hiroyuki Sanada",
+     "character": "Yoshii Toranaga",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "cosmo-jarvis",
+     "name": "Cosmo Jarvis",
+     "character": "John Blackthorne",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "anna-sawai",
+     "name": "Anna Sawai",
+     "character": "Toda Mariko",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "tadanobu-asano",
+     "name": "Tadanobu Asano",
+     "character": "Kashigi Yabushige",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "takehiro-hira",
+     "name": "Takehiro Hira",
+     "character": "Ishido Kazunari",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "hiroto-kanai",
+     "name": "Hiroto Kanai",
+     "character": "Kashigi Omi",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "moeka-hoshi",
+     "name": "Moeka Hoshi",
+     "character": "Usami Fuji",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "fumi-nikaido",
+     "name": "Fumi Nikaido",
+     "character": "Ochiba no Kata",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "tommy-bastow",
+     "name": "Tommy Bastow",
+     "character": "Father Martin Alvito",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "nestor-carbonell",
+     "name": "Néstor Carbonell",
+     "character": "Vasco Rodrigues",
+     "seasons": [
+      1
      ]
     }
    ]
@@ -995,6 +1788,83 @@
       }
      ]
     }
+   ],
+   "cast": [
+    {
+     "id": "pedro-pascal",
+     "name": "Pedro Pascal",
+     "character": "Joel Miller",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "bella-ramsey",
+     "name": "Bella Ramsey",
+     "character": "Ellie",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "gabriel-luna",
+     "name": "Gabriel Luna",
+     "character": "Tommy Miller",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "anna-torv",
+     "name": "Anna Torv",
+     "character": "Tess",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "nick-offerman",
+     "name": "Nick Offerman",
+     "character": "Bill",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "murray-bartlett",
+     "name": "Murray Bartlett",
+     "character": "Frank",
+     "seasons": [
+      1
+     ]
+    },
+    {
+     "id": "isabela-merced",
+     "name": "Isabela Merced",
+     "character": "Dina",
+     "seasons": [
+      2
+     ]
+    },
+    {
+     "id": "kaitlyn-dever",
+     "name": "Kaitlyn Dever",
+     "character": "Abby",
+     "seasons": [
+      2
+     ]
+    },
+    {
+     "id": "jeffrey-wright",
+     "name": "Jeffrey Wright",
+     "character": "Isaac",
+     "seasons": [
+      2
+     ]
+    }
    ]
   },
   {
@@ -1170,7 +2040,1874 @@
       }
      ]
     }
+   ],
+   "cast": [
+    {
+     "id": "hailee-steinfeld",
+     "name": "Hailee Steinfeld",
+     "character": "Vi (voice)",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "ella-purnell",
+     "name": "Ella Purnell",
+     "character": "Jinx (voice)",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "kevin-alejandro",
+     "name": "Kevin Alejandro",
+     "character": "Jayce Talis (voice)",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "katie-leung",
+     "name": "Katie Leung",
+     "character": "Caitlyn Kiramman (voice)",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "harry-lloyd",
+     "name": "Harry Lloyd",
+     "character": "Viktor (voice)",
+     "seasons": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "jason-spisak",
+     "name": "Jason Spisak",
+     "character": "Silco (voice)",
+     "seasons": [
+      1,
+      2
+     ]
+    }
    ]
   }
- ]
+ ],
+ "people": {
+  "adam-scott": {
+   "name": "Adam Scott",
+   "known_for": [
+    {
+     "title": "Parks and Recreation",
+     "year": 2009
+    },
+    {
+     "title": "Severance",
+     "year": 2022
+    },
+    {
+     "title": "Step Brothers",
+     "year": 2008
+    },
+    {
+     "title": "The Secret Life of Walter Mitty",
+     "year": 2013
+    },
+    {
+     "title": "Big Little Lies",
+     "year": 2017
+    }
+   ]
+  },
+  "aileen-wu": {
+   "name": "Aileen Wu",
+   "known_for": []
+  },
+  "alyla-browne": {
+   "name": "Alyla Browne",
+   "known_for": []
+  },
+  "amy-adams": {
+   "name": "Amy Adams",
+   "known_for": [
+    {
+     "title": "Arrival",
+     "year": 2016
+    },
+    {
+     "title": "Her",
+     "year": 2013
+    },
+    {
+     "title": "American Hustle",
+     "year": 2013
+    },
+    {
+     "title": "Enchanted",
+     "year": 2007
+    }
+   ]
+  },
+  "ana-de-armas": {
+   "name": "Ana de Armas",
+   "known_for": [
+    {
+     "title": "Blade Runner 2049",
+     "year": 2017
+    },
+    {
+     "title": "Knives Out",
+     "year": 2019
+    },
+    {
+     "title": "No Time to Die",
+     "year": 2021
+    },
+    {
+     "title": "Blonde",
+     "year": 2022
+    }
+   ]
+  },
+  "angus-sampson": {
+   "name": "Angus Sampson",
+   "known_for": [
+    {
+     "title": "Insidious",
+     "year": 2010
+    },
+    {
+     "title": "Mad Max: Fury Road",
+     "year": 2015
+    },
+    {
+     "title": "Furiosa: A Mad Max Saga",
+     "year": 2024
+    }
+   ]
+  },
+  "anna-sawai": {
+   "name": "Anna Sawai",
+   "known_for": [
+    {
+     "title": "Shōgun",
+     "year": 2024
+    },
+    {
+     "title": "Pachinko",
+     "year": 2022
+    },
+    {
+     "title": "Monarch: Legacy of Monsters",
+     "year": 2023
+    },
+    {
+     "title": "F9",
+     "year": 2021
+    }
+   ]
+  },
+  "anna-torv": {
+   "name": "Anna Torv",
+   "known_for": []
+  },
+  "anne-hathaway": {
+   "name": "Anne Hathaway",
+   "known_for": []
+  },
+  "antoine-reinartz": {
+   "name": "Antoine Reinartz",
+   "known_for": []
+  },
+  "anya-taylor-joy": {
+   "name": "Anya Taylor-Joy",
+   "known_for": [
+    {
+     "title": "The Queen's Gambit",
+     "year": 2020
+    },
+    {
+     "title": "The Witch",
+     "year": 2015
+    },
+    {
+     "title": "Furiosa: A Mad Max Saga",
+     "year": 2024
+    },
+    {
+     "title": "Split",
+     "year": 2016
+    },
+    {
+     "title": "Last Night in Soho",
+     "year": 2021
+    },
+    {
+     "title": "The Menu",
+     "year": 2022
+    }
+   ]
+  },
+  "archie-renaux": {
+   "name": "Archie Renaux",
+   "known_for": []
+  },
+  "austin-butler": {
+   "name": "Austin Butler",
+   "known_for": [
+    {
+     "title": "Elvis",
+     "year": 2022
+    },
+    {
+     "title": "Dune: Part Two",
+     "year": 2024
+    },
+    {
+     "title": "The Bikeriders",
+     "year": 2024
+    },
+    {
+     "title": "Masters of the Air",
+     "year": 2024
+    },
+    {
+     "title": "Once Upon a Time in Hollywood",
+     "year": 2019
+    }
+   ]
+  },
+  "bella-ramsey": {
+   "name": "Bella Ramsey",
+   "known_for": []
+  },
+  "benny-safdie": {
+   "name": "Benny Safdie",
+   "known_for": []
+  },
+  "bill-nighy": {
+   "name": "Bill Nighy",
+   "known_for": []
+  },
+  "britt-lower": {
+   "name": "Britt Lower",
+   "known_for": [
+    {
+     "title": "Severance",
+     "year": 2022
+    },
+    {
+     "title": "Man Seeking Woman",
+     "year": 2015
+    }
+   ]
+  },
+  "cailee-spaeny": {
+   "name": "Cailee Spaeny",
+   "known_for": [
+    {
+     "title": "Priscilla",
+     "year": 2023
+    },
+    {
+     "title": "Civil War",
+     "year": 2024
+    },
+    {
+     "title": "Alien: Romulus",
+     "year": 2024
+    }
+   ]
+  },
+  "carla-juri": {
+   "name": "Carla Juri",
+   "known_for": []
+  },
+  "carrie-anne-moss": {
+   "name": "Carrie-Anne Moss",
+   "known_for": []
+  },
+  "casey-affleck": {
+   "name": "Casey Affleck",
+   "known_for": [
+    {
+     "title": "Manchester by the Sea",
+     "year": 2016
+    },
+    {
+     "title": "Interstellar",
+     "year": 2014
+    },
+    {
+     "title": "Oppenheimer",
+     "year": 2023
+    },
+    {
+     "title": "Gone Baby Gone",
+     "year": 2007
+    }
+   ]
+  },
+  "catherine-o-hara": {
+   "name": "Catherine O'Hara",
+   "known_for": []
+  },
+  "charlotte-rampling": {
+   "name": "Charlotte Rampling",
+   "known_for": [
+    {
+     "title": "45 Years",
+     "year": 2015
+    },
+    {
+     "title": "Swimming Pool",
+     "year": 2003
+    },
+    {
+     "title": "The Night Porter",
+     "year": 1974
+    },
+    {
+     "title": "Dune",
+     "year": 2021
+    }
+   ]
+  },
+  "chris-hemsworth": {
+   "name": "Chris Hemsworth",
+   "known_for": [
+    {
+     "title": "Thor",
+     "year": 2011
+    },
+    {
+     "title": "Avengers: Endgame",
+     "year": 2019
+    },
+    {
+     "title": "Extraction",
+     "year": 2020
+    },
+    {
+     "title": "Rush",
+     "year": 2013
+    },
+    {
+     "title": "Furiosa: A Mad Max Saga",
+     "year": 2024
+    }
+   ]
+  },
+  "christian-friedel": {
+   "name": "Christian Friedel",
+   "known_for": []
+  },
+  "christopher-abbott": {
+   "name": "Christopher Abbott",
+   "known_for": []
+  },
+  "christopher-walken": {
+   "name": "Christopher Walken",
+   "known_for": [
+    {
+     "title": "The Deer Hunter",
+     "year": 1978
+    },
+    {
+     "title": "Pulp Fiction",
+     "year": 1994
+    },
+    {
+     "title": "Catch Me If You Can",
+     "year": 2002
+    },
+    {
+     "title": "Severance",
+     "year": 2022
+    },
+    {
+     "title": "Dune: Part Two",
+     "year": 2024
+    }
+   ]
+  },
+  "cillian-murphy": {
+   "name": "Cillian Murphy",
+   "known_for": [
+    {
+     "title": "Oppenheimer",
+     "year": 2023
+    },
+    {
+     "title": "Peaky Blinders",
+     "year": 2013
+    },
+    {
+     "title": "28 Days Later",
+     "year": 2002
+    },
+    {
+     "title": "Inception",
+     "year": 2010
+    },
+    {
+     "title": "Batman Begins",
+     "year": 2005
+    }
+   ]
+  },
+  "connie-nielsen": {
+   "name": "Connie Nielsen",
+   "known_for": []
+  },
+  "cosmo-jarvis": {
+   "name": "Cosmo Jarvis",
+   "known_for": [
+    {
+     "title": "Shōgun",
+     "year": 2024
+    },
+    {
+     "title": "Lady Macbeth",
+     "year": 2016
+    },
+    {
+     "title": "Calm with Horses",
+     "year": 2019
+    },
+    {
+     "title": "Persuasion",
+     "year": 2022
+    }
+   ]
+  },
+  "dave-bautista": {
+   "name": "Dave Bautista",
+   "known_for": [
+    {
+     "title": "Guardians of the Galaxy",
+     "year": 2014
+    },
+    {
+     "title": "Blade Runner 2049",
+     "year": 2017
+    },
+    {
+     "title": "Dune",
+     "year": 2021
+    },
+    {
+     "title": "Glass Onion",
+     "year": 2022
+    },
+    {
+     "title": "Knock at the Cabin",
+     "year": 2023
+    }
+   ]
+  },
+  "david-jonsson": {
+   "name": "David Jonsson",
+   "known_for": []
+  },
+  "denzel-washington": {
+   "name": "Denzel Washington",
+   "known_for": [
+    {
+     "title": "Training Day",
+     "year": 2001
+    },
+    {
+     "title": "Gladiator II",
+     "year": 2024
+    },
+    {
+     "title": "Glory",
+     "year": 1989
+    },
+    {
+     "title": "Malcolm X",
+     "year": 1992
+    }
+   ]
+  },
+  "derek-jacobi": {
+   "name": "Derek Jacobi",
+   "known_for": []
+  },
+  "dichen-lachman": {
+   "name": "Dichen Lachman",
+   "known_for": [
+    {
+     "title": "Severance",
+     "year": 2022
+    },
+    {
+     "title": "Dollhouse",
+     "year": 2009
+    },
+    {
+     "title": "Altered Carbon",
+     "year": 2018
+    },
+    {
+     "title": "Jurassic World Dominion",
+     "year": 2022
+    }
+   ]
+  },
+  "ella-purnell": {
+   "name": "Ella Purnell",
+   "known_for": [
+    {
+     "title": "Fallout",
+     "year": 2024
+    },
+    {
+     "title": "Arcane",
+     "year": 2021
+    },
+    {
+     "title": "Yellowjackets",
+     "year": 2021
+    }
+   ]
+  },
+  "elliot-page": {
+   "name": "Elliot Page",
+   "known_for": []
+  },
+  "emily-blunt": {
+   "name": "Emily Blunt",
+   "known_for": [
+    {
+     "title": "Oppenheimer",
+     "year": 2023
+    },
+    {
+     "title": "A Quiet Place",
+     "year": 2018
+    },
+    {
+     "title": "Sicario",
+     "year": 2015
+    },
+    {
+     "title": "Edge of Tomorrow",
+     "year": 2014
+    }
+   ]
+  },
+  "emma-stone": {
+   "name": "Emma Stone",
+   "known_for": [
+    {
+     "title": "La La Land",
+     "year": 2016
+    },
+    {
+     "title": "Poor Things",
+     "year": 2023
+    },
+    {
+     "title": "The Favourite",
+     "year": 2018
+    },
+    {
+     "title": "Easy A",
+     "year": 2010
+    }
+   ]
+  },
+  "florence-pugh": {
+   "name": "Florence Pugh",
+   "known_for": [
+    {
+     "title": "Midsommar",
+     "year": 2019
+    },
+    {
+     "title": "Little Women",
+     "year": 2019
+    },
+    {
+     "title": "Oppenheimer",
+     "year": 2023
+    },
+    {
+     "title": "Dune: Part Two",
+     "year": 2024
+    },
+    {
+     "title": "Black Widow",
+     "year": 2021
+    }
+   ]
+  },
+  "forest-whitaker": {
+   "name": "Forest Whitaker",
+   "known_for": [
+    {
+     "title": "The Last King of Scotland",
+     "year": 2006
+    },
+    {
+     "title": "Arrival",
+     "year": 2016
+    },
+    {
+     "title": "Andor",
+     "year": 2022
+    },
+    {
+     "title": "Rogue One",
+     "year": 2016
+    }
+   ]
+  },
+  "fred-hechinger": {
+   "name": "Fred Hechinger",
+   "known_for": []
+  },
+  "fumi-nikaido": {
+   "name": "Fumi Nikaido",
+   "known_for": []
+  },
+  "gabriel-luna": {
+   "name": "Gabriel Luna",
+   "known_for": []
+  },
+  "gary-oldman": {
+   "name": "Gary Oldman",
+   "known_for": [
+    {
+     "title": "Darkest Hour",
+     "year": 2017
+    },
+    {
+     "title": "Slow Horses",
+     "year": 2022
+    },
+    {
+     "title": "The Dark Knight",
+     "year": 2008
+    },
+    {
+     "title": "Léon: The Professional",
+     "year": 1994
+    },
+    {
+     "title": "Tinker Tailor Soldier Spy",
+     "year": 2011
+    }
+   ]
+  },
+  "gloria-foster": {
+   "name": "Gloria Foster",
+   "known_for": []
+  },
+  "greta-lee": {
+   "name": "Greta Lee",
+   "known_for": []
+  },
+  "hailee-steinfeld": {
+   "name": "Hailee Steinfeld",
+   "known_for": [
+    {
+     "title": "True Grit",
+     "year": 2010
+    },
+    {
+     "title": "Arcane",
+     "year": 2021
+    },
+    {
+     "title": "Spider-Man: Across the Spider-Verse",
+     "year": 2023
+    },
+    {
+     "title": "Hawkeye",
+     "year": 2021
+    }
+   ]
+  },
+  "harrison-ford": {
+   "name": "Harrison Ford",
+   "known_for": [
+    {
+     "title": "Star Wars",
+     "year": 1977
+    },
+    {
+     "title": "Raiders of the Lost Ark",
+     "year": 1981
+    },
+    {
+     "title": "Blade Runner",
+     "year": 1982
+    },
+    {
+     "title": "Blade Runner 2049",
+     "year": 2017
+    }
+   ]
+  },
+  "harry-lloyd": {
+   "name": "Harry Lloyd",
+   "known_for": []
+  },
+  "hidetaka-yoshioka": {
+   "name": "Hidetaka Yoshioka",
+   "known_for": []
+  },
+  "hiroto-kanai": {
+   "name": "Hiroto Kanai",
+   "known_for": []
+  },
+  "hiroyuki-sanada": {
+   "name": "Hiroyuki Sanada",
+   "known_for": [
+    {
+     "title": "The Last Samurai",
+     "year": 2003
+    },
+    {
+     "title": "Shōgun",
+     "year": 2024
+    },
+    {
+     "title": "John Wick: Chapter 4",
+     "year": 2023
+    },
+    {
+     "title": "The Twilight Samurai",
+     "year": 2002
+    },
+    {
+     "title": "Sunshine",
+     "year": 2007
+    },
+    {
+     "title": "Bullet Train",
+     "year": 2022
+    }
+   ]
+  },
+  "hugo-weaving": {
+   "name": "Hugo Weaving",
+   "known_for": []
+  },
+  "imogen-kogge": {
+   "name": "Imogen Kogge",
+   "known_for": []
+  },
+  "isabela-merced": {
+   "name": "Isabela Merced",
+   "known_for": [
+    {
+     "title": "Alien: Romulus",
+     "year": 2024
+    },
+    {
+     "title": "The Last of Us",
+     "year": 2023
+    },
+    {
+     "title": "Dora and the Lost City of Gold",
+     "year": 2019
+    },
+    {
+     "title": "Superman",
+     "year": 2025
+    }
+   ]
+  },
+  "jared-leto": {
+   "name": "Jared Leto",
+   "known_for": [
+    {
+     "title": "Dallas Buyers Club",
+     "year": 2013
+    },
+    {
+     "title": "Fight Club",
+     "year": 1999
+    },
+    {
+     "title": "Blade Runner 2049",
+     "year": 2017
+    },
+    {
+     "title": "Requiem for a Dream",
+     "year": 2000
+    }
+   ]
+  },
+  "jason-spisak": {
+   "name": "Jason Spisak",
+   "known_for": []
+  },
+  "javier-bardem": {
+   "name": "Javier Bardem",
+   "known_for": [
+    {
+     "title": "No Country for Old Men",
+     "year": 2007
+    },
+    {
+     "title": "Skyfall",
+     "year": 2012
+    },
+    {
+     "title": "Dune: Part Two",
+     "year": 2024
+    },
+    {
+     "title": "Vicky Cristina Barcelona",
+     "year": 2008
+    },
+    {
+     "title": "Biutiful",
+     "year": 2010
+    }
+   ]
+  },
+  "jeffrey-wright": {
+   "name": "Jeffrey Wright",
+   "known_for": [
+    {
+     "title": "Westworld",
+     "year": 2016
+    },
+    {
+     "title": "The Batman",
+     "year": 2022
+    },
+    {
+     "title": "The Last of Us",
+     "year": 2023
+    },
+    {
+     "title": "Casino Royale",
+     "year": 2006
+    },
+    {
+     "title": "American Fiction",
+     "year": 2023
+    }
+   ]
+  },
+  "jen-tullock": {
+   "name": "Jen Tullock",
+   "known_for": []
+  },
+  "jeremy-renner": {
+   "name": "Jeremy Renner",
+   "known_for": []
+  },
+  "jerrod-carmichael": {
+   "name": "Jerrod Carmichael",
+   "known_for": []
+  },
+  "jessica-chastain": {
+   "name": "Jessica Chastain",
+   "known_for": []
+  },
+  "joe-pantoliano": {
+   "name": "Joe Pantoliano",
+   "known_for": []
+  },
+  "johann-karthaus": {
+   "name": "Johann Karthaus",
+   "known_for": []
+  },
+  "john-lithgow": {
+   "name": "John Lithgow",
+   "known_for": [
+    {
+     "title": "3rd Rock from the Sun",
+     "year": 1996
+    },
+    {
+     "title": "Dexter",
+     "year": 2009
+    },
+    {
+     "title": "Interstellar",
+     "year": 2014
+    },
+    {
+     "title": "Killers of the Flower Moon",
+     "year": 2023
+    },
+    {
+     "title": "Conclave",
+     "year": 2024
+    }
+   ]
+  },
+  "john-magaro": {
+   "name": "John Magaro",
+   "known_for": []
+  },
+  "john-turturro": {
+   "name": "John Turturro",
+   "known_for": [
+    {
+     "title": "The Big Lebowski",
+     "year": 1998
+    },
+    {
+     "title": "Barton Fink",
+     "year": 1991
+    },
+    {
+     "title": "O Brother, Where Art Thou?",
+     "year": 2000
+    },
+    {
+     "title": "Severance",
+     "year": 2022
+    },
+    {
+     "title": "The Batman",
+     "year": 2022
+    },
+    {
+     "title": "Do the Right Thing",
+     "year": 1989
+    }
+   ]
+  },
+  "joseph-gordon-levitt": {
+   "name": "Joseph Gordon-Levitt",
+   "known_for": []
+  },
+  "joseph-quinn": {
+   "name": "Joseph Quinn",
+   "known_for": [
+    {
+     "title": "Stranger Things",
+     "year": 2016
+    },
+    {
+     "title": "Gladiator II",
+     "year": 2024
+    },
+    {
+     "title": "A Quiet Place: Day One",
+     "year": 2024
+    }
+   ]
+  },
+  "josh-brolin": {
+   "name": "Josh Brolin",
+   "known_for": [
+    {
+     "title": "No Country for Old Men",
+     "year": 2007
+    },
+    {
+     "title": "Avengers: Infinity War",
+     "year": 2018
+    },
+    {
+     "title": "Sicario",
+     "year": 2015
+    },
+    {
+     "title": "Dune",
+     "year": 2021
+    },
+    {
+     "title": "Milk",
+     "year": 2008
+    }
+   ]
+  },
+  "josh-hartnett": {
+   "name": "Josh Hartnett",
+   "known_for": []
+  },
+  "kaitlyn-dever": {
+   "name": "Kaitlyn Dever",
+   "known_for": []
+  },
+  "katie-leung": {
+   "name": "Katie Leung",
+   "known_for": []
+  },
+  "keanu-reeves": {
+   "name": "Keanu Reeves",
+   "known_for": [
+    {
+     "title": "The Matrix",
+     "year": 1999
+    },
+    {
+     "title": "John Wick",
+     "year": 2014
+    },
+    {
+     "title": "John Wick: Chapter 4",
+     "year": 2023
+    },
+    {
+     "title": "Speed",
+     "year": 1994
+    },
+    {
+     "title": "Point Break",
+     "year": 1991
+    }
+   ]
+  },
+  "ken-watanabe": {
+   "name": "Ken Watanabe",
+   "known_for": []
+  },
+  "kenneth-branagh": {
+   "name": "Kenneth Branagh",
+   "known_for": [
+    {
+     "title": "Henry V",
+     "year": 1989
+    },
+    {
+     "title": "Belfast",
+     "year": 2021
+    },
+    {
+     "title": "Murder on the Orient Express",
+     "year": 2017
+    },
+    {
+     "title": "Oppenheimer",
+     "year": 2023
+    }
+   ]
+  },
+  "kevin-alejandro": {
+   "name": "Kevin Alejandro",
+   "known_for": []
+  },
+  "kirsten-dunst": {
+   "name": "Kirsten Dunst",
+   "known_for": [
+    {
+     "title": "Spider-Man",
+     "year": 2002
+    },
+    {
+     "title": "Melancholia",
+     "year": 2011
+    },
+    {
+     "title": "Civil War",
+     "year": 2024
+    },
+    {
+     "title": "Fargo",
+     "year": 2014
+    },
+    {
+     "title": "The Power of the Dog",
+     "year": 2021
+    }
+   ]
+  },
+  "kit-connor": {
+   "name": "Kit Connor",
+   "known_for": []
+  },
+  "lachy-hulme": {
+   "name": "Lachy Hulme",
+   "known_for": []
+  },
+  "laurence-fishburne": {
+   "name": "Laurence Fishburne",
+   "known_for": [
+    {
+     "title": "The Matrix",
+     "year": 1999
+    },
+    {
+     "title": "John Wick: Chapter 4",
+     "year": 2023
+    },
+    {
+     "title": "Apocalypse Now",
+     "year": 1979
+    },
+    {
+     "title": "Boyz n the Hood",
+     "year": 1991
+    }
+   ]
+  },
+  "lea-seydoux": {
+   "name": "Léa Seydoux",
+   "known_for": [
+    {
+     "title": "Blue Is the Warmest Colour",
+     "year": 2013
+    },
+    {
+     "title": "No Time to Die",
+     "year": 2021
+    },
+    {
+     "title": "The Grand Budapest Hotel",
+     "year": 2014
+    },
+    {
+     "title": "Dune: Part Two",
+     "year": 2024
+    },
+    {
+     "title": "Spectre",
+     "year": 2015
+    }
+   ]
+  },
+  "leonardo-dicaprio": {
+   "name": "Leonardo DiCaprio",
+   "known_for": [
+    {
+     "title": "Titanic",
+     "year": 1997
+    },
+    {
+     "title": "Inception",
+     "year": 2010
+    },
+    {
+     "title": "The Revenant",
+     "year": 2015
+    },
+    {
+     "title": "The Wolf of Wall Street",
+     "year": 2013
+    },
+    {
+     "title": "Killers of the Flower Moon",
+     "year": 2023
+    }
+   ]
+  },
+  "luis-noah-witte": {
+   "name": "Luis Noah Witte",
+   "known_for": []
+  },
+  "lupita-nyong-o": {
+   "name": "Lupita Nyong'o",
+   "known_for": [
+    {
+     "title": "12 Years a Slave",
+     "year": 2013
+    },
+    {
+     "title": "Us",
+     "year": 2019
+    },
+    {
+     "title": "Black Panther",
+     "year": 2018
+    },
+    {
+     "title": "The Wild Robot",
+     "year": 2024
+    }
+   ]
+  },
+  "mackenzie-davis": {
+   "name": "Mackenzie Davis",
+   "known_for": []
+  },
+  "mackenzie-foy": {
+   "name": "Mackenzie Foy",
+   "known_for": []
+  },
+  "marion-cotillard": {
+   "name": "Marion Cotillard",
+   "known_for": []
+  },
+  "mark-ruffalo": {
+   "name": "Mark Ruffalo",
+   "known_for": []
+  },
+  "matt-damon": {
+   "name": "Matt Damon",
+   "known_for": [
+    {
+     "title": "Good Will Hunting",
+     "year": 1997
+    },
+    {
+     "title": "The Bourne Identity",
+     "year": 2002
+    },
+    {
+     "title": "The Martian",
+     "year": 2015
+    },
+    {
+     "title": "Interstellar",
+     "year": 2014
+    },
+    {
+     "title": "Oppenheimer",
+     "year": 2023
+    }
+   ]
+  },
+  "matthew-mcconaughey": {
+   "name": "Matthew McConaughey",
+   "known_for": [
+    {
+     "title": "Interstellar",
+     "year": 2014
+    },
+    {
+     "title": "True Detective",
+     "year": 2014
+    },
+    {
+     "title": "Dallas Buyers Club",
+     "year": 2013
+    },
+    {
+     "title": "Dazed and Confused",
+     "year": 1993
+    }
+   ]
+  },
+  "michael-caine": {
+   "name": "Michael Caine",
+   "known_for": [
+    {
+     "title": "The Dark Knight",
+     "year": 2008
+    },
+    {
+     "title": "Interstellar",
+     "year": 2014
+    },
+    {
+     "title": "Inception",
+     "year": 2010
+    },
+    {
+     "title": "The Italian Job",
+     "year": 1969
+    },
+    {
+     "title": "The Cider House Rules",
+     "year": 1999
+    }
+   ]
+  },
+  "michael-chernus": {
+   "name": "Michael Chernus",
+   "known_for": []
+  },
+  "michael-stuhlbarg": {
+   "name": "Michael Stuhlbarg",
+   "known_for": []
+  },
+  "milo-machado-graner": {
+   "name": "Milo Machado-Graner",
+   "known_for": []
+  },
+  "minami-hamabe": {
+   "name": "Minami Hamabe",
+   "known_for": []
+  },
+  "moeka-hoshi": {
+   "name": "Moeka Hoshi",
+   "known_for": []
+  },
+  "munetaka-aoki": {
+   "name": "Munetaka Aoki",
+   "known_for": []
+  },
+  "murray-bartlett": {
+   "name": "Murray Bartlett",
+   "known_for": []
+  },
+  "nathan-jones": {
+   "name": "Nathan Jones",
+   "known_for": [
+    {
+     "title": "Mad Max: Fury Road",
+     "year": 2015
+    },
+    {
+     "title": "Troy",
+     "year": 2004
+    },
+    {
+     "title": "Furiosa: A Mad Max Saga",
+     "year": 2024
+    }
+   ]
+  },
+  "nestor-carbonell": {
+   "name": "Néstor Carbonell",
+   "known_for": [
+    {
+     "title": "Lost",
+     "year": 2004
+    },
+    {
+     "title": "Bates Motel",
+     "year": 2013
+    },
+    {
+     "title": "The Dark Knight",
+     "year": 2008
+    },
+    {
+     "title": "Shōgun",
+     "year": 2024
+    },
+    {
+     "title": "The Morning Show",
+     "year": 2019
+    }
+   ]
+  },
+  "nick-offerman": {
+   "name": "Nick Offerman",
+   "known_for": [
+    {
+     "title": "Parks and Recreation",
+     "year": 2009
+    },
+    {
+     "title": "The Last of Us",
+     "year": 2023
+    },
+    {
+     "title": "Civil War",
+     "year": 2024
+    },
+    {
+     "title": "Devs",
+     "year": 2020
+    }
+   ]
+  },
+  "patricia-arquette": {
+   "name": "Patricia Arquette",
+   "known_for": [
+    {
+     "title": "Boyhood",
+     "year": 2014
+    },
+    {
+     "title": "True Romance",
+     "year": 1993
+    },
+    {
+     "title": "Medium",
+     "year": 2005
+    },
+    {
+     "title": "Severance",
+     "year": 2022
+    },
+    {
+     "title": "Escape at Dannemora",
+     "year": 2018
+    }
+   ]
+  },
+  "paul-mescal": {
+   "name": "Paul Mescal",
+   "known_for": [
+    {
+     "title": "Normal People",
+     "year": 2020
+    },
+    {
+     "title": "Aftersun",
+     "year": 2022
+    },
+    {
+     "title": "Gladiator II",
+     "year": 2024
+    },
+    {
+     "title": "All of Us Strangers",
+     "year": 2023
+    }
+   ]
+  },
+  "pedro-pascal": {
+   "name": "Pedro Pascal",
+   "known_for": [
+    {
+     "title": "The Last of Us",
+     "year": 2023
+    },
+    {
+     "title": "The Mandalorian",
+     "year": 2019
+    },
+    {
+     "title": "Game of Thrones",
+     "year": 2011
+    },
+    {
+     "title": "Narcos",
+     "year": 2015
+    },
+    {
+     "title": "Gladiator II",
+     "year": 2024
+    },
+    {
+     "title": "The Wild Robot",
+     "year": 2024
+    }
+   ]
+  },
+  "rami-malek": {
+   "name": "Rami Malek",
+   "known_for": [
+    {
+     "title": "Bohemian Rhapsody",
+     "year": 2018
+    },
+    {
+     "title": "Mr. Robot",
+     "year": 2015
+    },
+    {
+     "title": "No Time to Die",
+     "year": 2021
+    },
+    {
+     "title": "Oppenheimer",
+     "year": 2023
+    }
+   ]
+  },
+  "ramy-youssef": {
+   "name": "Ramy Youssef",
+   "known_for": []
+  },
+  "rebecca-ferguson": {
+   "name": "Rebecca Ferguson",
+   "known_for": [
+    {
+     "title": "Mission: Impossible – Rogue Nation",
+     "year": 2015
+    },
+    {
+     "title": "Dune",
+     "year": 2021
+    },
+    {
+     "title": "Silo",
+     "year": 2023
+    },
+    {
+     "title": "Doctor Sleep",
+     "year": 2019
+    },
+    {
+     "title": "The Greatest Showman",
+     "year": 2017
+    }
+   ]
+  },
+  "robert-downey-jr": {
+   "name": "Robert Downey Jr.",
+   "known_for": [
+    {
+     "title": "Iron Man",
+     "year": 2008
+    },
+    {
+     "title": "Oppenheimer",
+     "year": 2023
+    },
+    {
+     "title": "Sherlock Holmes",
+     "year": 2009
+    },
+    {
+     "title": "Tropic Thunder",
+     "year": 2008
+    }
+   ]
+  },
+  "robin-wright": {
+   "name": "Robin Wright",
+   "known_for": []
+  },
+  "ryan-gosling": {
+   "name": "Ryan Gosling",
+   "known_for": [
+    {
+     "title": "Drive",
+     "year": 2011
+    },
+    {
+     "title": "La La Land",
+     "year": 2016
+    },
+    {
+     "title": "Blade Runner 2049",
+     "year": 2017
+    },
+    {
+     "title": "Barbie",
+     "year": 2023
+    },
+    {
+     "title": "The Notebook",
+     "year": 2004
+    }
+   ]
+  },
+  "ryunosuke-kamiki": {
+   "name": "Ryunosuke Kamiki",
+   "known_for": [
+    {
+     "title": "Godzilla Minus One",
+     "year": 2023
+    },
+    {
+     "title": "Your Name",
+     "year": 2016
+    }
+   ]
+  },
+  "sakura-ando": {
+   "name": "Sakura Ando",
+   "known_for": []
+  },
+  "samuel-theis": {
+   "name": "Samuel Theis",
+   "known_for": []
+  },
+  "sandra-huller": {
+   "name": "Sandra Hüller",
+   "known_for": [
+    {
+     "title": "Anatomy of a Fall",
+     "year": 2023
+    },
+    {
+     "title": "The Zone of Interest",
+     "year": 2023
+    },
+    {
+     "title": "Toni Erdmann",
+     "year": 2016
+    }
+   ]
+  },
+  "spike-fearn": {
+   "name": "Spike Fearn",
+   "known_for": []
+  },
+  "stellan-skarsgard": {
+   "name": "Stellan Skarsgård",
+   "known_for": [
+    {
+     "title": "Good Will Hunting",
+     "year": 1997
+    },
+    {
+     "title": "Chernobyl",
+     "year": 2019
+    },
+    {
+     "title": "Andor",
+     "year": 2022
+    },
+    {
+     "title": "Dune",
+     "year": 2021
+    },
+    {
+     "title": "Mamma Mia!",
+     "year": 2008
+    },
+    {
+     "title": "Breaking the Waves",
+     "year": 1996
+    }
+   ]
+  },
+  "stephanie-hsu": {
+   "name": "Stephanie Hsu",
+   "known_for": []
+  },
+  "stephen-mckinley-henderson": {
+   "name": "Stephen McKinley Henderson",
+   "known_for": [
+    {
+     "title": "Fences",
+     "year": 2016
+    },
+    {
+     "title": "Lady Bird",
+     "year": 2017
+    },
+    {
+     "title": "Dune",
+     "year": 2021
+    },
+    {
+     "title": "Civil War",
+     "year": 2024
+    }
+   ]
+  },
+  "swann-arlaud": {
+   "name": "Swann Arlaud",
+   "known_for": []
+  },
+  "sylvia-hoeks": {
+   "name": "Sylvia Hoeks",
+   "known_for": []
+  },
+  "tadanobu-asano": {
+   "name": "Tadanobu Asano",
+   "known_for": [
+    {
+     "title": "Ichi the Killer",
+     "year": 2001
+    },
+    {
+     "title": "Zatoichi",
+     "year": 2003
+    },
+    {
+     "title": "Thor",
+     "year": 2011
+    },
+    {
+     "title": "Shōgun",
+     "year": 2024
+    },
+    {
+     "title": "Mortal Kombat",
+     "year": 2021
+    }
+   ]
+  },
+  "takehiro-hira": {
+   "name": "Takehiro Hira",
+   "known_for": [
+    {
+     "title": "Shōgun",
+     "year": 2024
+    },
+    {
+     "title": "Giri/Haji",
+     "year": 2019
+    }
+   ]
+  },
+  "teo-yoo": {
+   "name": "Teo Yoo",
+   "known_for": []
+  },
+  "timothee-chalamet": {
+   "name": "Timothée Chalamet",
+   "known_for": [
+    {
+     "title": "Call Me by Your Name",
+     "year": 2017
+    },
+    {
+     "title": "Dune: Part Two",
+     "year": 2024
+    },
+    {
+     "title": "Wonka",
+     "year": 2023
+    },
+    {
+     "title": "A Complete Unknown",
+     "year": 2024
+    },
+    {
+     "title": "Little Women",
+     "year": 2019
+    },
+    {
+     "title": "Interstellar",
+     "year": 2014
+    }
+   ]
+  },
+  "tom-burke": {
+   "name": "Tom Burke",
+   "known_for": [
+    {
+     "title": "Strike",
+     "year": 2017
+    },
+    {
+     "title": "The Souvenir",
+     "year": 2019
+    },
+    {
+     "title": "Furiosa: A Mad Max Saga",
+     "year": 2024
+    },
+    {
+     "title": "War & Peace",
+     "year": 2016
+    }
+   ]
+  },
+  "tom-hardy": {
+   "name": "Tom Hardy",
+   "known_for": [
+    {
+     "title": "Mad Max: Fury Road",
+     "year": 2015
+    },
+    {
+     "title": "Inception",
+     "year": 2010
+    },
+    {
+     "title": "Peaky Blinders",
+     "year": 2013
+    },
+    {
+     "title": "Venom",
+     "year": 2018
+    },
+    {
+     "title": "Bronson",
+     "year": 2008
+    }
+   ]
+  },
+  "tommy-bastow": {
+   "name": "Tommy Bastow",
+   "known_for": []
+  },
+  "tramell-tillman": {
+   "name": "Tramell Tillman",
+   "known_for": [
+    {
+     "title": "Severance",
+     "year": 2022
+    },
+    {
+     "title": "Mission: Impossible – The Final Reckoning",
+     "year": 2025
+    }
+   ]
+  },
+  "tzi-ma": {
+   "name": "Tzi Ma",
+   "known_for": []
+  },
+  "ving-rhames": {
+   "name": "Ving Rhames",
+   "known_for": [
+    {
+     "title": "Pulp Fiction",
+     "year": 1994
+    },
+    {
+     "title": "Mission: Impossible",
+     "year": 1996
+    },
+    {
+     "title": "The Wild Robot",
+     "year": 2024
+    }
+   ]
+  },
+  "wagner-moura": {
+   "name": "Wagner Moura",
+   "known_for": []
+  },
+  "willem-dafoe": {
+   "name": "Willem Dafoe",
+   "known_for": [
+    {
+     "title": "Poor Things",
+     "year": 2023
+    },
+    {
+     "title": "Platoon",
+     "year": 1986
+    },
+    {
+     "title": "Spider-Man",
+     "year": 2002
+    },
+    {
+     "title": "The Lighthouse",
+     "year": 2019
+    },
+    {
+     "title": "The Grand Budapest Hotel",
+     "year": 2014
+    }
+   ]
+  },
+  "yuki-yamada": {
+   "name": "Yuki Yamada",
+   "known_for": []
+  },
+  "zach-cherry": {
+   "name": "Zach Cherry",
+   "known_for": [
+    {
+     "title": "Severance",
+     "year": 2022
+    },
+    {
+     "title": "You",
+     "year": 2018
+    }
+   ]
+  },
+  "zendaya": {
+   "name": "Zendaya",
+   "known_for": [
+    {
+     "title": "Euphoria",
+     "year": 2019
+    },
+    {
+     "title": "Dune: Part Two",
+     "year": 2024
+    },
+    {
+     "title": "Spider-Man: Homecoming",
+     "year": 2017
+    },
+    {
+     "title": "Challengers",
+     "year": 2024
+    },
+    {
+     "title": "The Greatest Showman",
+     "year": 2017
+    }
+   ]
+  }
+ }
 }

@@ -177,6 +177,16 @@ async fn title(api: tauri::State<'_, Api>, kind: Kind, id: u32) -> Result<Value,
 }
 
 #[tauri::command]
+async fn person(api: tauri::State<'_, Api>, id: String) -> Result<Value, String> {
+    // A slug from the server, but it lands in a URL path: refuse anything that could leave it.
+    if !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+        return Err(json!({ "error": { "code": "not_found" } }).to_string());
+    }
+    api.call(reqwest::Method::GET, &format!("/people/{id}"), None)
+        .await
+}
+
+#[tauri::command]
 async fn watch_state(api: tauri::State<'_, Api>) -> Result<Value, String> {
     api.call(reqwest::Method::GET, "/watchstate", None).await
 }
@@ -418,6 +428,7 @@ pub fn run() {
             server_host,
             library,
             title,
+            person,
             watch_state,
             set_watched,
             me,

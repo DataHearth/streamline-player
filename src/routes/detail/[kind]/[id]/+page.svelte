@@ -5,11 +5,12 @@
 	import { prefs } from "#lib/tv/prefs.svelte.ts";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, badges, hideBroken, decisions, network as whereAmI, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Decision, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
+	import { artwork, badges, headshot, monogram, hideBroken, decisions, network as whereAmI, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Decision, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
 	import { toast } from "#lib/tv/toast.svelte.ts";
 	import { Check, CheckCheck, Eye, Play, RotateCcw } from "@lucide/svelte";
 
 	const MAX_SIMILAR = 10;
+	const MAX_CAST = 14;
 	const kind = $derived(page.params.kind as Kind);
 	const id = $derived(Number(page.params.id));
 	let t = $state.raw<Title | null>(null);
@@ -87,6 +88,9 @@
 		return () => (stale = true);
 	});
 
+	// On a series, only who appears in the season on screen, as the design's desktop Detail does.
+	const castShown = $derived((t?.cast ?? []).filter((c) => kind !== "series" || !c.seasons || c.seasons.includes(curSeason)));
+
 	const eyebrow = $derived(t ? (kind === "series" ? [t.network, ...t.genres] : t.genres).filter(Boolean).join(" · ") : "");
 
 	function play() {
@@ -102,6 +106,24 @@
 		toast(`${kind === "series" ? "Series marked" : "Marked"} as ${was ? "unwatched" : "watched"}`);
 	}
 </script>
+
+{#snippet castRow()}
+	{#if castShown.length}
+		<div class="more-title">{kind === "series" ? `Cast · Season ${curSeason}` : "Cast"}<span class="count">{castShown.length}</span></div>
+		<div class="cast">
+			{#each castShown.slice(0, MAX_CAST) as c (c.id)}
+				{@const m = monogram(c.name)}
+				<button data-tv="1" data-fid="cast:{c.id}" class="castc" onclick={() => goto(`/person/${c.id}`)}>
+					<span class="face" style:background={m.bg} style:color={m.fg}>
+						{m.initials}<img src={headshot(c.id)} alt="" loading="lazy" onerror={hideBroken} />
+					</span>
+					<span class="cast-name">{c.name}</span>
+					<span class="cast-role">{c.character}</span>
+				</button>
+			{/each}
+		</div>
+	{/if}
+{/snippet}
 
 <TvScreen onback={() => history.back()} scroll>
 	{#if failed !== null}
@@ -169,7 +191,9 @@
 							</button>
 						{/each}
 					</div>
+					{@render castRow()}
 				{:else}
+					{@render castRow()}
 					<div class="more-title">More like this</div>
 					<div class="similar">
 						{#each similar as it (`${it.kind}:${it.id}`)}
@@ -472,6 +496,86 @@
 		padding: 0 120px;
 		font-size: 30px;
 		font-weight: 600;
+	}
+
+	.count {
+		margin-left: 14px;
+		font: 400 22px var(--font-mono);
+		color: var(--fg-subtle);
+	}
+
+	.cast {
+		display: flex;
+		gap: 12px;
+		overflow: hidden;
+		padding: 12px 110px 40px;
+	}
+
+	.castc {
+		flex: none;
+		width: 200px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+		padding: 12px 10px 16px;
+		border: 0;
+		border-radius: 24px;
+		background: none;
+		color: var(--fg);
+		text-align: center;
+		cursor: pointer;
+		outline: none;
+	}
+
+	.face {
+		position: relative;
+		display: grid;
+		place-items: center;
+		width: 150px;
+		height: 150px;
+		margin-bottom: 8px;
+		border-radius: 50%;
+		overflow: hidden;
+		font-size: 48px;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+		box-shadow: 0 0 0 1px var(--border);
+		transition: transform 180ms var(--ease), box-shadow 180ms;
+	}
+
+	.face img {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.castc:focus .face {
+		transform: scale(1.08);
+		box-shadow: 0 0 0 4px var(--fg), 0 24px 60px rgba(0, 0, 0, 0.7);
+	}
+
+	.cast-name,
+	.cast-role {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.cast-name {
+		font-size: 24px;
+		font-weight: 600;
+		line-height: 1.25;
+	}
+
+	.cast-role {
+		font-size: 20px;
+		line-height: 1.3;
+		color: var(--fg-subtle);
 	}
 
 	.similar {

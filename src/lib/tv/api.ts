@@ -22,7 +22,12 @@ export type Title = {
 	total_seasons?: number;
 	first_aired?: string;
 	seasons?: Season[];
+	/** Principal cast in billing order; on a series, `seasons` says which seasons each appears in. */
+	cast?: CastMember[];
 };
+export type CastMember = { id: string; name: string; character: string; seasons?: number[] };
+export type Credit = { kind: Kind; id: number; title: string; year: number; character: string; seasons?: number[]; total_seasons?: number };
+export type Person = { id: string; name: string; department: string; credits: Credit[]; known_for: { title: string; year: number; kind?: Kind; id?: number }[] };
 export type Watch = {
 	media_id: string;
 	movie_id?: number;
@@ -63,12 +68,31 @@ const listOf = <T>(page: { items: T[] }) => page.items;
 
 export const library = (kind: Kind) => invoke<{ items: Title[] }>("library", { kind }).then(listOf);
 export const title = (kind: Kind, id: number) => invoke<Title>("title", { kind, id });
+export const person = (id: string) => invoke<Person>("person", { id });
 export const watchState = () => invoke<{ items: Watch[] }>("watch_state").then(listOf);
 export const setWatched = (mediaId: string, watched: boolean) => invoke("set_watched", { mediaId, watched });
 
 // `convertFileSrc` would percent-encode the slashes of a whole path.
 const ARTWORK = convertFileSrc("", "artwork");
 export const artwork = (kind: Kind, id: number, name: "poster" | "backdrop") => `${ARTWORK}${kind}/${id}/${name}.jpg`;
+export const headshot = (person: string) => `${ARTWORK}people/${person}/photo.jpg`;
+
+/** Initials on a colour of its own, for people without a headshot (the design's monogram). */
+export function monogram(name: string) {
+	const parts = name.trim().split(/\s+/);
+	let h = 0;
+	for (const ch of name) h = (h * 31 + ch.codePointAt(0)!) >>> 0;
+	const hue = h % 360;
+	return { initials: (parts[0]![0]! + (parts.length > 1 ? parts.at(-1)![0]! : "")).toUpperCase(), bg: `oklch(0.36 0.06 ${hue})`, fg: `oklch(0.92 0.04 ${hue})` };
+}
+
+/** Which seasons a series credit covers: "Season 2", "Seasons 2–5", "All 4 seasons". */
+export function seasonSpan(seasons: number[], total: number) {
+	if (seasons.length === total) return total === 1 ? "Season 1" : `All ${total} seasons`;
+	if (seasons.length === 1) return `Season ${seasons[0]}`;
+	const run = seasons.every((n, i) => i === 0 || n === seasons[i - 1]! + 1);
+	return run ? `Seasons ${seasons[0]}\u2013${seasons.at(-1)}` : `Seasons ${seasons.join(", ")}`;
+}
 
 export const runtime = (min: number) => {
 	const h = Math.floor(min / 60);

@@ -60,6 +60,9 @@
 	}
 
 	onMount(() => {
+		// The layout holds the first screen back until it knows the device is paired, so that
+		// screen mounts after the navigation that brought it: afterNavigate never fires for it.
+		focusTimer = setTimeout(() => focusDefault(stage), FOCUS_DELAY_MS);
 		tick();
 		const timer = setInterval(tick, 10_000);
 		const listener = addPluginListener("player", "back", back);
