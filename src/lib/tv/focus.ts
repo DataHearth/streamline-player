@@ -118,5 +118,8 @@ export function move(key: string, root: HTMLElement) {
 	}
 	// Up from the tenth card of a row means the row above, however far it sits sideways.
 	best ??= bestNav;
+	// Entering a list of sections lands on the current one, not the nearest.
+	const group = best?.closest("[data-tv-group]");
+	if (group && !group.contains(cur)) best = group.querySelector<HTMLElement>("[data-tv-current]") ?? best;
 	if (best) focus(best, root);
 }

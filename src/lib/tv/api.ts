@@ -1,7 +1,8 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { decodeHere, prefs } from "./prefs.svelte";
 
 export type Kind = "movies" | "series";
-export type FileSummary = { resolution?: string; hdr?: string; audio?: string; channels?: string };
+export type FileSummary = { resolution?: string; codec?: string; hdr?: string; audio?: string; channels?: string };
 export type Episode = { id: number; number: number; title: string; overview: string; runtime: number; has_file: boolean; media_file_id: string };
 export type Season = { number: number; name: string; episodes: Episode[] };
 export type Title = {
@@ -40,14 +41,23 @@ export type AudioOut = { action: string; codec: string; channels: number };
 export type Decision = { mode: Mode; video: VideoOut; audio: AudioOut; video_reasons: Reason[]; audio_reasons: Reason[]; needs_slot: boolean; bandwidth: number; error?: undefined } | { error: { code: string; message: string } };
 export type DecisionOption = { audio_index?: number | null; burn_in_subtitle?: number | null; max_bitrate?: number | null };
 
-let capabilities: Promise<unknown> | null = null;
+let capabilities: { decode: string; value: Promise<unknown> } | null = null;
 // ponytail: mpv is the only desktop backend so far (Linux); macOS and Windows will need their own name.
 export const PLAYER_NAME = /Android/.test(navigator.userAgent) ? "ExoPlayer" : "mpv";
-export const playerCapabilities = () => (capabilities ??= invoke("plugin:player|capabilities"));
+/** What this device plays, as the server needs it; it changes with the pass-through settings. */
+export function playerCapabilities() {
+	const decode = decodeHere();
+	if (capabilities?.decode !== decode.join()) capabilities = { decode: decode.join(), value: invoke("plugin:player|capabilities", { decode }) };
+	return capabilities.value;
+}
 
 /** What the engine would do for each option, without starting anything. */
 export const decisions = async (mediaId: string, options: DecisionOption[]) =>
 	invoke<{ bit_rate: number; decisions: Decision[] }>("decisions", { mediaId, capabilities: await playerCapabilities(), options });
+
+/** Where Streamline places this device right now; anything but a clear "home" is away. */
+export const network = () =>
+	invoke<{ network?: string }>("playback_status").then((st) => (st.network === "home" ? "home" : "away") as "home" | "away").catch(() => "away" as const);
 
 const listOf = <T>(page: { items: T[] }) => page.items;
 
@@ -74,6 +84,7 @@ export const pct = (w?: Watch) => (w && w.duration_seconds > 0 ? Math.round((w.p
 
 export function badges(q?: FileSummary) {
 	if (!q) return [];
+	if (prefs.techDetails) return [q.resolution, q.codec, q.hdr, q.audio && `${q.audio} ${q.channels ?? ""}`.trim()].filter((b): b is string => !!b);
 	const res = q.resolution === "4320p" ? "8K" : q.resolution === "2160p" ? "4K" : q.resolution === "1080p" ? "HD" : q.resolution;
 	const hdr = q.hdr === "Dolby Vision" ? "Dolby Vision" : q.hdr ? "HDR" : null;
 	return [res, hdr, q.audio && /Atmos/.test(q.audio) ? "Dolby Atmos" : q.channels].filter((b): b is string => !!b);

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-restoreDisplay"
+description = "Enables the restoreDisplay command without any pre-configured scope."
+commands.allow = ["restoreDisplay"]
+
+[[permission]]
+identifier = "deny-restoreDisplay"
+description = "Denies the restoreDisplay command without any pre-configured scope."
+commands.deny = ["restoreDisplay"]

@@ -5,6 +5,9 @@ Allows controlling the native player and listening to its events
 #### This default permission set includes the following:
 
 - `allow-capabilities`
+- `allow-deviceInfo`
+- `allow-frameRate`
+- `allow-restoreDisplay`
 - `allow-load`
 - `allow-play`
 - `allow-pause`
@@ -51,6 +54,58 @@ Enables the capabilities command without any pre-configured scope.
 <td>
 
 Denies the capabilities command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-deviceInfo`
+
+</td>
+<td>
+
+Enables the deviceInfo command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-deviceInfo`
+
+</td>
+<td>
+
+Denies the deviceInfo command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-frameRate`
+
+</td>
+<td>
+
+Enables the frameRate command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-frameRate`
+
+</td>
+<td>
+
+Denies the frameRate command without any pre-configured scope.
 
 </td>
 </tr>
@@ -233,6 +288,32 @@ Enables the remove_listener command without any pre-configured scope.
 <td>
 
 Denies the remove_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-restoreDisplay`
+
+</td>
+<td>
+
+Enables the restoreDisplay command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-restoreDisplay`
+
+</td>
+<td>
+
+Denies the restoreDisplay command without any pre-configured scope.
 
 </td>
 </tr>

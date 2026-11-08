@@ -6,7 +6,7 @@
 	import TvScreen from "#lib/tv/TvScreen.svelte";
 	import { artwork, episodesOf, everything, stillPos, title as fetchTitle, watchState, type Kind, type Title } from "#lib/tv/api.ts";
 
-	type Play = { key: string; mediaId: string; titleName: string; heading: string; eyebrow: string; frame: string; poster: string; framePos: string; start: number; next: { code: string; title: string; overview: string; still: string; stillPos: string; label: string; href: string } | null; more: { title: string; poster: string; href: string }[] };
+	type Play = { key: string; anime: boolean; mediaId: string; titleName: string; heading: string; eyebrow: string; frame: string; poster: string; framePos: string; start: number; next: { code: string; title: string; overview: string; still: string; stillPos: string; label: string; href: string } | null; more: { title: string; poster: string; href: string }[] };
 
 	const kind = $derived(page.params.kind as Kind);
 	const id = $derived(Number(page.params.id));
@@ -35,6 +35,7 @@
 			key: e.media_file_id,
 			mediaId: e.media_file_id,
 			titleName: t.title,
+			anime: isAnime(t),
 			heading: e.title,
 			eyebrow: `${t.title} · S${e.season} E${e.number}`,
 			frame: still,
@@ -47,6 +48,8 @@
 			more: following ? [] : await moreLike(k, t),
 		};
 	}
+
+	const isAnime = (t: Title) => t.genres.some((g) => /^(anime|animation)$/i.test(g));
 
 	async function moreLike(k: Kind, t: Title) {
 		const g = t.genres[0] ?? "";
@@ -62,6 +65,7 @@
 			key: mediaId,
 			mediaId,
 			titleName: t.title,
+			anime: isAnime(t),
 			heading: t.title,
 			eyebrow: `${t.year} · ${g}`,
 			frame: artwork("movies", t.id, "backdrop"),

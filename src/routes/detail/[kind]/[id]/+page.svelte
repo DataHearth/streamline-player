@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
-	import { autoCap, PRESETS, rememberedThroughput } from "#lib/player/auto.ts";
+	import { autoCap, PRESETS, presetOf, rememberedThroughput } from "#lib/player/auto.ts";
+	import { prefs } from "#lib/tv/prefs.svelte.ts";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, badges, hideBroken, decisions, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Decision, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
+	import { artwork, badges, hideBroken, decisions, network as whereAmI, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Decision, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
 	import { toast } from "#lib/tv/toast.svelte.ts";
 	import { Check, CheckCheck, Eye, Play, RotateCcw } from "@lucide/svelte";
 
@@ -71,11 +72,12 @@
 		playback = null;
 		if (!media) return;
 		let stale = false;
-		decisions(media, [{}, ...PRESETS.map((n) => ({ max_bitrate: n * 1_000_000 }))]).then(
-			(r) => {
+		Promise.all([decisions(media, [{}, ...PRESETS.map((n) => ({ max_bitrate: n * 1_000_000 }))]), whereAmI()]).then(
+			([r, net]) => {
 				if (stale) return;
 				const original = r.decisions[0];
-				const cap = autoCap(rememberedThroughput(), r.bit_rate / 1_000_000, !!original && !original.error && original.video.action === "copy");
+				const q = presetOf(net === "home" ? prefs.qHome : prefs.qAway);
+				const cap = q === "original" ? null : q === "auto" ? autoCap(rememberedThroughput(net), r.bit_rate / 1_000_000, !!original && !original.error && original.video.action === "copy") : q;
 				playback = r.decisions[cap ? PRESETS.indexOf(cap) + 1 : 0] ?? null;
 			},
 			() => {

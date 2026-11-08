@@ -43,6 +43,7 @@ p.add_argument("--media", action="append", default=[], help="id=path, repeatable
 p.add_argument("--clip", action="append", default=[], help="file the library's titles play, repeatable")
 p.add_argument("--demo-markers", action="store_true", help="give episodes an intro and credits, to see the cards")
 p.add_argument("--art", default="", help="directory holding the artwork")
+p.add_argument("--network", choices=["home", "away"], default="away", help="where Streamline places this device; away is what a missing answer means")
 p.add_argument("--heartbeat-timeout", type=float, default=90, help="seconds without a heartbeat before a session is stopped")
 args = p.parse_args()
 FILES = dict(m.split("=", 1) for m in args.media)
@@ -218,7 +219,18 @@ class Handler(BaseHTTPRequestHandler):
             return None
         if self.path == "/api/v1/playback/status":
             st, _ = engine("GET", "/v1/health")
-            return self.reply(200, {"available": st == 200, "media": sorted(MEDIA)})
+            return self.reply(200, {"available": st == 200, "media": sorted(MEDIA), "network": args.network})
+        if self.path == "/api/v1/me":
+            return self.reply(200, {"name": "Antoine Langlois", "email": "antoine@example.net", "role": "Admin", "library_language": "English"})
+        if self.path == "/api/v1/devices":
+            now = time.time()
+            ago = lambda s: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - s))
+            return self.reply(200, {"items": [
+                {"id": "dev-self", "name": "Living room", "platform": "Android TV", "last_seen": ago(0), "streaming": False, "current": True},
+                {"id": "dev-phone", "name": "Pixel 9", "platform": "Android", "last_seen": ago(120), "streaming": True, "current": False},
+                {"id": "dev-laptop", "name": "framework-13", "platform": "Linux", "last_seen": ago(3 * 86400), "streaming": False, "current": False},
+                {"id": "dev-parents", "name": "Parents' TV", "platform": "Android TV", "last_seen": ago(9 * 86400), "streaming": False, "current": False},
+            ]})
         m = re.fullmatch(r"/api/v1/playback/media/([^/]+)/tracks", self.path)
         if m and m[1] in MEDIA:
             return self.reply(200, tracks(m[1], MEDIA[m[1]], f"http://{self.headers['Host']}"))

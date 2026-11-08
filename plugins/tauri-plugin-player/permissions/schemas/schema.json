@@ -307,6 +307,30 @@
           "markdownDescription": "Denies the capabilities command without any pre-configured scope."
         },
         {
+          "description": "Enables the deviceInfo command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-deviceInfo",
+          "markdownDescription": "Enables the deviceInfo command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the deviceInfo command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-deviceInfo",
+          "markdownDescription": "Denies the deviceInfo command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the frameRate command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-frameRate",
+          "markdownDescription": "Enables the frameRate command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the frameRate command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-frameRate",
+          "markdownDescription": "Denies the frameRate command without any pre-configured scope."
+        },
+        {
           "description": "Enables the load command without any pre-configured scope.",
           "type": "string",
           "const": "allow-load",
@@ -389,6 +413,18 @@
           "type": "string",
           "const": "deny-remove-listener",
           "markdownDescription": "Denies the remove_listener command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the restoreDisplay command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-restoreDisplay",
+          "markdownDescription": "Enables the restoreDisplay command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the restoreDisplay command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-restoreDisplay",
+          "markdownDescription": "Denies the restoreDisplay command without any pre-configured scope."
         },
         {
           "description": "Enables the seek command without any pre-configured scope.",
@@ -475,10 +511,10 @@
           "markdownDescription": "Denies the voice command without any pre-configured scope."
         },
         {
-          "description": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-voice`\n- `allow-registerListener`\n- `allow-register-listener`\n- `allow-removeListener`\n- `allow-remove-listener`",
+          "description": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-deviceInfo`\n- `allow-frameRate`\n- `allow-restoreDisplay`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-voice`\n- `allow-registerListener`\n- `allow-register-listener`\n- `allow-removeListener`\n- `allow-remove-listener`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-voice`\n- `allow-registerListener`\n- `allow-register-listener`\n- `allow-removeListener`\n- `allow-remove-listener`"
+          "markdownDescription": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-deviceInfo`\n- `allow-frameRate`\n- `allow-restoreDisplay`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-voice`\n- `allow-registerListener`\n- `allow-register-listener`\n- `allow-removeListener`\n- `allow-remove-listener`"
         }
       ]
     }

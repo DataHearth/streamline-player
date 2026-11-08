@@ -5,6 +5,16 @@ const USABLE_SHARE = 0.8;
 const ORIGINAL_MARGIN = 1.15;
 const KEY = "throughput";
 
+type Network = "home" | "away";
+export type Quality = "auto" | "original" | number;
+
+/** A quality setting as Settings words it ("Auto", "Original", "8 Mbit/s"). */
+export function presetOf(label: string): Quality {
+	if (label === "Original") return "original";
+	const n = parseInt(label, 10);
+	return Number.isFinite(n) ? n : "auto";
+}
+
 const usableMbit = (bitsPerSecond: number) => (bitsPerSecond / MBIT) * USABLE_SHARE;
 
 /** No measurement yet means no reason to hold back: a stall corrects it. */
@@ -26,18 +36,18 @@ export function stepDown(measured: number | null, currentMbit: number, mayGuess:
 	return PRESETS.find((n) => n < currentMbit && n <= usable) ?? (currentMbit > 1 ? 1 : null);
 }
 
-// ponytail: one value per device, enough for a TV that never moves. Key it by network when phones ship.
-export function rememberedThroughput() {
+/** One reading per network: a phone's home Wi-Fi says nothing about its mobile data. */
+export function rememberedThroughput(network: Network) {
 	try {
-		return Number(localStorage.getItem(KEY)) || null;
+		return Number(localStorage.getItem(`${KEY}:${network}`)) || null;
 	} catch {
 		return null;
 	}
 }
 
-export function rememberThroughput(bitsPerSecond: number) {
+export function rememberThroughput(bitsPerSecond: number, network: Network) {
 	try {
-		localStorage.setItem(KEY, String(bitsPerSecond));
+		localStorage.setItem(`${KEY}:${network}`, String(bitsPerSecond));
 	} catch {
 		// Next start measures again.
 	}

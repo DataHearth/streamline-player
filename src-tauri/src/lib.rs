@@ -112,6 +112,16 @@ async fn set_watched(
 }
 
 #[tauri::command]
+async fn me(api: tauri::State<'_, Api>) -> Result<Value, String> {
+    api.call(reqwest::Method::GET, "/me", None).await
+}
+
+#[tauri::command]
+async fn devices(api: tauri::State<'_, Api>) -> Result<Value, String> {
+    api.call(reqwest::Method::GET, "/devices", None).await
+}
+
+#[tauri::command]
 async fn playback_status(api: tauri::State<'_, Api>) -> Result<Value, String> {
     api.call(reqwest::Method::GET, "/playback/status", None)
         .await
@@ -318,6 +328,8 @@ pub fn run() {
             title,
             watch_state,
             set_watched,
+            me,
+            devices,
             playback_status,
             decisions,
             media_tracks,

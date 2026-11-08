@@ -2,6 +2,9 @@
 // mobile plugin), Linux in src/desktop.rs. These names only feed the ACL.
 const COMMANDS: &[&str] = &[
     "capabilities",
+    "deviceInfo",
+    "frameRate",
+    "restoreDisplay",
     "load",
     "play",
     "pause",

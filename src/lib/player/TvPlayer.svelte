@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { decisions, hideBroken, orPoster, PLAYER_NAME, playerCapabilities, type Decision } from "#lib/tv/api.ts";
+	import { decisions, hideBroken, network as whereAmI, orPoster, PLAYER_NAME, playerCapabilities, type Decision } from "#lib/tv/api.ts";
 	import { focusDefault as focusStageDefault, move } from "#lib/tv/focus.ts";
 	import HaltScreen from "./HaltScreen.svelte";
-	import { autoCap, PRESETS, rememberedThroughput, rememberThroughput, stepDown } from "./auto.ts";
+	import { autoCap, PRESETS, presetOf, rememberedThroughput, rememberThroughput, stepDown, type Quality } from "./auto.ts";
 	import { haltFor, type Halt } from "./halt.ts";
 	import "./screen.css";
 	import { toast } from "#lib/tv/toast.svelte.ts";
+	import { decodeHere, FRAME_RATE_MODE, myLanguage, prefs, setPref as savePref } from "#lib/tv/prefs.svelte.ts";
 	import { addPluginListener, invoke } from "@tauri-apps/api/core";
 	import {
 		Activity,
@@ -45,6 +46,7 @@
 		start: startAt,
 		next,
 		more,
+		anime,
 		onexit,
 		onnext,
 		onopen,
@@ -59,6 +61,7 @@
 		start: number;
 		next: Next | null;
 		more: More[];
+		anime: boolean;
 		onexit: () => void;
 		onnext: () => void;
 		onopen: (href: string) => void;
@@ -76,7 +79,6 @@
 		audio_reasons: Reason[];
 		hw: string;
 	};
-	type Quality = "auto" | "original" | number;
 	type Tab = "subs" | "audio" | "quality" | "speed";
 	type Stats = { player?: string; version: string; buffer: number; videoBitrate: number; audioBitrate: number; rendered: number; dropped: number; displayHz: number };
 	type AudioTrack = { index: number; codec: string; channels: number; language: string; default: boolean };
@@ -156,12 +158,15 @@
 	let cues = $state.raw<Cue[]>([]);
 	let cueText = $state("");
 	let styleOpen = $state(false);
-	let prefs = $state(loadPrefs());
 	let osd = $state<string | null>(null);
 	let quality = $state<Quality>("auto");
 	let autoPick = $state<number | null | undefined>(undefined);
 	let measured = $state<number | null>(null);
-	let measuredOnce = $state(rememberedThroughput() !== null);
+	// Where Streamline places this device; anything but a clear "home" is away.
+	let network = $state<"home" | "away" | null>(null);
+	let picked = false;
+	let introSkipped = false;
+	let measuredOnce = $state(false);
 	let measuredInStall: number | null = null;
 	let stallSince = 0;
 	let stepUpHold = STEP_UP_HOLD_MS;
@@ -204,7 +209,7 @@
 	const creditsAt = $derived(tracks?.markers.credits?.[0] ?? (next && duration > 0 ? duration - UP_NEXT_SECS : null));
 	const upNextOn = $derived(!!next && creditsAt !== null && position >= creditsAt && !upNextDismissed && !ended);
 	const creditsOn = $derived(!!tracks?.markers.credits && !upNextOn && creditsAt !== null && position >= creditsAt && position < duration - 1);
-	const skipOn = $derived((introOn || creditsOn) && !ended && !halt);
+	const skipOn = $derived(((introOn && !prefs.autoSkip) || creditsOn) && !ended && !halt);
 	const upNextFrac = $derived(creditsAt === null ? 0 : Math.min(1, Math.max(0, (position - creditsAt) / UP_NEXT_SECS)));
 	// The player reports every 500 ms; between reports the bar moves on each frame at the playback speed.
 	let frameAt = $state(0);
@@ -270,22 +275,8 @@
 	const subKind = $derived<SubKind | "burn">(burn ? "burn" : selectedSub ? subInfo(selectedSub).kind : "text");
 	const cueSize = $derived(Math.round((subKind === "text" || subKind === "styled" ? (SIZE_PX[prefs.subSize] ?? DEFAULT_SIZE_PX) : DEFAULT_SIZE_PX) * TV_CUE_SCALE));
 
-	function loadPrefs() {
-		const fallback = { subSize: "M", subBg: "Shadow", subColor: "White" };
-		try {
-			return { ...fallback, ...JSON.parse(localStorage.getItem("subtitle-style") ?? "{}") };
-		} catch {
-			return fallback;
-		}
-	}
-
 	function setPref(key: "subSize" | "subBg" | "subColor", value: string) {
-		prefs = { ...prefs, [key]: value };
-		try {
-			localStorage.setItem("subtitle-style", JSON.stringify(prefs));
-		} catch {
-			// The style still applies for this session.
-		}
+		savePref(key, value);
 		syncTiming();
 	}
 
@@ -491,7 +482,7 @@
 			...(known.length ? [{ k: "Bitrate", v: known.join(" \u00B7 ") }] : []),
 		];
 		if (live) {
-			const speed = measured ?? rememberedThroughput();
+			const speed = measured ?? (network && rememberedThroughput(network));
 			rows.push(
 				{ k: "Throughput", v: speed === null ? "Measuring\u2026" : mbit(speed), c: speed !== null && speed < SLOW_THROUGHPUT ? "var(--status-warning)" : undefined },
 				{ k: "Buffer", v: `${live.buffer.toFixed(1)} s ahead` },
@@ -523,7 +514,14 @@
 	});
 
 	$effect(() => {
-		if (next && upNextOn && creditsAt !== null && position >= creditsAt + UP_NEXT_SECS) leave().then(onnext);
+		if (prefs.autoplay && next && upNextOn && creditsAt !== null && position >= creditsAt + UP_NEXT_SECS) leave().then(onnext);
+	});
+
+	$effect(() => {
+		if (introOn && prefs.autoSkip && !introSkipped && !ended) {
+			introSkipped = true;
+			skip();
+		}
 	});
 
 	// With the controls hidden, nothing else holds focus: OK must land on the card.
@@ -557,14 +555,26 @@
 		if (text !== cueText) cueText = text;
 	}
 
+	const animeAudio = (list: AudioTrack[]) => (anime && prefs.animeRule ? list.find((t) => language(t.language) === "Japanese") : undefined);
+
+	function initialAudio(list: AudioTrack[]) {
+		const wanted = prefs.audioLang === "Original language" ? undefined : list.find((t) => language(t.language) === prefs.audioLang);
+		return animeAudio(list) ?? wanted;
+	}
+
 	// A forced track translates the foreign passages of the audio it goes with. Never burned in on
 	// its own: that would convert the video without the viewer asking.
 	function autoForced() {
 		if (subTouched || !tracks || tracks.preparing) return;
 		const audio = selectedAudio && language(selectedAudio.language);
-		const want = tracks.subtitles.find((t) => t.forced && !subInfo(t).burnOnly && language(t.language) === audio) ?? null;
-		if ((want?.index ?? null) !== subPick) pickSub(want, false);
+		const usable = tracks.subtitles.filter((t) => !subInfo(t).burnOnly);
+		const full = usable.filter((t) => !t.forced && language(t.language) === myLanguage()).sort((a, b) => Number(a.sdh) - Number(b.sdh))[0];
+		const forced = usable.find((t) => t.forced && language(t.language) === audio);
+		const always = prefs.subsMode === "Always" || (!!animeAudio(tracks.audio) && audio === "Japanese");
+		const want = always ? (full ?? forced) : prefs.subsMode === "Off" ? undefined : forced;
+		if ((want?.index ?? null) !== subPick) pickSub(want ?? null, false);
 	}
+
 
 	async function pickSub(t: SubTrack | null, byViewer = true) {
 		subTouched ||= byViewer;
@@ -610,6 +620,10 @@
 
 	async function refreshTracks() {
 		tracks = await invoke<Tracks>("media_tracks", { mediaId }).catch(() => tracks);
+		if (tracks && !picked) {
+			picked = true;
+			audioPick = initialAudio(tracks.audio)?.index ?? null;
+		}
 		autoForced();
 		await refreshPreview();
 	}
@@ -698,10 +712,13 @@
 		stop();
 		buffering = true;
 		try {
+			network ??= await whereAmI();
+			measuredOnce ||= rememberedThroughput(network) !== null;
+			if (!picked) quality = presetOf(network === "home" ? prefs.qHome : prefs.qAway);
 			const capabilities = await playerCapabilities();
 			await refreshTracks();
 			if (id !== startId) return;
-			if (autoPick === undefined) autoPick = autoCap(rememberedThroughput(), preview && preview.bitRate / MBIT, originalPlays);
+			if (autoPick === undefined) autoPick = autoCap(rememberedThroughput(network ?? "away"), preview && preview.bitRate / MBIT, originalPlays);
 			const started = await invoke<Session>("start_session", { mediaId, capabilities, position: at, tracks: sessionTracks() });
 			// The viewer left while the server was still answering.
 			if (id !== startId) {
@@ -709,7 +726,8 @@
 				return;
 			}
 			session = started;
-			await player("load", { url: session.url });
+			await player("frameRate", { mode: FRAME_RATE_MODE[prefs.frameRate] ?? "off" }).catch(() => {});
+			await player("load", { url: session.url, decode: decodeHere() });
 			if (at > 0) await player("seek", { seconds: at });
 			if (!paused) await player("play");
 			if (halt) unhalt();
@@ -753,6 +771,7 @@
 	async function exit() {
 		clearHalt();
 		startId++;
+		player("restoreDisplay").catch(() => {});
 		await leave();
 		onexit();
 	}
@@ -1038,7 +1057,7 @@
 				measuredInStall = Math.max(e.bitrate, measured ?? 0);
 				measured = e.bitrate;
 				measuredOnce = true;
-				rememberThroughput(e.bitrate);
+				if (network) rememberThroughput(e.bitrate, network);
 				considerStepUp();
 			}),
 			addPluginListener("player", "back", back),
@@ -1299,9 +1318,9 @@
 					<span class="upnext-code">UP NEXT &middot; {next.code}</span>
 					<span class="upnext-title">{next.title}</span>
 				</div>
-				<div class="upnext-timer" role="progressbar" aria-label="Next episode starts when this fills" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(upNextFrac * 100)}>
+				{#if prefs.autoplay}<div class="upnext-timer" role="progressbar" aria-label="Next episode starts when this fills" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(upNextFrac * 100)}>
 					<div style:transform="scaleX({upNextFrac})"></div>
-				</div>
+				</div>{/if}
 			</div>
 			<div class="upnext-row">
 				<button data-tv="1" data-tv-default="1" class="btn-ink" onclick={() => leave().then(onnext)}><Play size={15} fill="currentColor" /><span>Play now</span></button>

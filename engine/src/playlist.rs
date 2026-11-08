@@ -290,6 +290,10 @@ pub fn master_playlist(plan: &Plan, a: &Analysis, bandwidth: u64) -> String {
     if let Some(s) = supplemental {
         let _ = write!(line, ",SUPPLEMENTAL-CODECS=\"{s}\"");
     }
+    // Players switch the TV's refresh rate from this; the engine never changes a stream's rate.
+    if let Some(fps) = source_video(plan, a).map(|v| v.fps).filter(|f| *f > 0.0) {
+        let _ = write!(line, ",FRAME-RATE={fps:.3}");
+    }
     format!("#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-INDEPENDENT-SEGMENTS\n{line}\nmedia.m3u8\n")
 }
 
@@ -595,5 +599,17 @@ mod tests {
             1,
         );
         assert!(m.contains("VIDEO-RANGE=PQ,SUPPLEMENTAL-CODECS=\"dvh1.08.06/db1p\""));
+    }
+
+    #[test]
+    fn master_states_frame_rate() {
+        let mut v = stream("h264", "High", 41, 1920, 1080, 8);
+        v.fps = 24000.0 / 1001.0;
+        let m = master_playlist(
+            &copy(CopyTag::Hvc1, DvHandling::Keep),
+            &analysis(v, "aac"),
+            1,
+        );
+        assert!(m.contains(",FRAME-RATE=23.976\n"), "{m}");
     }
 }

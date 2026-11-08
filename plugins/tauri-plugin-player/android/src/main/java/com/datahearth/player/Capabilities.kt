@@ -7,10 +7,13 @@ import android.media.AudioManager
 import android.media.MediaCodecInfo
 import android.media.MediaCodecInfo.CodecProfileLevel as P
 import android.media.MediaCodecList
+import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.view.Display
 import androidx.annotation.OptIn
 import androidx.media3.common.C
+import androidx.media3.common.MediaLibraryInfo
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.audio.AudioCapabilities
 import app.tauri.plugin.JSObject
@@ -49,12 +52,15 @@ object Capabilities {
         "audio/eac3-joc" to "eac3", "audio/flac" to "flac", "audio/opus" to "opus", "audio/vorbis" to "vorbis",
         "audio/vnd.dts" to "dts", "audio/vnd.dts.hd" to "dts", "audio/true-hd" to "truehd",
     )
+    private val HDR_NAMES = mapOf(
+        "hdr10" to "HDR10", "hlg" to "HLG", "hdr10plus" to "HDR10+", "dolby_vision" to "Dolby Vision",
+    )
     private val PASSTHROUGH = mapOf(
         C.ENCODING_AC3 to "ac3", C.ENCODING_E_AC3 to "eac3", C.ENCODING_E_AC3_JOC to "eac3",
         C.ENCODING_DTS to "dts", C.ENCODING_DTS_HD to "dts", C.ENCODING_DOLBY_TRUEHD to "truehd",
     )
 
-    fun build(context: Context): JSObject {
+    fun build(context: Context, decode: Set<String> = emptySet()): JSObject {
         val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { !it.isEncoder }
         val modes = defaultDisplay(context).supportedModes.toList()
         val video = JSONArray()
@@ -73,14 +79,33 @@ object Capabilities {
                 put("formats", JSONArray(formats))
                 put("dv_profiles", JSONArray(dv.toList()))
             })
-            put("audio", audio(context, codecs))
+            put("audio", audio(context, codecs, decode))
             put("containers", JSONArray(listOf("mp4", "mkv")))
             put("subtitles", JSONArray(listOf("webvtt", "srt", "ass", "pgs")))
             put("hls_keyframe_exact", false)
         }
     }
 
-    private fun defaultDisplay(context: Context): Display =
+    fun deviceInfo(context: Context): JSObject {
+        val display = defaultDisplay(context)
+        val mode = display.mode
+        val pm = context.packageManager
+        return JSObject().apply {
+            put("name", Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME) ?: Build.MODEL)
+            put("model", "${Build.MANUFACTURER} ${Build.MODEL}")
+            put("platform", if (pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) "Android TV" else "Android")
+            put("player", "ExoPlayer ${MediaLibraryInfo.VERSION}")
+            put("display", JSObject().apply {
+                put("name", display.name)
+                put("width", mode.physicalWidth)
+                put("height", mode.physicalHeight)
+                put("refresh_hz", Math.round(mode.refreshRate * 1000.0) / 1000.0)
+                put("hdr", JSONArray(hdrTypes(context).map { HDR_NAMES.getValue(it) }))
+            })
+        }
+    }
+
+    fun defaultDisplay(context: Context): Display =
         context.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
 
     private fun hevcLevel(constant: Int): Int? = HEVC_LEVELS.getOrNull(Integer.numberOfTrailingZeros(constant) / 2)
@@ -128,10 +153,10 @@ object Capabilities {
 
     @OptIn(UnstableApi::class)
     @Suppress("DEPRECATION")
-    private fun audio(context: Context, all: List<MediaCodecInfo>): JSObject {
+    private fun audio(context: Context, all: List<MediaCodecInfo>, decode: Set<String>): JSObject {
         val codecs = all.flatMap { it.supportedTypes.mapNotNull { t -> AUDIO[t.lowercase()] } }.toSortedSet()
         val passthrough = AudioCapabilities.getCapabilities(context).let { ac ->
-            PASSTHROUGH.filterKeys { ac.supportsEncoding(it) }.values.toSortedSet()
+            PASSTHROUGH.filterKeys { ac.supportsEncoding(it) }.values.toSortedSet().apply { removeAll(decode) }
         }
         // An empty channelCounts array means the device takes any count; stereo is the safe floor.
         val channels = context.getSystemService(AudioManager::class.java)

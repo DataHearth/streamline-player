@@ -21,7 +21,10 @@ import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResult
 import androidx.media3.common.MediaItem
+import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaLibraryInfo
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
@@ -36,9 +39,11 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -53,6 +58,17 @@ import app.tauri.plugin.Plugin
 @InvokeArg
 class LoadArgs {
     lateinit var url: String
+    var decode: Array<String> = emptyArray()
+}
+
+@InvokeArg
+class CapabilitiesArgs {
+    var decode: Array<String> = emptyArray()
+}
+
+@InvokeArg
+class FrameRateArgs {
+    var mode: String = "off"
 }
 
 @InvokeArg
@@ -96,6 +112,23 @@ private class DelayableAudioRenderer(
     override fun getPositionUs(): Long = super.getPositionUs() + delayUs()
 }
 
+/** Refuses passthrough for the codecs the viewer chose to decode here, so ExoPlayer falls back to MediaCodec. */
+@androidx.annotation.OptIn(UnstableApi::class)
+private class DecodeHereSink(sink: AudioSink, private val decoded: () -> Set<String>) : ForwardingAudioSink(sink) {
+    private fun refused(format: Format): Boolean {
+        val codec = when (MimeTypes.getEncoding(format.sampleMimeType ?: return false, format.codecs)) {
+            C.ENCODING_E_AC3, C.ENCODING_E_AC3_JOC -> "eac3"
+            C.ENCODING_DTS, C.ENCODING_DTS_HD -> "dts"
+            C.ENCODING_DOLBY_TRUEHD -> "truehd"
+            else -> return false
+        }
+        return codec in decoded()
+    }
+
+    override fun supportsFormat(format: Format) = !refused(format) && super.supportsFormat(format)
+    override fun getFormatSupport(format: Format) = if (refused(format)) AudioSink.SINK_FORMAT_UNSUPPORTED else super.getFormatSupport(format)
+}
+
 private const val TAG = "PlayerPlugin"
 private const val POSITION_INTERVAL_MS = 500L
 // DefaultBandwidthMeter answers with its built-in guess for the network type until it has seen this much.
@@ -114,6 +147,9 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     private var surfaceView: SurfaceView? = null
     private var overlay: SubtitleOverlay? = null
     @Volatile private var audioDelayUs = 0L
+    @Volatile private var decodeHere = emptySet<String>()
+    private var frameRateMode = "off"
+    private var displaySwitched = false
     private var resumeOnForeground = false
     private var meteredBytes = 0L
     private var meterQuietUntil = 0L
@@ -208,6 +244,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         })
         p.addAnalyticsListener(droppedFramesLogger)
         p.addAnalyticsListener(bandwidthEvents)
+        p.addAnalyticsListener(frameRateEvents)
         player = p
         main.post(readsTicker)
         // The remote's Back belongs to the player's own stack: menu, controls, then leave.
@@ -245,7 +282,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
             eventListener: AudioRendererEventListener,
             out: ArrayList<Renderer>,
         ) {
-            out.add(DelayableAudioRenderer(context, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, audioSink) { audioDelayUs })
+            out.add(DelayableAudioRenderer(context, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, DecodeHereSink(audioSink) { decodeHere }) { audioDelayUs })
         }
     }
 
@@ -283,6 +320,28 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
             meteredBytes += totalBytesLoaded
             if (meteredBytes >= METER_TRUSTED_BYTES && System.currentTimeMillis() >= meterQuietUntil) emitBandwidth(bitrateEstimate, "meter")
         }
+    }
+
+    @androidx.annotation.OptIn(UnstableApi::class)
+    private val frameRateEvents = object : AnalyticsListener {
+        override fun onVideoInputFormatChanged(eventTime: AnalyticsListener.EventTime, format: Format, decoderReuseEvaluation: DecoderReuseEvaluation?) {
+            if (format.frameRate > 0) matchFrameRate(format.frameRate.toDouble())
+        }
+    }
+
+    private fun matchFrameRate(fps: Double) {
+        if (frameRateMode == "off" || (frameRateMode == "start" && displaySwitched)) return
+        val current = Capabilities.defaultDisplay(activity).mode
+        val target = Capabilities.defaultDisplay(activity).supportedModes
+            .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+            .mapNotNull { mode ->
+                val multiple = Math.round(mode.refreshRate / fps).toInt()
+                if (multiple >= 1 && Math.abs(mode.refreshRate - multiple * fps) <= 0.01 * multiple) multiple to mode else null
+            }
+            .minByOrNull { it.first }?.second ?: return
+        displaySwitched = true
+        if (target.modeId == current.modeId) return
+        activity.window.attributes = activity.window.attributes.apply { preferredDisplayModeId = target.modeId }
     }
 
     @androidx.annotation.OptIn(UnstableApi::class)
@@ -346,6 +405,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     fun load(invoke: Invoke) {
         val args = invoke.parseArgs(LoadArgs::class.java)
         onPlayer(invoke) {
+            decodeHere = args.decode.toSet()
             meterQuietUntil = System.currentTimeMillis() + METER_QUIET_AFTER_LOAD_MS
             it.setMediaItem(MediaItem.fromUri(args.url))
             it.prepare()
@@ -378,7 +438,31 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
-    fun capabilities(invoke: Invoke) = invoke.resolve(Capabilities.build(activity))
+    fun capabilities(invoke: Invoke) {
+        val args = invoke.parseArgs(CapabilitiesArgs::class.java)
+        invoke.resolve(Capabilities.build(activity, args.decode.toSet()))
+    }
+
+    @Command
+    fun deviceInfo(invoke: Invoke) = invoke.resolve(Capabilities.deviceInfo(activity))
+
+    @Command
+    fun frameRate(invoke: Invoke) {
+        val args = invoke.parseArgs(FrameRateArgs::class.java)
+        main.post {
+            frameRateMode = args.mode
+            invoke.resolve()
+        }
+    }
+
+    @Command
+    fun restoreDisplay(invoke: Invoke) {
+        main.post {
+            displaySwitched = false
+            activity.window.attributes = activity.window.attributes.apply { preferredDisplayModeId = 0 }
+            invoke.resolve()
+        }
+    }
 
     @Command
     fun play(invoke: Invoke) = onPlayer(invoke) { it.play() }
