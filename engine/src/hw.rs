@@ -26,6 +26,9 @@ pub struct Hw {
     pub device: String,
     pub encoders: EncoderSet,
     pub libplacebo: bool,
+    /// libplacebo on frames in memory, on a Vulkan device of its own: tonemaps where frames
+    /// cannot be mapped to Vulkan.
+    pub libplacebo_sw: bool,
     pub untested: bool,
     pub hw_decode: bool,
     pub cpu_encoders: EncoderSet,
@@ -38,6 +41,7 @@ impl Hw {
             device,
             encoders,
             libplacebo,
+            libplacebo_sw: false,
             untested: !matches!(backend, Backend::Vaapi | Backend::Cpu),
             hw_decode: true,
             cpu_encoders: if backend == Backend::Cpu {
@@ -270,6 +274,23 @@ async fn libplacebo_works(ffmpeg: &Path) -> bool {
     ffmpeg_succeeds(ffmpeg, &args).await
 }
 
+/// No `-init_hw_device vulkan`: given ffmpeg's Vulkan device, libplacebo before 7.387 (API 365)
+/// refuses the queue flags ffmpeg 9.0 sets and fails to initialise.
+async fn libplacebo_sw_works(ffmpeg: &Path) -> bool {
+    let args = owned(&[
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=256x144:duration=0.2",
+        "-vf",
+        "format=p010le,libplacebo=w=128:h=72:format=nv12:tonemapping=bt.2390",
+        "-f",
+        "null",
+        "-",
+    ]);
+    ffmpeg_succeeds(ffmpeg, &args).await
+}
+
 fn named_backend(accel: HwAccel) -> Option<Backend> {
     match accel {
         HwAccel::Auto => None,
@@ -312,11 +333,14 @@ async fn probe_encoders(cfg: &Config) -> Hw {
     for backend in order {
         let encoders = probe_backend(&ffmpeg, backend, &cfg.hw_device).await;
         if encoders.h264 || encoders.hevc || encoders.av1 {
-            // On AMD (RX 7900 XT, Mesa RADV) the reverse hwmap from Vulkan back to VAAPI fails with
-            // VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT, and parallel Vulkan video work
-            // hung the GPU and rebooted the host. VAAPI tonemaps on the CPU instead.
+            // On AMD (RX 7900 XT and Radeon 780M, Mesa RADV) the reverse hwmap from Vulkan back to
+            // VAAPI fails with VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT or renders
+            // nothing, a forward hwmap of libplacebo's output to VAAPI reset the 780M, and parallel
+            // Vulkan video work hung the 7900 XT and rebooted the host. VAAPI downloads the frames
+            // and tonemaps them with libplacebo on its own device, or on the CPU.
             let libplacebo = libplacebo && backend != Backend::Vaapi;
             let mut hw = Hw::new(backend, cfg.hw_device.clone(), encoders, libplacebo);
+            hw.libplacebo_sw = backend == Backend::Vaapi && libplacebo_sw_works(&ffmpeg).await;
             if backend != Backend::Cpu {
                 hw.cpu_encoders = probe_backend(&ffmpeg, Backend::Cpu, "").await;
             }

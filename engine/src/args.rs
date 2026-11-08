@@ -59,13 +59,20 @@ fn keeps_hdr(out: HdrOut) -> bool {
 }
 
 fn libplacebo(w: u32, h: u32, out: HdrOut, derive: &str) -> String {
+    format!(
+        "hwmap=derive_device=vulkan,{},hwmap=derive_device={derive}:reverse=1",
+        placebo_filter(w, h, out)
+    )
+}
+
+fn placebo_filter(w: u32, h: u32, out: HdrOut) -> String {
     let (fmt, space, prim, trc) = match out {
         HdrOut::Keep(Hdr::Hdr10) => ("p010", "bt2020nc", "bt2020", "smpte2084"),
         HdrOut::Keep(Hdr::Hlg) => ("p010", "bt2020nc", "bt2020", "arib-std-b67"),
         _ => ("nv12", "bt709", "bt709", "bt709"),
     };
     format!(
-        "hwmap=derive_device=vulkan,libplacebo=w={w}:h={h}:format={fmt}:colorspace={space}:color_primaries={prim}:color_trc={trc}:tonemapping=bt.2390:apply_dolbyvision=1,hwmap=derive_device={derive}:reverse=1"
+        "libplacebo=w={w}:h={h}:format={fmt}:colorspace={space}:color_primaries={prim}:color_trc={trc}:tonemapping=bt.2390:apply_dolbyvision=1"
     )
 }
 
@@ -143,7 +150,11 @@ fn pipeline(plan: &Plan, a: &Analysis, hw: &Hw) -> Pipeline {
         } else {
             rest.push(format!("scale={width}:{height}"));
         }
-        rest.push(CPU_TONEMAP.to_owned());
+        rest.push(if hw.libplacebo_sw {
+            placebo_filter(width, height, HdrOut::Tonemap)
+        } else {
+            CPU_TONEMAP.to_owned()
+        });
         on_gpu = false;
     } else {
         // Without a format the scaler keeps the source's: a 10-bit SDR source would come out as
@@ -776,6 +787,22 @@ mod tests {
         );
         assert!(contains_seq(&args, &["-c:v", "libx264"]));
         assert!(contains_seq(&args, &["-x264-params", "scenecut=0"]));
+    }
+
+    #[test]
+    fn vaapi_tonemaps_downloaded_frames_with_libplacebo() {
+        let p = plan(
+            transcode(VideoCodec::H264, HdrOut::Tonemap, false),
+            AudioAction::Copy,
+        );
+        let mut hw = hw(Backend::Vaapi, false);
+        hw.libplacebo_sw = true;
+        let args = run(&p, &hw, 0, 0.0);
+        let vf = value_of(&args, "-vf");
+        assert_eq!(
+            vf,
+            "scale_vaapi=w=1920:h=1080,hwdownload,format=p010le,libplacebo=w=1920:h=1080:format=nv12:colorspace=bt709:color_primaries=bt709:color_trc=bt709:tonemapping=bt.2390:apply_dolbyvision=1,format=nv12,hwupload"
+        );
     }
 
     #[test]

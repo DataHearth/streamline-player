@@ -53,7 +53,7 @@ pub async fn health(State(s): State<AppState>) -> Json<Health> {
         backend: crate::session::backend_name(s.hw.backend),
         untested: s.hw.untested,
         vaapi: s.hw.backend == crate::hw::Backend::Vaapi,
-        libplacebo: s.hw.libplacebo,
+        libplacebo: s.hw.libplacebo || s.hw.libplacebo_sw,
         dovi_tool: s.hw.encoders.dovi_tool,
         encoders: encoder_names(&s.hw.encoders),
         decoders: s.hw.decoders(),
