@@ -1,4 +1,6 @@
 use serde_json::{Value, json};
+use std::{fs, path::PathBuf};
+use tauri::{AppHandle, Manager};
 
 // ponytail: fixed dev server (dev/mock-streamline.py); device pairing replaces it.
 // 10.0.2.2 is the Android emulator's alias for the host.
@@ -115,8 +117,53 @@ async fn playback_status(api: tauri::State<'_, Api>) -> Result<Value, String> {
         .await
 }
 
+/// The session this device has open, on disk so that a launch after a crash can stop it:
+/// a crash skips `stop_session`, and the dead session would hold its conversion slot until
+/// Streamline's heartbeat timeout.
+fn open_session_file(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|d| d.join("open-session"))
+}
+
+fn record_open_session(app: &AppHandle, id: &str) {
+    if let Some(file) = open_session_file(app) {
+        let _ = file.parent().map(fs::create_dir_all);
+        let _ = fs::write(file, id);
+    }
+}
+
+fn forget_open_session(app: &AppHandle, id: &str) {
+    if let Some(file) = open_session_file(app)
+        && fs::read_to_string(&file).is_ok_and(|open| open == id)
+    {
+        let _ = fs::remove_file(file);
+    }
+}
+
+fn stop_left_over_session(app: &AppHandle) {
+    let Some(file) = open_session_file(app) else {
+        return;
+    };
+    let Ok(id) = fs::read_to_string(&file) else {
+        return;
+    };
+    // Removed before the DELETE is sent, so a session started meanwhile is never the one forgotten.
+    let _ = fs::remove_file(file);
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let path = format!("/playback/sessions/{id}");
+        let _ = app
+            .state::<Api>()
+            .call(reqwest::Method::DELETE, &path, None)
+            .await;
+    });
+}
+
 #[tauri::command]
 async fn start_session(
+    app: AppHandle,
     api: tauri::State<'_, Api>,
     media_id: String,
     capabilities: Value,
@@ -131,8 +178,13 @@ async fn start_session(
     if let (Some(body), Some(tracks)) = (body.as_object_mut(), tracks.as_object()) {
         body.extend(tracks.clone());
     }
-    api.call(reqwest::Method::POST, "/playback/sessions", Some(body))
-        .await
+    let session = api
+        .call(reqwest::Method::POST, "/playback/sessions", Some(body))
+        .await?;
+    if let Some(id) = session["session_id"].as_str() {
+        record_open_session(&app, id);
+    }
+    Ok(session)
 }
 
 #[tauri::command]
@@ -199,7 +251,12 @@ async fn session_info(api: tauri::State<'_, Api>, id: String) -> Result<Value, S
 }
 
 #[tauri::command]
-async fn stop_session(api: tauri::State<'_, Api>, id: String) -> Result<(), String> {
+async fn stop_session(
+    app: AppHandle,
+    api: tauri::State<'_, Api>,
+    id: String,
+) -> Result<(), String> {
+    forget_open_session(&app, &id);
     api.call(
         reqwest::Method::DELETE,
         &format!("/playback/sessions/{id}"),
@@ -233,6 +290,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_player::init())
         .manage(Api(client))
+        .setup(|app| {
+            stop_left_over_session(app.handle());
+            Ok(())
+        })
         .register_asynchronous_uri_scheme_protocol("artwork", move |_ctx, request, responder| {
             let client = images.clone();
             let path = request.uri().path().to_owned();
