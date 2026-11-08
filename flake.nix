@@ -15,21 +15,9 @@
       perSystem =
         { pkgs, system, ... }:
         let
-          rust = pkgs.rust-bin.stable.latest.default.override {
-            extensions = [
-              "rust-src"
-              "rust-analyzer"
-            ];
-            targets = [ "x86_64-pc-windows-gnu" ];
-          };
-          rustAndroid = rust.override {
-            targets = [
-              "aarch64-linux-android"
-              "armv7-linux-androideabi"
-              "i686-linux-android"
-              "x86_64-linux-android"
-            ];
-          };
+          rust = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+          nodejs = pkgs.callPackage ./nix/node.nix { };
+          pnpm = pkgs.callPackage ./nix/pnpm.nix { };
           android = pkgs.androidenv.composeAndroidPackages {
             # The system image is API 36; Tauri's Android template compiles against 37.
             platformVersions = [
@@ -76,7 +64,7 @@
             nativeBuildInputs = with pkgs; [
               rust
               cargo-tauri
-              nodejs_24
+              nodejs
               pnpm
               pkg-config
               wrapGAppsHook3
@@ -112,9 +100,9 @@
           # for desktop work.
           devShells.android = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
-              rustAndroid
+              rust
               cargo-tauri
-              nodejs_24
+              nodejs
               pnpm
               jdk17
               androidSdk
