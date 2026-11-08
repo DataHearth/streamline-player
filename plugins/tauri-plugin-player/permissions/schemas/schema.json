@@ -463,10 +463,22 @@
           "markdownDescription": "Denies the timing command without any pre-configured scope."
         },
         {
-          "description": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-registerListener`\n- `allow-register-listener`\n- `allow-removeListener`\n- `allow-remove-listener`",
+          "description": "Enables the voice command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-voice",
+          "markdownDescription": "Enables the voice command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the voice command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-voice",
+          "markdownDescription": "Denies the voice command without any pre-configured scope."
+        },
+        {
+          "description": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-voice`\n- `allow-registerListener`\n- `allow-register-listener`\n- `allow-removeListener`\n- `allow-remove-listener`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-registerListener`\n- `allow-register-listener`\n- `allow-removeListener`\n- `allow-remove-listener`"
+          "markdownDescription": "Allows controlling the native player and listening to its events\n#### This default permission set includes:\n\n- `allow-capabilities`\n- `allow-load`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-speed`\n- `allow-stats`\n- `allow-subtitle`\n- `allow-timing`\n- `allow-voice`\n- `allow-registerListener`\n- `allow-register-listener`\n- `allow-removeListener`\n- `allow-remove-listener`"
         }
       ]
     }

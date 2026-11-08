@@ -13,6 +13,7 @@ permissions = [
   "allow-stats",
   "allow-subtitle",
   "allow-timing",
+  "allow-voice",
   "allow-registerListener",
   "allow-register-listener",
   "allow-removeListener",

@@ -11,6 +11,7 @@ const COMMANDS: &[&str] = &[
     "stats",
     "subtitle",
     "timing",
+    "voice",
     "registerListener",
     "register_listener",
     "removeListener",

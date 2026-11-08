@@ -1,19 +1,25 @@
 package com.datahearth.player
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
+import android.speech.RecognizerIntent
 import android.util.Log
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.SurfaceView
 import android.view.ViewGroup
+import android.view.Window
 import android.webkit.WebView
 import java.util.concurrent.atomic.AtomicLong
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.ActivityResult
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaLibraryInfo
 import androidx.media3.common.PlaybackException
@@ -36,6 +42,7 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
@@ -210,6 +217,16 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
                 override fun handleOnBackPressed() = trigger("back", JSObject())
             },
         )
+        // The remote's mic key opens our search instead of Android's global one. Caught on the
+        // window: the WebView overrides dispatchKeyEvent, so a key listener on it never runs.
+        val inner = activity.window.callback
+        activity.window.callback = object : Window.Callback by inner {
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                if (event.keyCode != KeyEvent.KEYCODE_SEARCH && event.keyCode != KeyEvent.KEYCODE_VOICE_ASSIST) return inner.dispatchKeyEvent(event)
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) trigger("voiceKey", JSObject())
+                return true
+            }
+        }
         // Without this the first D-pad press only moves Android focus into the
         // WebView instead of reaching the page.
         webView.requestFocus()
@@ -339,6 +356,25 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     fun stop(invoke: Invoke) = onPlayer(invoke) {
         it.stop()
         it.clearMediaItems()
+    }
+
+    /** Android's own listening dialog: it needs no microphone permission of ours. */
+    @Command
+    fun voice(invoke: Invoke) {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        try {
+            startActivityForResult(invoke, intent, "voiceResult")
+        } catch (e: ActivityNotFoundException) {
+            invoke.reject("no speech recognizer on this device")
+        }
+    }
+
+    @ActivityCallback
+    private fun voiceResult(invoke: Invoke, result: ActivityResult) {
+        val text = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        invoke.resolve(JSObject().apply { put("text", text ?: "") })
     }
 
     @Command

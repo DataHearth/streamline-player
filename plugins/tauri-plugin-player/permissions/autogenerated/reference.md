@@ -14,6 +14,7 @@ Allows controlling the native player and listening to its events
 - `allow-stats`
 - `allow-subtitle`
 - `allow-timing`
+- `allow-voice`
 - `allow-registerListener`
 - `allow-register-listener`
 - `allow-removeListener`
@@ -388,6 +389,32 @@ Enables the timing command without any pre-configured scope.
 <td>
 
 Denies the timing command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-voice`
+
+</td>
+<td>
+
+Enables the voice command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-voice`
+
+</td>
+<td>
+
+Denies the voice command without any pre-configured scope.
 
 </td>
 </tr>

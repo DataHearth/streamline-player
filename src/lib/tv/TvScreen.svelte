@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { afterNavigate, goto } from "$app/navigation";
-	import { addPluginListener } from "@tauri-apps/api/core";
-	import { Film, House, TvMinimal } from "@lucide/svelte";
+	import { addPluginListener, invoke } from "@tauri-apps/api/core";
+	import { Film, House, Search, TvMinimal } from "@lucide/svelte";
 	import { onMount, type Snippet } from "svelte";
 	import { focus, focusDefault, forgetFocus, move } from "./focus";
+	import { search } from "./search.svelte";
 
-	type Tab = "home" | "movies" | "series";
+	type Tab = "search" | "home" | "movies" | "series";
 	let { tab, scroll = false, onback, children }: { tab?: Tab; scroll?: boolean; onback?: () => void; children: Snippet } = $props();
 
 	const TABS = [
+		{ id: "search", label: "", href: "/search", icon: Search },
 		{ id: "home", label: "Home", href: "/", icon: House },
 		{ id: "movies", label: "Movies", href: "/library/movies", icon: Film },
 		{ id: "series", label: "Shows", href: "/library/series", icon: TvMinimal },
@@ -48,14 +50,24 @@
 		focusTimer = setTimeout(() => focusDefault(stage), FOCUS_DELAY_MS);
 	});
 
+	async function listen() {
+		if (location.pathname.startsWith("/player")) return;
+		const { text } = await invoke<{ text: string }>("plugin:player|voice").catch(() => ({ text: "" }));
+		if (!text.trim()) return;
+		search.q = text.trim();
+		if (location.pathname !== "/search") goto("/search");
+	}
+
 	onMount(() => {
 		tick();
 		const timer = setInterval(tick, 10_000);
 		const listener = addPluginListener("player", "back", back);
+		const voice = addPluginListener("player", "voiceKey", listen);
 		return () => {
 			clearTimeout(focusTimer);
 			clearInterval(timer);
 			listener.then((h) => h.unregister());
+			voice.then((h) => h.unregister());
 		};
 	});
 </script>
@@ -72,7 +84,7 @@
 			</div>
 			<div class="tabs" data-tv-row="1">
 				{#each TABS as t}
-					<button data-tv="1" data-tv-active={t.id === tab ? "1" : undefined} class="pill" class:current={t.id === tab} aria-current={t.id === tab ? "page" : undefined} onclick={() => goto(t.href)}>
+					<button data-tv="1" data-tv-active={t.id === tab ? "1" : undefined} class="pill" class:current={t.id === tab} class:icon={!t.label} aria-label={t.label || "Search"} aria-current={t.id === tab ? "page" : undefined} onclick={() => goto(t.href)}>
 						<t.icon size={28} strokeWidth={1.75} />{t.label}
 					</button>
 				{/each}
@@ -169,6 +181,10 @@
 		cursor: pointer;
 		outline: none;
 		transition: background var(--dur-fast), color var(--dur-fast), transform 150ms;
+	}
+
+	.pill.icon {
+		gap: 0;
 	}
 
 	.pill.current {
