@@ -1,5 +1,5 @@
-// Commands are implemented in Kotlin; Tauri forwards any command the Rust side
-// does not handle to the registered mobile plugin. These names only feed the ACL.
+// Android answers these in Kotlin (Tauri forwards commands the Rust side does not handle to the
+// mobile plugin), Linux in src/desktop.rs. These names only feed the ACL.
 const COMMANDS: &[&str] = &[
     "capabilities",
     "load",
@@ -12,6 +12,7 @@ const COMMANDS: &[&str] = &[
     "subtitle",
     "timing",
     "registerListener",
+    "register_listener",
     "removeListener",
     "remove_listener",
 ];

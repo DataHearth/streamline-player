@@ -93,6 +93,9 @@
               libsoup_3
               librsvg
               openssl
+              # The desktop player: libmpv through its OpenGL render API; libGL brings libEGL.
+              mpv-unwrapped
+              libGL
               glib-networking
               # WebKitGTK's MSE plays through GStreamer; without these Shaka sees no codecs.
               gst_all_1.gstreamer

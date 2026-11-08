@@ -15,6 +15,7 @@ Allows controlling the native player and listening to its events
 - `allow-subtitle`
 - `allow-timing`
 - `allow-registerListener`
+- `allow-register-listener`
 - `allow-removeListener`
 - `allow-remove-listener`
 
@@ -153,6 +154,32 @@ Enables the registerListener command without any pre-configured scope.
 <td>
 
 Denies the registerListener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:allow-register-listener`
+
+</td>
+<td>
+
+Enables the register_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`player:deny-register-listener`
+
+</td>
+<td>
+
+Denies the register_listener command without any pre-configured scope.
 
 </td>
 </tr>
