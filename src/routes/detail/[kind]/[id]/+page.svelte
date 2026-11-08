@@ -4,7 +4,7 @@
 	import { autoCap, PRESETS, rememberedThroughput } from "#lib/player/auto.ts";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, badges, decisions, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Decision, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
+	import { artwork, badges, hideBroken, decisions, episodesOf, everything, inProgress, left, meta, orPoster, pct, runtime, setWatched, stillPos, title as fetchTitle, watchState, type Decision, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
 	import { toast } from "#lib/tv/toast.svelte.ts";
 	import { Check, CheckCheck, Eye, Play, RotateCcw } from "@lucide/svelte";
 
@@ -170,8 +170,8 @@
 				{:else}
 					<div class="more-title">More like this</div>
 					<div class="similar">
-						{#each similar as it}
-							<button data-tv="1" class="sim" onclick={() => goto(`/detail/${it.kind}/${it.id}`)}><img src={artwork(it.kind, it.id, "poster")} alt={it.title} loading="lazy" /></button>
+						{#each similar as it (`${it.kind}:${it.id}`)}
+							<button data-tv="1" class="sim" aria-label={it.title} onclick={() => goto(`/detail/${it.kind}/${it.id}`)}><img src={artwork(it.kind, it.id, "poster")} alt={it.title} loading="lazy" onerror={hideBroken} /></button>
 						{/each}
 					</div>
 				{/if}

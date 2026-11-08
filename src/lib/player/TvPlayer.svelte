@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { decisions, orPoster, playerCapabilities, type Decision } from "#lib/tv/api.ts";
+	import { decisions, hideBroken, orPoster, PLAYER_NAME, playerCapabilities, type Decision } from "#lib/tv/api.ts";
 	import { focusDefault as focusStageDefault, move } from "#lib/tv/focus.ts";
 	import HaltScreen from "./HaltScreen.svelte";
 	import { autoCap, PRESETS, rememberedThroughput, rememberThroughput, stepDown } from "./auto.ts";
@@ -81,7 +81,7 @@
 	type Stats = { player?: string; version: string; buffer: number; videoBitrate: number; audioBitrate: number; rendered: number; dropped: number; displayHz: number };
 	type AudioTrack = { index: number; codec: string; channels: number; language: string; default: boolean };
 	type SubTrack = { index: number; codec: string; language: string; forced: boolean; sdh: boolean; files: Record<string, string> };
-	type Tracks = { preparing: boolean; container: string; video: { codec: string; width: number; height: number; hdr?: string; dv?: unknown } | null; chapters: { start: number; end: number; title: string }[]; markers: { intro: [number, number] | null; credits: [number, number] | null }; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
+	type Tracks = { preparing: boolean; container: string; video: { codec: string; width: number; height: number; profile?: string; hdr?: string; dv?: unknown } | null; chapters: { start: number; end: number; title: string }[]; markers: { intro: [number, number] | null; credits: [number, number] | null }; audio: AudioTrack[]; subtitles: SubTrack[]; fonts: string[] };
 	type StatRow = { k: string; v: string; c?: string; why?: boolean };
 	type SubKind = "text" | "styled" | "image";
 	type Cue = { start: number; end: number; text: string };
@@ -93,7 +93,6 @@
 	// Seconds the bar may run ahead of the last report, should reports stop.
 	const MAX_EXTRAPOLATION = 1;
 	const SEEK_STEP = 10;
-	const PLAYER_NAME = "ExoPlayer";
 	const TAB_NAMES: Record<Tab, string> = { audio: "Audio", subs: "Subtitles", quality: "Quality", speed: "Speed" };
 	const CODEC_NAMES: Record<string, string> = {
 		h264: "H.264",
@@ -366,22 +365,26 @@
 	}
 
 	const mbit = (bits: number) => `${(bits / 1_000_000).toFixed(bits < 1_000_000 ? 2 : 1)} Mbit/s`;
-	const videoName = (codec: string, height: number) => `${CODEC_NAMES[codec] ?? codec.toUpperCase()} ${height}p`;
+	// Wide films are cropped (3840×2076, 1920×800): the width names the class, as on the box.
+	const resName = (w: number, h: number) => `${w >= 7000 || h >= 4000 ? 4320 : w >= 3400 || h >= 2000 ? 2160 : w >= 1800 || h >= 1000 ? 1080 : w >= 1200 || h >= 700 ? 720 : h}p`;
+	const codecName = (codec: string, profile?: string) => `${CODEC_NAMES[codec] ?? codec.toUpperCase()}${profile ? ` ${profile.replace(/\s/g, "")}` : ""}`;
+	const videoName = (codec: string, w: number, h: number, profile?: string) => `${codecName(codec, profile)} ${resName(w, h)}`;
 	const HDR_NAMES: Record<string, string> = { hdr10: "HDR10", hlg: "HLG" };
 	const rangeName = (hdr?: string, dv?: boolean) => (dv ? " Dolby Vision" : hdr && HDR_NAMES[hdr] ? ` ${HDR_NAMES[hdr]}` : "");
 	function videoOutName(s: Session) {
-		const name = videoName(s.video.codec, s.video.height);
-		if (s.video.action === "copy") return `${name}${rangeName(s.video.hdr, s.video.dv_profile !== undefined)}`;
+		const copy = s.video.action === "copy";
+		const name = videoName(s.video.codec, s.video.width, s.video.height, copy ? tracks?.video?.profile : undefined);
+		if (copy) return `${name}${rangeName(s.video.hdr, s.video.dv_profile !== undefined)}`;
 		return `${name} ${HDR_NAMES[s.video.hdr] ?? "SDR"}`;
 	}
-	const originalSub = $derived(tracks?.video ? `${tracks.video.height}p ${CODEC_NAMES[tracks.video.codec] ?? tracks.video.codec}${rangeName(tracks.video.hdr, !!tracks.video.dv)}` : "");
+	const originalSub = $derived(tracks?.video ? `${resName(tracks.video.width, tracks.video.height)} ${codecName(tracks.video.codec, tracks.video.profile)}${rangeName(tracks.video.hdr, !!tracks.video.dv)}` : "");
 	const audioOutName = (s: { audio: Session["audio"] }) => `${CODEC_NAMES[s.audio.codec] ?? s.audio.codec} ${channelLayout(s.audio.channels)}`;
 	const modeBadge = (d?: Decision) => (d && !d.error ? MODE_LABEL[d.mode].toLowerCase() : "");
 	const modeTone = (d?: Decision): Tone => (d && !d.error && !d.needs_slot ? "ok" : "conv");
 
 	function qualitySub(d: Decision | undefined) {
 		if (!d || d.error) return d?.error.message ?? "";
-		return d.video.action === "copy" ? `Same as Original \u00B7 the file is ${fileMbit}` : videoName(d.video.codec, d.video.height);
+		return d.video.action === "copy" ? `Same as Original \u00B7 the file is ${fileMbit}` : videoName(d.video.codec, d.video.width, d.video.height);
 	}
 
 	const autoDecision = $derived(autoPick ? preview?.presets[autoPick] : preview?.original);
@@ -390,7 +393,7 @@
 		const why = d && !d.error && !originalPlays ? (d.video_reasons[0]?.text ?? "") : "based on your connection";
 		if (autoPick) return `Now ${autoPick} Mbit/s \u00B7 ${why}`;
 		if (!d || d.error || originalPlays) return measuredOnce ? "Now Original \u00B7 your connection allows it" : "Now Original";
-		return `Now ${videoName(d.video.codec, d.video.height)} \u00B7 ${why}`;
+		return `Now ${videoName(d.video.codec, d.video.width, d.video.height)} \u00B7 ${why}`;
 	});
 
 	function currentCap() {
@@ -465,7 +468,7 @@
 		const copy = session.video.action === "copy";
 		const direct = session.mode === "direct";
 		const box = tracks?.container.toUpperCase() ?? "";
-		const inName = tracks?.video ? `${videoName(tracks.video.codec, tracks.video.height)}${rangeName(tracks.video.hdr, !!tracks.video.dv)}` : "";
+		const inName = tracks?.video ? `${videoName(tracks.video.codec, tracks.video.width, tracks.video.height, tracks.video.profile)}${rangeName(tracks.video.hdr, !!tracks.video.dv)}` : "";
 		const outName = videoOutName(session);
 		const audioIn = selectedAudio ? audioName(selectedAudio) : "";
 		const audioOut = audioOutName(session);
@@ -473,7 +476,7 @@
 		const known = [live && live.videoBitrate > 0 && `${mbit(live.videoBitrate)} video`, live && live.audioBitrate > 0 && `${mbit(live.audioBitrate)} audio`].filter(Boolean);
 		const rows: StatRow[] = [
 			{ k: "Mode", v: `${MODE_LABEL[session.mode]}${direct ? " \u00B7 the original file" : session.mode === "remux" ? " \u00B7 nothing converted" : ""}`, c: full ? "var(--status-available)" : "var(--status-downloading)" },
-			{ k: "Player", v: live?.player ?? `${PLAYER_NAME} \u00B7 Media3 ${live?.version ?? ""} \u00B7 Android TV` },
+			{ k: "Player", v: live?.player ?? PLAYER_NAME },
 			{ k: "Video", v: copy ? `${outName} \u00B7 as-is` : `${inName} \u2192 ${outName}`, c: "var(--player-ink)" },
 			...(copy ? [] : why(session.video_reasons)),
 			{ k: "Audio", v: session.audio.action === "copy" ? `${audioIn} \u00B7 as-is` : `${audioIn} \u2192 ${audioOut}`, c: "var(--player-ink)" },
@@ -500,7 +503,7 @@
 		return rows;
 	});
 
-	const subRenderer = (kind: SubKind) => (kind === "styled" ? "libass" : kind === "image" ? "Media3" : "web view");
+	const subRenderer = (kind: SubKind) => (kind === "styled" ? "libass" : kind === "image" ? (PLAYER_NAME === "mpv" ? "mpv" : "Media3") : "web view");
 
 	$effect(() => {
 		if (!stats) return;
@@ -1353,8 +1356,8 @@
 							<div class="end-more">
 								<span class="more-title">More like this</span>
 								<div class="more-row">
-									{#each more as it}
-										<button data-tv="1" class="more-card" aria-label={it.title} onclick={() => onopen(it.href)}><img src={it.poster} alt="" loading="lazy" /></button>
+									{#each more as it (it.href)}
+										<button data-tv="1" class="more-card" aria-label={it.title} onclick={() => onopen(it.href)}><img src={it.poster} alt="" loading="lazy" onerror={hideBroken} /></button>
 									{/each}
 								</div>
 							</div>

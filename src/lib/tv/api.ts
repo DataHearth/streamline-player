@@ -14,6 +14,8 @@ export type Title = {
 	added_at: string;
 	file_summary?: FileSummary;
 	runtime?: number;
+	/** Age rating as printed on the box: "PG-13", "R", "12". */
+	certification?: string;
 	media_files?: { id: string }[];
 	network?: string;
 	total_seasons?: number;
@@ -39,6 +41,8 @@ export type Decision = { mode: Mode; video: VideoOut; audio: AudioOut; video_rea
 export type DecisionOption = { audio_index?: number | null; burn_in_subtitle?: number | null; max_bitrate?: number | null };
 
 let capabilities: Promise<unknown> | null = null;
+// ponytail: mpv is the only desktop backend so far (Linux); macOS and Windows will need their own name.
+export const PLAYER_NAME = /Android/.test(navigator.userAgent) ? "ExoPlayer" : "mpv";
 export const playerCapabilities = () => (capabilities ??= invoke("plugin:player|capabilities"));
 
 /** What the engine would do for each option, without starting anything. */
@@ -77,8 +81,8 @@ export function badges(q?: FileSummary) {
 
 export const meta = (kind: Kind, t: Title) =>
 	kind === "series"
-		? `${t.first_aired ? `${new Date(t.first_aired).getUTCFullYear()}\u2013` : t.year} · ${t.total_seasons ?? t.seasons?.length ?? 0} season${(t.total_seasons ?? t.seasons?.length) === 1 ? "" : "s"} · ★ ${t.rating}`
-		: `${t.year} · ${runtime(t.runtime ?? 0)} · ★ ${t.rating}`;
+		? `${t.first_aired ? `${t.first_aired.slice(0, 4)}\u2013` : t.year} · ${t.total_seasons ?? t.seasons?.length ?? 0} season${(t.total_seasons ?? t.seasons?.length) === 1 ? "" : "s"} · ★ ${t.rating}`
+		: [t.year, runtime(t.runtime ?? 0), t.certification, `★ ${t.rating}`].filter(Boolean).join(" · ");
 
 /** Episodes in play order, each with its season number. */
 export const episodesOf = (t: Title) => (t.seasons ?? []).flatMap((s) => s.episodes.map((e) => ({ ...e, season: s.number })));
@@ -92,10 +96,14 @@ export const everything = async () => {
 	return [...movies.map((t) => ({ ...t, kind: "movies" as Kind })), ...shows.map((t) => ({ ...t, kind: "series" as Kind }))];
 };
 
-/** Titles without a backdrop fall back to their poster. A failing poster stops here: the src no longer changes. */
+const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
+/** WebKit draws a broken-image glyph over the card; a blank image keeps the card's frame and background. */
+export const hideBroken = (e: Event) => ((e.currentTarget as HTMLImageElement).src = BLANK);
+
+/** Titles without a backdrop fall back to their poster; without either, the image hides. */
 export const orPoster = (poster: string, position?: string) => (e: Event) => {
 	const img = e.currentTarget as HTMLImageElement;
-	if (img.src === poster) return;
+	if (img.src === poster) return hideBroken(e);
 	img.src = poster;
 	img.style.objectPosition = position ?? "";
 };

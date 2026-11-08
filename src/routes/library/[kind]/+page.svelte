@@ -3,7 +3,7 @@
 	import { page } from "$app/state";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, episodesOf, inProgress, library, pct, title as fetchTitle, watchState, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
+	import { artwork, episodesOf, hideBroken, inProgress, library, pct, title as fetchTitle, watchState, type Kind, type Title, type Watch } from "#lib/tv/api.ts";
 	import { Check } from "@lucide/svelte";
 
 	type Flag = "unwatched" | "progress" | "uhd" | "hdr";
@@ -90,10 +90,10 @@
 				{/each}
 			</div>
 			<div class="grid">
-				{#each items as t}
+				{#each items as t (t.id)}
 					<div class="item">
 						<button data-tv="1" data-fid={String(t.id)} class="card" aria-label={t.title} onclick={() => goto(`/detail/${kind}/${t.id}`)}>
-							<img src={artwork(kind, t.id, "poster")} alt="" loading="lazy" />
+							<img src={artwork(kind, t.id, "poster")} alt="" loading="lazy" onerror={hideBroken} />
 							{#if going(t)}<span class="bar"><span style:width="{pct(going(t))}%"></span></span>{/if}
 							{#if watched(t)}<span class="done"><Check size={22} strokeWidth={3} /></span>{/if}
 						</button>

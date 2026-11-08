@@ -1,7 +1,7 @@
 import { CircleAlert, Cpu, Folder, Server, WifiOff } from "@lucide/svelte";
 import type { Component } from "svelte";
+import { PLAYER_NAME } from "#lib/tv/api.ts";
 
-const PLAYER_NAME = "ExoPlayer";
 const RETRY_SECS = 10;
 const OFFLINE_CHECK_SECS = 5;
 

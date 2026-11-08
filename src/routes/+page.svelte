@@ -12,7 +12,7 @@
 	import { goto } from "$app/navigation";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, badges, episodesOf, inProgress, left, library, meta, orPoster, pct, stillPos, title as fetchTitle, watchState } from "#lib/tv/api.ts";
+	import { artwork, badges, hideBroken, episodesOf, inProgress, left, library, meta, orPoster, pct, stillPos, title as fetchTitle, watchState } from "#lib/tv/api.ts";
 	import { focusDefault } from "#lib/tv/focus.ts";
 	import { onMount, tick } from "svelte";
 
@@ -48,7 +48,7 @@
 		front = 1 - front;
 	});
 
-	const poster = (kind: Kind, t: Title, label: string): Item => ({ key: `${label}:${t.id}`, kind, t, eyebrow: label, href: `/detail/${kind}/${t.id}` });
+	const poster = (kind: Kind, t: Title, label: string): Item => ({ key: `${label}:${kind}:${t.id}`, kind, t, eyebrow: label, href: `/detail/${kind}/${t.id}` });
 
 	onMount(() => {
 		const first = !cached;
@@ -137,7 +137,7 @@
 				<section style:height="{r.h}px" style:opacity={ri === row ? 1 : 0} style:pointer-events={ri === row ? "auto" : "none"}>
 					<h2 style:color={ri === row ? "var(--fg)" : "var(--fg-subtle)"}>{r.title}</h2>
 					<div class="row" data-tv-row="1">
-						{#each r.items as it, ii}
+						{#each r.items as it, ii (it.key)}
 							{#if r.wide}
 								<button data-tv="1" data-tv-default={ri === 0 && ii === 0 ? "1" : undefined} data-fid={it.key} class="wide" onfocus={() => onFocus(it, ri)} onclick={() => goto(it.href)}>
 									<img src={it.img} alt="" loading="lazy" style:object-position={it.pos} onerror={orPoster(artwork(it.kind, it.t.id, "poster"))} />
@@ -147,7 +147,7 @@
 								</button>
 							{:else}
 								<button data-tv="1" data-tv-default={ri === 0 && ii === 0 ? "1" : undefined} data-fid={it.key} class="poster" onfocus={() => onFocus(it, ri)} onclick={() => goto(it.href)}>
-									<img src={artwork(it.kind, it.t.id, "poster")} alt={it.t.title} loading="lazy" />
+									<img src={artwork(it.kind, it.t.id, "poster")} alt={it.t.title} loading="lazy" onerror={hideBroken} />
 								</button>
 							{/if}
 						{/each}
