@@ -20,10 +20,13 @@
 	let playback = $state.raw<Decision | null>(null);
 	const PLAIN = { direct: "Plays as-is", remux: "Plays in original quality", audio_transcode: "Original picture, converted sound", transcode: "Converted for this device" };
 	const seasonParam = $derived(Number(page.url.searchParams.get("s")) || null);
+	let loadId = 0;
 
 	$effect(() => {
 		const [k, i] = [kind, id];
 		t = null;
+		watch = [];
+		similar = [];
 		season = null;
 		heroBlur = false;
 		failed = null;
@@ -31,7 +34,12 @@
 	});
 
 	async function load(k: Kind, i: number) {
-		const [title, w, all] = await Promise.all([fetchTitle(k, i), watchState(), k === "movies" ? everything() : Promise.resolve([])]);
+		const call = ++loadId;
+		const [title, w, all] = await Promise.all([fetchTitle(k, i), watchState(), k === "movies" ? everything() : Promise.resolve([])]).catch((e) => {
+			if (call === loadId) throw e;
+			return [];
+		});
+		if (call !== loadId) return;
 		t = title;
 		watch = w;
 		const g = title.genres[0] ?? "";
@@ -60,15 +68,21 @@
 	// Failing to know how it will play must not get in the way of the page.
 	$effect(() => {
 		const media = playMedia;
+		playback = null;
 		if (!media) return;
+		let stale = false;
 		decisions(media, [{}, ...PRESETS.map((n) => ({ max_bitrate: n * 1_000_000 }))]).then(
 			(r) => {
+				if (stale) return;
 				const original = r.decisions[0];
 				const cap = autoCap(rememberedThroughput(), r.bit_rate / 1_000_000, !!original && !original.error && original.video.action === "copy");
 				playback = r.decisions[cap ? PRESETS.indexOf(cap) + 1 : 0] ?? null;
 			},
-			() => (playback = null),
+			() => {
+				if (!stale) playback = null;
+			},
 		);
+		return () => (stale = true);
 	});
 
 	const eyebrow = $derived(t ? (kind === "series" ? [t.network, ...t.genres] : t.genres).filter(Boolean).join(" · ") : "");

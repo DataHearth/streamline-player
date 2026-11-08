@@ -17,9 +17,11 @@
 	const kind = $derived(page.params.kind as Kind);
 	let titles = $state.raw<Title[]>([]);
 	let watch = $state.raw<Watch[]>([]);
+	let loaded = $state(false);
 	let flags = $state<Flag[]>([]);
 	let doneShows = $state.raw(new Set<number>());
 	let failed = $state<string | null>(null);
+	let loadId = 0;
 
 	$effect(() => {
 		const current = kind;
@@ -29,15 +31,27 @@
 	});
 
 	async function load(current: Kind) {
-		const [t, w] = await Promise.all([library(current), watchState()]);
+		const id = ++loadId;
+		titles = [];
+		watch = [];
+		doneShows = new Set();
+		loaded = false;
+		const [t, w] = await Promise.all([library(current), watchState()]).catch((e) => {
+			// A failure of the load the viewer already left is not theirs to see.
+			if (id === loadId) throw e;
+			return [];
+		});
+		if (id !== loadId) return;
 		titles = [...t].sort((a, b) => b.added_at.localeCompare(a.added_at));
 		watch = w;
-		if (current === "series") markDoneShows(w);
+		loaded = true;
+		if (current === "series") markDoneShows(w, id).catch(() => {});
 	}
 
-	async function markDoneShows(w: Watch[]) {
+	async function markDoneShows(w: Watch[], id: number) {
 		const started = [...new Set(w.filter((x) => x.watched).flatMap((x) => x.series_id ?? []))];
 		const shows = await Promise.all(started.map((id) => fetchTitle("series", id)));
+		if (id !== loadId) return;
 		const seen = new Set(w.filter((x) => x.watched).map((x) => x.media_id));
 		doneShows = new Set(shows.filter((s) => { const eps = episodesOf(s).filter((e) => e.has_file); return eps.length > 0 && eps.every((e) => seen.has(e.media_file_id)); }).map((s) => s.id));
 	}
@@ -68,7 +82,7 @@
 		<div class="page">
 			<div class="head">
 				<h1>{kind === "series" ? "Shows" : "Movies"}</h1>
-				<span class="count">{items.length} of {titles.length} {kind === "series" ? "shows" : "movies"}</span>
+				{#if loaded}<span class="count">{items.length} of {titles.length} {kind === "series" ? "shows" : "movies"}</span>{/if}
 			</div>
 			<div class="filters">
 				{#each FLAGS as [f, label]}

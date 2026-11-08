@@ -129,6 +129,7 @@
 	const AUDIO_DELAY_LIMIT = 500;
 	const RECOVERY_WINDOW_MS = 30_000;
 	const MENU_EXIT_MS = 240;
+	const HALT_EXIT_MS = 240;
 	const SEEK_RUN_MS = 900;
 	const MODE_LABEL = { direct: "Direct", remux: "Remux", audio_transcode: "Audio converted", transcode: "Converted" };
 
@@ -177,6 +178,8 @@
 	let upNextDismissed = $state(false);
 	let subTouched = false;
 	let halt = $state<Halt | null>(null);
+	let haltLeaving = $state(false);
+	const halted = $derived(!!halt && !haltLeaving);
 	let skL = $state<Flash>({ ph: "idle", amt: 0, rot: 0 });
 	let skR = $state<Flash>({ ph: "idle", amt: 0, rot: 0 });
 	let pf = $state<"idle" | "in" | "out">("idle");
@@ -185,6 +188,7 @@
 	let previewId = 0;
 	let lastMove = Date.now();
 	let retryTimer: ReturnType<typeof setInterval> | undefined;
+	let unhaltTimer: ReturnType<typeof setTimeout> | undefined;
 	let seekTimer: ReturnType<typeof setTimeout> | undefined;
 	let startId = 0;
 	let paused = false;
@@ -636,7 +640,15 @@
 
 	function clearHalt() {
 		clearInterval(retryTimer);
+		clearTimeout(unhaltTimer);
 		halt = null;
+		haltLeaving = false;
+	}
+
+	function unhalt() {
+		clearInterval(retryTimer);
+		haltLeaving = true;
+		unhaltTimer = setTimeout(clearHalt, HALT_EXIT_MS);
 	}
 
 	function closeMenu() {
@@ -651,7 +663,10 @@
 
 	function showHalt(h: Halt) {
 		if (menu) closeMenu();
+		stats = false;
 		player("pause").catch(() => {});
+		clearTimeout(unhaltTimer);
+		haltLeaving = false;
 		halt = h;
 		focusDefault();
 	}
@@ -675,7 +690,8 @@
 	async function start(at = position) {
 		const id = ++startId;
 		const after = halt?.kind;
-		clearHalt();
+		// The halt screen stays up through the attempt: a retry that fails again only updates it.
+		clearInterval(retryTimer);
 		stop();
 		buffering = true;
 		try {
@@ -693,6 +709,7 @@
 			await player("load", { url: session.url });
 			if (at > 0) await player("seek", { seconds: at });
 			if (!paused) await player("play");
+			if (halt) unhalt();
 			showControls(true);
 			resumedToast(after, started);
 		} catch (e) {
@@ -710,13 +727,14 @@
 		const at = position;
 		await stop();
 		await start(at);
-		if (session && !halt) toast("Reconnected \u00B7 playback resumed");
+		if (session && (!halt || haltLeaving)) toast("Reconnected \u00B7 playback resumed");
 	}
 
 	const sessionGone = (raw: string) => raw.includes('"not_found"');
 
 	function failedToStart(raw: string) {
-		const { halt: h, retryIn } = haltFor(raw, { host, at: fmt(position), titleName });
+		let { halt: h, retryIn } = haltFor(raw, { host, at: fmt(position), titleName });
+		if (h.kind === "busy" && halt?.kind === "busy") h = { ...h, alts: halt.alts, body: halt.body };
 		if (retryIn) haltWithRetry(h, retryIn);
 		else showHalt(h);
 		if (h.kind === "busy") offerAlternatives();
@@ -906,7 +924,7 @@
 	}
 
 	function back() {
-		if (halt || ended) return exit();
+		if (halted || ended) return exit();
 		if (menu) return closeMenu();
 		if (stats) {
 			stats = false;
@@ -927,14 +945,14 @@
 			return;
 		}
 		// A keyboard's Space, as in every desktop player; a remote has none.
-		if (k === " " && !halt && !ended) {
+		if (k === " " && !halted && !ended) {
 			e.preventDefault();
 			togglePlay();
 			return;
 		}
 		const arrow = k.startsWith("Arrow");
 		if (!arrow && k !== "Enter") return;
-		if (halt || menu || ended) {
+		if (halted || menu || ended) {
 			if (arrow) {
 				e.preventDefault();
 				move(k, stage);
@@ -1348,7 +1366,7 @@
 	{/if}
 
 	{#if halt}
-		<HaltScreen {halt} {frame} {poster} {framePos} backLabel="Back to {titleName}" onretry={() => start()} onback={exit} />
+		<HaltScreen {halt} leaving={haltLeaving} {frame} {poster} {framePos} backLabel="Back to {titleName}" onretry={() => start()} onback={exit} />
 	{/if}
 </div>
 

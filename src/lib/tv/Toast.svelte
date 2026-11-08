@@ -37,6 +37,10 @@
 		pointer-events: none;
 	}
 
+	:global(body:has([data-tv-nav])) .stage {
+		padding-top: 124px;
+	}
+
 	.scale {
 		transform: scale(1.6);
 		transform-origin: 100% 0;

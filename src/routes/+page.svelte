@@ -1,21 +1,25 @@
-<script module>
-	let booted = false;
+<script module lang="ts">
+	import type { Kind, Title } from "#lib/tv/api.ts";
+
+	type Item = { key: string; kind: Kind; t: Title; eyebrow: string; img?: string; pos?: string; code?: string; pct?: number; left?: string; href: string };
+	type Row = { title: string; wide: boolean; h: number; ch: number; items: Item[] };
+
+	// Coming back to Home shows the last rows at once; a fresh load replaces them.
+	let cached: Row[] | null = null;
 </script>
 
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
-	import { artwork, badges, episodesOf, inProgress, left, library, meta, orPoster, pct, stillPos, title as fetchTitle, watchState, type Kind, type Title } from "#lib/tv/api.ts";
-	import { onMount } from "svelte";
-
-	type Item = { key: string; kind: Kind; t: Title; eyebrow: string; img?: string; pos?: string; code?: string; pct?: number; left?: string; href: string };
-	type Row = { title: string; wide: boolean; h: number; ch: number; items: Item[] };
+	import { artwork, badges, episodesOf, inProgress, left, library, meta, orPoster, pct, stillPos, title as fetchTitle, watchState } from "#lib/tv/api.ts";
+	import { focusDefault } from "#lib/tv/focus.ts";
+	import { onMount, tick } from "svelte";
 
 	const SCREEN_H = 1080;
-	let loaded = $state(booted);
+	let loaded = $state(!!cached);
 	let failed = $state<string | null>(null);
-	let rows = $state.raw<Row[]>([]);
+	let rows = $state.raw<Row[]>(cached ?? []);
 	let fid = $state<string | null>(null);
 	let row = $state(0);
 	let slots = $state.raw<(Item | null)[]>([null, null]);
@@ -47,11 +51,19 @@
 	const poster = (kind: Kind, t: Title, label: string): Item => ({ key: `${label}:${t.id}`, kind, t, eyebrow: label, href: `/detail/${kind}/${t.id}` });
 
 	onMount(() => {
-		load().then(onLoaded, (e) => (failed = String(e)));
+		const first = !cached;
+		load().then(
+			() => {
+				onLoaded();
+				// The screen's own default focus gives up after ~2 s and lands on the tabs.
+				if (first) tick().then(() => !document.activeElement?.closest(".rows") && focusDefault(document.querySelector<HTMLElement>("[data-tv-screen]") ?? document.body));
+			},
+			(e) => !cached && (failed = String(e)),
+		);
 	});
 
 	function onLoaded() {
-		booted = true;
+		cached = rows;
 		loaded = true;
 		failed = null;
 	}
@@ -98,7 +110,8 @@
 	{#each slots as slot, i}
 		{#if slot}
 			<div class="bg" style:opacity={i === front ? 1 : 0}>
-				<img src={artwork(slot.kind, slot.t.id, "backdrop")} alt="" onerror={orPoster(artwork(slot.kind, slot.t.id, "poster"), "50% 22%")} />
+				<!-- A fresh element per title: the poster fallback's position must not carry over to the next backdrop. -->
+				{#key slot.t}<img src={artwork(slot.kind, slot.t.id, "backdrop")} alt="" onerror={orPoster(artwork(slot.kind, slot.t.id, "poster"), "50% 22%")} />{/key}
 			</div>
 		{/if}
 	{/each}

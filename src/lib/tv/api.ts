@@ -77,7 +77,7 @@ export function badges(q?: FileSummary) {
 
 export const meta = (kind: Kind, t: Title) =>
 	kind === "series"
-		? `${t.first_aired ?? t.year} · ${t.total_seasons} season${t.total_seasons === 1 ? "" : "s"} · ★ ${t.rating}`
+		? `${t.first_aired ? `${new Date(t.first_aired).getUTCFullYear()}\u2013` : t.year} · ${t.total_seasons ?? t.seasons?.length ?? 0} season${(t.total_seasons ?? t.seasons?.length) === 1 ? "" : "s"} · ★ ${t.rating}`
 		: `${t.year} · ${runtime(t.runtime ?? 0)} · ★ ${t.rating}`;
 
 /** Episodes in play order, each with its season number. */
@@ -97,5 +97,5 @@ export const orPoster = (poster: string, position?: string) => (e: Event) => {
 	const img = e.currentTarget as HTMLImageElement;
 	if (img.src === poster) return;
 	img.src = poster;
-	if (position) img.style.objectPosition = position;
+	img.style.objectPosition = position ?? "";
 };

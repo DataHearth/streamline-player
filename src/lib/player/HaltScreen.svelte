@@ -10,12 +10,13 @@
 		poster = "",
 		framePos = "",
 		backLabel = "",
+		leaving = false,
 		onretry,
 		onback,
-	}: { halt: Halt; frame?: string; poster?: string; framePos?: string; backLabel?: string; onretry: () => void; onback?: () => void } = $props();
+	}: { halt: Halt; frame?: string; poster?: string; framePos?: string; backLabel?: string; leaving?: boolean; onretry: () => void; onback?: () => void } = $props();
 </script>
 
-<div class="halt sl-full" role="alertdialog" aria-label={halt.eyebrow} data-tv-trap="1">
+<div class="halt sl-full" class:leaving role="alertdialog" aria-label={halt.eyebrow} data-tv-trap="1">
 	{#if frame}<img class="frame" src={frame} alt="" style:object-position={framePos} onerror={orPoster(poster)} />{/if}
 	<div class="halt-scrim"></div>
 	<div class="halt-zoom">
@@ -62,6 +63,12 @@
 		overflow: hidden;
 		background: var(--bg-deep);
 		animation: halt-fade 260ms var(--ease);
+		transition: opacity 240ms var(--ease);
+	}
+
+	.halt.leaving {
+		opacity: 0;
+		pointer-events: none;
 	}
 
 	@keyframes halt-rise {
