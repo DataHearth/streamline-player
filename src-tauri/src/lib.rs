@@ -292,6 +292,17 @@ pub fn run() {
         .manage(Api(client))
         .setup(|app| {
             stop_left_over_session(app.handle());
+            #[cfg(target_os = "linux")]
+            // WebKitGTK (seen on 2.54.1) zooms pages by gtk-xft-dpi / 96, and GTK reports -1
+            // when no XSETTINGS daemon runs (Hyprland, sway): pages get a zoom of -1/96, a
+            // negative innerWidth and devicePixelRatio, a collapsed layout and clicks that
+            // miss. Drop this once WebKitGTK ignores an unset DPI.
+            if let Some(settings) = gtk::Settings::default() {
+                use gtk::prelude::GtkSettingsExt;
+                if settings.gtk_xft_dpi() <= 0 {
+                    settings.set_gtk_xft_dpi(96 * 1024);
+                }
+            }
             Ok(())
         })
         .register_asynchronous_uri_scheme_protocol("artwork", move |_ctx, request, responder| {
