@@ -16,6 +16,7 @@
     "Adventure"
    ],
    "rating": 8.2,
+   "certification": "PG-13",
    "added_at": "2026-11-02T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -47,6 +48,7 @@
     "Adventure"
    ],
    "rating": 7.5,
+   "certification": "R",
    "added_at": "2026-10-31T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -78,6 +80,7 @@
     "Science fiction"
    ],
    "rating": 7.2,
+   "certification": "R",
    "added_at": "2026-10-29T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -109,6 +112,7 @@
     "Family"
    ],
    "rating": 8.4,
+   "certification": "PG",
    "added_at": "2026-10-27T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -140,6 +144,7 @@
     "Thriller"
    ],
    "rating": 7,
+   "certification": "R",
    "added_at": "2026-10-25T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -171,6 +176,7 @@
     "Drama"
    ],
    "rating": 6.8,
+   "certification": "R",
    "added_at": "2026-10-23T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -202,6 +208,7 @@
     "Drama"
    ],
    "rating": 7.6,
+   "certification": "PG-13",
    "added_at": "2026-10-21T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -233,6 +240,7 @@
     "Science fiction"
    ],
    "rating": 7.8,
+   "certification": "R",
    "added_at": "2026-10-19T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -264,6 +272,7 @@
     "Mystery"
    ],
    "rating": 7.7,
+   "certification": "R",
    "added_at": "2026-10-17T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -295,6 +304,7 @@
     "History"
    ],
    "rating": 7.1,
+   "certification": "PG-13",
    "added_at": "2026-10-15T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -326,6 +336,7 @@
     "Drama"
    ],
    "rating": 7.8,
+   "certification": "PG-13",
    "added_at": "2026-10-13T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -357,6 +368,7 @@
     "History"
    ],
    "rating": 8.1,
+   "certification": "R",
    "added_at": "2026-10-11T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -388,6 +400,7 @@
     "Drama"
    ],
    "rating": 7.6,
+   "certification": "PG-13",
    "added_at": "2026-10-09T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -419,6 +432,7 @@
     "Drama"
    ],
    "rating": 8.4,
+   "certification": "PG-13",
    "added_at": "2026-10-07T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -450,6 +464,7 @@
     "Drama"
    ],
    "rating": 7.6,
+   "certification": "R",
    "added_at": "2026-10-05T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -481,6 +496,7 @@
     "Action"
    ],
    "rating": 8.4,
+   "certification": "PG-13",
    "added_at": "2026-10-03T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
@@ -512,6 +528,7 @@
     "Action"
    ],
    "rating": 8.2,
+   "certification": "R",
    "added_at": "2026-10-01T00:00:00.000Z",
    "file_summary": {
     "file_count": 1,
