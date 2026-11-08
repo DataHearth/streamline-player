@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import { goto } from "$app/navigation";
 	import { focusDefault } from "#lib/tv/focus.ts";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
@@ -21,7 +22,7 @@
 		row("5 6 7 8 9 0 . - : /"),
 		[
 			{ label: "⌫", aria: "Delete", type: "", wide: 212 },
-			{ label: "Clear", aria: "Clear", type: "", wide: 212 },
+			{ label: i18n.keyboard_clear(), aria: "Clear", type: "", wide: 212 },
 			{ label: ".home.arpa", aria: "home.arpa", type: ".home.arpa", wide: 280 },
 		],
 	];
@@ -48,23 +49,21 @@
 	const chars = $derived(pairing ? [...pairing.code.toUpperCase()] : []);
 	const expires = $derived(`${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`);
 	const STATUS = {
-		waiting: { text: "Waiting for approval…", color: "var(--accent)", pulse: true },
-		approved: { text: "Approved", color: "var(--status-available)", pulse: false },
-		denied: { text: "Request denied", color: "var(--status-failed)", pulse: false },
+		waiting: { text: i18n.welcome_waiting(), color: "var(--accent)", pulse: true },
+		approved: { text: i18n.welcome_approved(), color: "var(--status-available)", pulse: false },
+		denied: { text: i18n.welcome_denied(), color: "var(--status-failed)", pulse: false },
 		failed: { text: "", color: "var(--status-failed)", pulse: false },
 	};
 	const shown = $derived({ ...STATUS[status], text: status === "failed" ? failure : STATUS[status].text });
 
-	const TITLES = { server: "Connect to your server", pair: "Pair this TV", paired: "This TV is paired" };
-	const STEPS = { server: "Step 1 of 2", pair: "Step 2 of 2", paired: "Done" };
+	const TITLES = { server: i18n.welcome_title_server(), pair: i18n.welcome_title_pair(), paired: i18n.welcome_title_paired() };
+	const STEPS = { server: i18n.welcome_step_1(), pair: i18n.welcome_step_2(), paired: i18n.welcome_step_done() };
 	const lead = $derived(
-		step === "server"
-			? "Enter the address you use for the Streamline web app."
-			: step === "pair"
-				? "On your phone, open the pairing page and enter this code. You only need to do this once."
-				: `Signed in as ${account.short}. Nobody typed a password on this TV.`,
+		step === "server" ? i18n.welcome_lead_server() : step === "pair" ? i18n.welcome_lead_pair() : i18n.welcome_lead_paired({ name: account.short }),
 	);
-	const tvHelp = $derived(error || (found ? "Streamline server found" : checking ? "Checking…" : "Type with the remote, or press Continue."));
+	const tvHelp = $derived(error || (found ? i18n.welcome_found() : checking ? i18n.welcome_checking() : i18n.welcome_type_hint()));
+	// The keys' aria names are also how `type` tells them apart, so they stay English underneath.
+	const KEY_NAMES: Record<string, () => string> = { Delete: i18n.keyboard_delete, Clear: i18n.keyboard_clear };
 
 	async function go(next: Step) {
 		step = next;
@@ -83,8 +82,8 @@
 	async function submit() {
 		if (checking || found) return;
 		const typed = url.trim();
-		if (!typed) return (error = "Enter your server’s address");
-		if (!/^([a-z]+:\/\/)?[a-z0-9.-]+(:\d+)?(\/.*)?$/i.test(typed)) return (error = "That doesn’t look like an address");
+		if (!typed) return (error = i18n.welcome_enter_address());
+		if (!/^([a-z]+:\/\/)?[a-z0-9.-]+(:\d+)?(\/.*)?$/i.test(typed)) return (error = i18n.welcome_bad_address());
 		checking = true;
 		error = "";
 		try {
@@ -92,7 +91,7 @@
 			found = true;
 			setTimeout(() => go("pair").then(newCode), FOUND_PAUSE_MS);
 		} catch (e) {
-			error = String(e);
+			error = String(e) === "not_streamline" ? i18n.welcome_not_streamline({ host }) : i18n.welcome_unreachable({ host });
 		} finally {
 			checking = false;
 		}
@@ -110,7 +109,7 @@
 			poll(id, p.interval);
 		} catch (e) {
 			if (id !== generation) return;
-			failure = /"code"/.test(String(e)) ? "The server refused to start pairing" : `Can’t reach ${host}`;
+			failure = /"code"/.test(String(e)) ? i18n.welcome_pairing_refused() : i18n.welcome_unreachable({ host });
 			status = "failed";
 		}
 	}
@@ -130,10 +129,10 @@
 		status = "approved";
 		const [me, state] = await Promise.all([
 			invoke<{ name: string }>("me").catch(() => ({ name: "" })),
-			invoke<{ keystore: string }>("auth_state"),
+			invoke<{ keystore: string; store_error: string | null }>("auth_state"),
 		]);
 		account = { name: me.name, short: me.name.split(" ")[0] ?? "" };
-		keystore = state.keystore;
+		keystore = state.store_error ? i18n.common_key_not_stored({ error: state.store_error }) : state.keystore;
 		setTimeout(() => go("paired"), APPROVED_PAUSE_MS);
 	}
 
@@ -185,7 +184,7 @@
 						<span>{tvHelp}</span>
 					</div>
 					<div class="actions">
-						<button data-tv="1" data-tv-default="1" class="tvbtn" onclick={submit}>{checking ? "Checking…" : found ? "Connected" : "Continue"}</button>
+						<button data-tv="1" data-tv-default="1" class="tvbtn" onclick={submit}>{checking ? i18n.welcome_checking() : found ? i18n.welcome_connected() : i18n.welcome_continue()}</button>
 					</div>
 				{:else if step === "pair"}
 					<div class="code">
@@ -196,19 +195,19 @@
 					<div class="status">
 						<span class="dot" class:pulse={shown.pulse} style:background={shown.color}></span>
 						<span>{shown.text}</span>
-						{#if pairing && status === "waiting"}<span class="expires">expires in {expires}</span>{/if}
+						{#if pairing && status === "waiting"}<span class="expires">{i18n.welcome_expires_in({ time: expires })}</span>{/if}
 					</div>
 					<div class="actions">
-						<button data-tv="1" data-tv-default="1" class="tvbtn" onclick={newCode}>Get a new code</button>
-						<button data-tv="1" class="tvbtn" onclick={changeServer}>Change server</button>
+						<button data-tv="1" data-tv-default="1" class="tvbtn" onclick={newCode}>{i18n.welcome_new_code()}</button>
+						<button data-tv="1" class="tvbtn" onclick={changeServer}>{i18n.welcome_change_server()}</button>
 					</div>
 				{:else}
 					<div class="facts">
-						<div><span>Account</span><span>{account.name}</span></div>
-						<div><span>This TV</span><span>{pairing?.name}</span></div>
-						<div><span>Key stored in</span><span>{keystore}</span></div>
+						<div><span>{i18n.welcome_account()}</span><span>{account.name}</span></div>
+						<div><span>{i18n.welcome_this_tv()}</span><span>{pairing?.name}</span></div>
+						<div><span>{i18n.welcome_key_stored_in()}</span><span>{keystore}</span></div>
 					</div>
-					<div><button data-tv="1" data-tv-default="1" class="tvbtn" onclick={() => goto("/", { replace: true })}>Start watching</button></div>
+					<div><button data-tv="1" data-tv-default="1" class="tvbtn" onclick={() => goto("/", { replace: true })}>{i18n.welcome_start_watching()}</button></div>
 				{/if}
 			</div>
 
@@ -218,16 +217,16 @@
 						{#each KEY_ROWS as keys}
 							<div class="keys">
 								{#each keys as k}
-									<button data-tv="1" class="tvkey" aria-label={k.aria} style:width={k.wide ? `${k.wide}px` : undefined} onclick={() => type(k)}>{k.label}</button>
+									<button data-tv="1" class="tvkey" aria-label={KEY_NAMES[k.aria]?.() ?? k.aria} style:width={k.wide ? `${k.wide}px` : undefined} onclick={() => type(k)}>{k.label}</button>
 								{/each}
 							</div>
 						{/each}
 					</div>
 				{:else if step === "pair"}
 					<div class="qr">
-						{#if pairing}<img src="data:image/svg+xml,{encodeURIComponent(pairing.qr)}" alt="QR code for the pairing page" />{/if}
+						{#if pairing}<img src="data:image/svg+xml,{encodeURIComponent(pairing.qr)}" alt={i18n.welcome_qr_alt()} />{/if}
 					</div>
-					<span class="scan">Scan with your phone, or open<br /><span class="mono">{pairPage}</span></span>
+					<span class="scan">{i18n.welcome_scan()}<br /><span class="mono">{pairPage}</span></span>
 				{:else}
 					<span class="done"><Check size={110} strokeWidth={2} /></span>
 				{/if}

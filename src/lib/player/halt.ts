@@ -1,5 +1,6 @@
 import { Ban, CircleAlert, Cpu, Folder, RotateCw, Server, WifiOff } from "@lucide/svelte";
 import type { Component } from "svelte";
+import { m as i18n } from "#lib/paraglide/messages.js";
 import { PLAYER_NAME } from "#lib/tv/api.ts";
 
 const RETRY_SECS = 10;
@@ -39,13 +40,13 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 		return {
 			halt: {
 				kind: "stop",
-				eyebrow: "Playback stopped",
+				eyebrow: i18n.halt_stop_eyebrow(),
 				icon: Ban,
-				title: "An admin stopped this stream",
+				title: i18n.halt_stop_title(),
 				message: { by: error.by ?? "", text: error.message ?? "" },
-				note: at ? `You were at ${at}. Your place is saved.` : "Your place is saved.",
+				note: at ? i18n.halt_stop_note_at({ at }) : i18n.halt_stop_note(),
 				failed: true,
-				retryLabel: "Try again",
+				retryLabel: i18n.halt_try_again(),
 			},
 		};
 	}
@@ -54,11 +55,11 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 			retryIn: error.retry_after ?? RETRY_SECS,
 			halt: {
 				kind: "restart",
-				eyebrow: "Server restarting",
+				eyebrow: i18n.halt_restart_eyebrow(),
 				icon: RotateCw,
-				title: "Back in a few seconds",
+				title: i18n.halt_restart_title(),
 				message: error.message ? { by: error.by ?? "", text: error.message } : undefined,
-				count: (left) => `Reconnecting in ${left} s${at ? ` · picks up at ${at}` : ""}`,
+				count: (left) => (at ? i18n.halt_restart_count_at({ left, at }) : i18n.halt_restart_count({ left })),
 				failed: false,
 			},
 		};
@@ -68,14 +69,14 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 			retryIn: error.retry_after ?? RETRY_SECS,
 			halt: {
 				kind: "busy",
-				eyebrow: "Server busy",
+				eyebrow: i18n.halt_busy_eyebrow(),
 				icon: Cpu,
-				title: "Waiting for a free slot",
-				body: `All conversions on ${host} are in use, and this stream needs one.`,
-				count: (left) => `Trying again in ${left} s`,
-				note: `You’re at ${at}. Playback starts as soon as a slot frees up.`,
+				title: i18n.halt_busy_title(),
+				body: i18n.halt_busy_body({ host }),
+				count: (left) => i18n.halt_count_retry({ left }),
+				note: i18n.halt_busy_note({ at: at ?? "" }),
 				failed: false,
-				retryLabel: "Try now",
+				retryLabel: i18n.halt_try_now(),
 			},
 		};
 	}
@@ -83,12 +84,12 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 		return {
 			halt: {
 				kind: "missing",
-				eyebrow: "File missing",
+				eyebrow: i18n.halt_missing_eyebrow(),
 				icon: Folder,
-				title: "This file isn’t on the server",
-				body: "Streamline can’t find it where the library expects it. It may have been moved, renamed or deleted.",
+				title: i18n.halt_missing_title(),
+				body: i18n.halt_missing_body(),
 				mono: error.message,
-				note: "Let your admin know. If it was moved, a library scan finds it again.",
+				note: i18n.halt_missing_note(),
 				failed: true,
 			},
 		};
@@ -97,11 +98,11 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 		return {
 			halt: {
 				kind: "nocodec",
-				eyebrow: "Can’t play here",
+				eyebrow: i18n.halt_nocodec_eyebrow(),
 				icon: CircleAlert,
-				title: `${titleName} can’t play on this device`,
-				body: `${PLAYER_NAME} can’t decode this file’s video, and the server can’t convert it: ${error.message}.`,
-				note: "Play it on another device, or ask your admin to turn on software conversion.",
+				title: i18n.halt_nocodec_title({ title: titleName ?? "" }),
+				body: i18n.halt_nocodec_body({ player: PLAYER_NAME, message: error.message ?? "" }),
+				note: i18n.halt_nocodec_note(),
 				failed: true,
 			},
 		};
@@ -110,12 +111,12 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 		return {
 			halt: {
 				kind: "error",
-				eyebrow: "Playback error",
+				eyebrow: i18n.halt_error_eyebrow(),
 				icon: CircleAlert,
-				title: "This can’t play right now",
+				title: i18n.halt_error_title(),
 				mono: error.message ?? error.code ?? raw,
 				failed: true,
-				retryLabel: "Try now",
+				retryLabel: i18n.halt_try_now(),
 			},
 		};
 	}
@@ -124,13 +125,13 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 			retryIn: OFFLINE_CHECK_SECS,
 			halt: {
 				kind: "offline",
-				eyebrow: "Offline",
+				eyebrow: i18n.halt_offline_eyebrow(),
 				icon: WifiOff,
-				title: "This device lost its connection",
-				body: at ? `Playback picks up at ${at} as soon as it’s back.` : "This picks up as soon as it’s back.",
-				wait: "Waiting for a network · checking every 5 s",
+				title: i18n.halt_offline_title(),
+				body: at ? i18n.halt_offline_body_at({ at }) : i18n.halt_offline_body(),
+				wait: i18n.halt_offline_wait({ secs: OFFLINE_CHECK_SECS }),
 				failed: false,
-				retryLabel: "Try again",
+				retryLabel: i18n.halt_try_again(),
 			},
 		};
 	}
@@ -138,13 +139,13 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 		retryIn: RETRY_SECS,
 		halt: {
 			kind: "unreachable",
-			eyebrow: "Can’t reach the server",
+			eyebrow: i18n.halt_unreachable_eyebrow(),
 			icon: Server,
-			title: `${host} isn’t answering`,
-			body: "The server may be off or restarting, or this device is away from your home network without the VPN.",
-			count: (left) => `Trying again in ${left} s${at ? ` · your place is saved at ${at}` : ""}`,
+			title: i18n.halt_unreachable_title({ host }),
+			body: i18n.halt_unreachable_body(),
+			count: (left) => (at ? i18n.halt_unreachable_count_at({ left, at }) : i18n.halt_count_retry({ left })),
 			failed: true,
-			retryLabel: "Try now",
+			retryLabel: i18n.halt_try_now(),
 		},
 	};
 }

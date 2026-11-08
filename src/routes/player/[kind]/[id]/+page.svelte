@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/state";
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import TvPlayer from "#lib/player/TvPlayer.svelte";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
@@ -43,7 +44,7 @@
 			framePos: stillPos(e.number, e.season),
 			start: wantsResume ? (watch.find((w) => w.media_id === e.media_file_id)?.position_seconds ?? 0) : 0,
 			next: following
-				? { code: `S${following.season} · E${following.number}`, title: following.title, overview: following.overview, still, stillPos: stillPos(following.number, following.season), label: `Play S${following.season} E${following.number}`, href: `/player/series/${i}?ep=${following.id}` }
+				? { code: `S${following.season} · E${following.number}`, title: following.title, overview: following.overview, still, stillPos: stillPos(following.number, following.season), label: i18n.player_play_episode({ season: following.season, episode: following.number }), href: `/player/series/${i}?ep=${following.id}` }
 				: null,
 			more: following ? [] : await moreLike(k, t),
 		};

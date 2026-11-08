@@ -9,6 +9,7 @@
 </script>
 
 <script lang="ts">
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import { goto } from "$app/navigation";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
@@ -81,10 +82,10 @@
 				const t = details.get(w.series_id);
 				const ep = t && episodesOf(t).find((e) => e.id === w.episode_id);
 				if (!t || !ep) continue;
-				cont.push({ key: `ep:${ep.id}`, kind: "series", t, eyebrow: `Continue · S${ep.season} E${ep.number} · ${ep.title}`, img: artwork("series", t.id, "backdrop"), pos: stillPos(ep.number, ep.season), code: `S${ep.season} E${ep.number}`, pct: pct(w), left: left(w.duration_seconds - w.position_seconds), href: `/player/series/${t.id}?ep=${ep.id}&resume=1` });
+				cont.push({ key: `ep:${ep.id}`, kind: "series", t, eyebrow: i18n.home_continue_episode({ season: ep.season, episode: ep.number, title: ep.title }), img: artwork("series", t.id, "backdrop"), pos: stillPos(ep.number, ep.season), code: i18n.common_episode_code({ season: ep.season, episode: ep.number }), pct: pct(w), left: left(w.duration_seconds - w.position_seconds), href: `/player/series/${t.id}?ep=${ep.id}&resume=1` });
 			} else {
 				const t = movies.find((m) => m.id === w.movie_id);
-				if (t) cont.push({ key: `movie:${t.id}`, kind: "movies", t, eyebrow: "Continue watching", img: artwork("movies", t.id, "backdrop"), pos: "50% 35%", code: String(t.year), pct: pct(w), left: left(w.duration_seconds - w.position_seconds), href: `/player/movies/${t.id}?resume=1` });
+				if (t) cont.push({ key: `movie:${t.id}`, kind: "movies", t, eyebrow: i18n.home_continue_watching(), img: artwork("movies", t.id, "backdrop"), pos: "50% 35%", code: String(t.year), pct: pct(w), left: left(w.duration_seconds - w.position_seconds), href: `/player/movies/${t.id}?resume=1` });
 			}
 		}
 		const recent = (list: Title[]) => [...list].sort((a, b) => b.added_at.localeCompare(a.added_at));
@@ -92,9 +93,9 @@
 		for (const m of [...movies, ...shows]) if (m.genres[0]) counts.set(m.genres[0], (counts.get(m.genres[0]) ?? 0) + 1);
 		const genre = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
 		rows = [
-			...(cont.length ? [{ title: "Continue watching", wide: true, h: 362, ch: 225, items: cont }] : []),
-			{ title: "Recently added · Movies", wide: false, h: 400, ch: 294, items: recent(movies).slice(0, 12).map((t) => poster("movies", t, "Recently added")) },
-			{ title: "Recently added · Shows", wide: false, h: 400, ch: 294, items: recent(shows).slice(0, 12).map((t) => poster("series", t, "New episodes")) },
+			...(cont.length ? [{ title: i18n.home_continue_watching(), wide: true, h: 362, ch: 225, items: cont }] : []),
+			{ title: i18n.home_recent_movies(), wide: false, h: 400, ch: 294, items: recent(movies).slice(0, 12).map((t) => poster("movies", t, i18n.home_recently_added())) },
+			{ title: i18n.home_recent_shows(), wide: false, h: 400, ch: 294, items: recent(shows).slice(0, 12).map((t) => poster("series", t, i18n.home_new_episodes())) },
 			{ title: genre, wide: false, h: 400, ch: 294, items: [...movies.filter((t) => t.genres.includes(genre)).map((t) => poster("movies", t, genre)), ...shows.filter((t) => t.genres.includes(genre)).map((t) => poster("series", t, genre))] },
 		].filter((r) => r.items.length);
 	}

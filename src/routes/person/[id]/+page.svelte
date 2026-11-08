@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
@@ -29,9 +30,14 @@
 	const movies = $derived(credits.filter((c) => c.kind === "movies"));
 	const series = $derived(credits.filter((c) => c.kind === "series"));
 	const characterOf = $derived(new Map(credits.map((c) => [`${c.kind}:${c.id}`, c.character])));
-	const summary = $derived(
-		[movies.length ? `${movies.length} movie${movies.length > 1 ? "s" : ""}` : "", series.length ? `${series.length} series` : ""].filter(Boolean).join(" and ") + " on your server",
-	);
+	const summary = $derived.by(() => {
+		const parts = [
+			movies.length ? (movies.length === 1 ? i18n.person_movies_one : i18n.person_movies_other)({ count: movies.length }) : "",
+			series.length ? (series.length === 1 ? i18n.person_series_one : i18n.person_series_other)({ count: series.length }) : "",
+		].filter(Boolean);
+		return i18n.person_on_your_server({ list: parts.length === 2 ? i18n.person_and({ a: parts[0]!, b: parts[1]! }) : (parts[0] ?? "") });
+	});
+	const DEPARTMENTS: Record<string, () => string> = { Acting: i18n.person_acting };
 	const m = $derived(monogram(p?.name ?? ""));
 	const backdrop = $derived(credits[0]);
 	const firstKnown = $derived(p?.known_for.findIndex((k) => k.id !== undefined) ?? -1);
@@ -68,7 +74,7 @@
 				<header>
 					<span class="face" style:background={m.bg} style:color={m.fg}>{m.initials}<img src={headshot(p.id)} alt="" onerror={hideBroken} /></span>
 					<div>
-						<div class="eyebrow">{p.department}</div>
+						<div class="eyebrow">{DEPARTMENTS[p.department]?.() ?? p.department}</div>
 						<h1>{p.name}</h1>
 						<div class="sum">{summary}</div>
 					</div>
@@ -76,7 +82,7 @@
 
 				{#if p.known_for.length}
 					<section>
-						<h2>Known for</h2>
+						<h2>{i18n.person_known_for()}</h2>
 						<div class="known">
 							{#each p.known_for as k, i}
 								{#if k.kind && k.id !== undefined}
@@ -85,13 +91,13 @@
 									<button data-tv="1" data-fid="known:{i}" data-tv-default={i === firstKnown ? "1" : undefined} class="ki" onclick={() => goto(`/detail/${kk}/${kid}`)}>
 										<img class="kp" src={artwork(kk, kid, "poster")} alt="" onerror={hideBroken} />
 										<span class="kt"><span class="ktt">{k.title}</span><span class="ks">{[k.year, characterOf.get(`${kk}:${kid}`)].filter(Boolean).join(" · ")}</span></span>
-										<span class="kst on">On server</span>
+										<span class="kst on">{i18n.person_on_server()}</span>
 									</button>
 								{:else}
 									<div class="ki out">
 										<span class="kp"></span>
 										<span class="kt"><span class="ktt">{k.title}</span><span class="ks">{k.year}</span></span>
-										<span class="kst">Not in library</span>
+										<span class="kst">{i18n.person_not_in_library()}</span>
 									</div>
 								{/if}
 							{/each}
@@ -99,8 +105,8 @@
 					</section>
 				{/if}
 
-				{#if series.length}{@render section("Series on your server", series, true)}{/if}
-				{#if movies.length}{@render section("Movies on your server", movies, !series.length)}{/if}
+				{#if series.length}{@render section(i18n.person_series_on_server(), series, true)}{/if}
+				{#if movies.length}{@render section(i18n.person_movies_on_server(), movies, !series.length)}{/if}
 			</div>
 		</div>
 	{/if}

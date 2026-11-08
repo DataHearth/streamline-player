@@ -123,11 +123,13 @@ pub async fn auth_state(api: tauri::State<'_, Api>) -> Result<Value, String> {
     Ok(json!({
         "server": c.server,
         "paired": c.key.is_some(),
-        "keystore": c.store_error.map_or(KEYSTORE.to_owned(), |e| format!("Not stored ({e})")),
+        "keystore": KEYSTORE,
+        "store_error": c.store_error,
     }))
 }
 
-/// Checks the address answers as Streamline before keeping it. Returns the round trip in ms.
+/// Checks the address answers as Streamline before keeping it. Returns the round trip in ms,
+/// or an error code the page words: `unreachable`, `not_streamline`.
 #[tauri::command]
 pub async fn connect(
     app: AppHandle,
@@ -135,7 +137,6 @@ pub async fn connect(
     url: String,
 ) -> Result<u64, String> {
     let url = normalize(&url);
-    let host = crate::host_of(&url).to_owned();
     let started = Instant::now();
     let resp = api
         .http
@@ -143,9 +144,9 @@ pub async fn connect(
         .timeout(HEALTH_TIMEOUT)
         .send()
         .await
-        .map_err(|_| format!("Can’t reach {host}"))?;
+        .map_err(|_| "unreachable")?;
     if !resp.status().is_success() {
-        return Err(format!("{host} answered, but not as a Streamline server"));
+        return Err("not_streamline".into());
     }
     let ms = started.elapsed().as_millis() as u64;
     if api.conn().await.server.as_deref() != Some(url.as_str()) {

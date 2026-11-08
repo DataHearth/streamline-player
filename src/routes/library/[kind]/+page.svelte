@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
@@ -8,8 +9,8 @@
 
 	type Flag = "unwatched" | "progress" | "uhd" | "hdr";
 	const FLAGS: [Flag, string][] = [
-		["unwatched", "Unwatched"],
-		["progress", "In progress"],
+		["unwatched", i18n.library_unwatched()],
+		["progress", i18n.library_in_progress()],
 		["uhd", "4K"],
 		["hdr", "HDR"],
 	];
@@ -81,8 +82,8 @@
 	{#key kind}
 		<div class="page">
 			<div class="head">
-				<h1>{kind === "series" ? "Shows" : "Movies"}</h1>
-				{#if loaded}<span class="count">{items.length} of {titles.length} {kind === "series" ? "shows" : "movies"}</span>{/if}
+				<h1>{kind === "series" ? i18n.nav_shows() : i18n.nav_movies()}</h1>
+				{#if loaded}<span class="count">{(kind === "series" ? i18n.library_count_shows : i18n.library_count_movies)({ count: items.length, total: titles.length })}</span>{/if}
 			</div>
 			<div class="filters">
 				{#each FLAGS as [f, label]}

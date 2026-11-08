@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import { goto } from "$app/navigation";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
@@ -29,7 +30,7 @@
 			.filter((t) => norm(t.title).includes(nq) || t.genres.some((g) => norm(g).startsWith(nq)))
 			.sort((a, b) => starts(a) - starts(b) || b.rating - a.rating);
 	});
-	const heading = $derived(q ? `${results.length} result${results.length === 1 ? "" : "s"}` : "Recently added");
+	const heading = $derived(q ? (results.length === 1 ? i18n.search_results_one : i18n.search_results_other)({ count: results.length }) : i18n.search_recently_added());
 </script>
 
 <TvScreen tab={failed === null ? "search" : undefined}>
@@ -40,7 +41,7 @@
 			<div class="board">
 				<div class="field">
 					<Search size={32} strokeWidth={1.75} color="var(--fg-subtle)" />
-					<span class="q" class:empty={!search.q}>{search.q || "Search"}</span><span class="caret"></span>
+					<span class="q" class:empty={!search.q}>{search.q || i18n.search_placeholder()}</span><span class="caret"></span>
 				</div>
 				<div class="keys">
 					{#each KEYS as k, i}
@@ -48,11 +49,11 @@
 					{/each}
 				</div>
 				<div class="wide">
-					<button data-tv="1" class="key" onclick={() => (search.q += " ")}>Space</button>
-					<button data-tv="1" class="key" aria-label="Delete" onclick={() => (search.q = search.q.slice(0, -1))}><Delete size="1em" strokeWidth={1.5} /></button>
-					<button data-tv="1" class="key" onclick={() => (search.q = "")}>Clear</button>
+					<button data-tv="1" class="key" onclick={() => (search.q += " ")}>{i18n.keyboard_space()}</button>
+					<button data-tv="1" class="key" aria-label={i18n.keyboard_delete()} onclick={() => (search.q = search.q.slice(0, -1))}><Delete size="1em" strokeWidth={1.5} /></button>
+					<button data-tv="1" class="key" onclick={() => (search.q = "")}>{i18n.keyboard_clear()}</button>
 				</div>
-				<div class="hint"><Mic size={26} strokeWidth={1.75} />Hold the mic button on your remote to search by voice</div>
+				<div class="hint"><Mic size={26} strokeWidth={1.75} />{i18n.search_voice_hint()}</div>
 			</div>
 			<div class="results">
 				<div class="heading">{heading}</div>

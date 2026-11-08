@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import { goto } from "$app/navigation";
 	import LoadFailed from "#lib/tv/LoadFailed.svelte";
 	import TvScreen from "#lib/tv/TvScreen.svelte";
 	import { playerCapabilities } from "#lib/tv/api.ts";
 	import { focus, focusDefault } from "#lib/tv/focus.ts";
-	import { myLanguage, prefs, setPref, type ChoiceKey, type ToggleKey } from "#lib/tv/prefs.svelte.ts";
+	import { prefs, setPref, type ChoiceKey, type ToggleKey } from "#lib/tv/prefs.svelte.ts";
 	import { invoke } from "@tauri-apps/api/core";
 	import { Captions, Check, ChevronRight, CirclePlay, Eye, Languages, MonitorSmartphone, Tv, User } from "@lucide/svelte";
 	import { tick, type Component } from "svelte";
@@ -35,7 +36,7 @@
 			invoke<Me>("me"),
 			invoke<{ items: Device[] }>("devices").then((d) => d.items),
 			invoke<string>("server_host"),
-			invoke<{ keystore: string }>("auth_state").then((a) => a.keystore),
+			invoke<{ keystore: string; store_error: string | null }>("auth_state").then((a) => (a.store_error ? i18n.common_key_not_stored({ error: a.store_error }) : a.keystore)),
 		]);
 		// Only a native player can answer these; the rows show a dash without them.
 		invoke<DeviceInfo>("plugin:player|deviceInfo").then((i) => (info = i)).catch(() => {});
@@ -57,80 +58,100 @@
 		return [v.has("h264"), v.has("hevc"), v.has("av1"), v.has("vp9"), hdr.includes("hdr10"), hdr.includes("dolby_vision"), ...["aac", "ac3", "eac3", "truehd", "dts", "flac"].map((x) => a.has(x))].filter(Boolean).length;
 	}
 
-	function seen(d: Device) {
-		if (d.streaming) return "streaming now";
+	function seen(d: Device, short = false) {
+		if (d.streaming) return short ? i18n.settings_streaming_now_short() : i18n.settings_streaming_now();
 		const s = (Date.now() - Date.parse(d.last_seen)) / 1000;
-		if (s < ACTIVE_SECS) return "active now";
-		if (s < 3600) return `last seen ${Math.round(s / 60)} min ago`;
-		if (s < 86400) return `last seen ${Math.round(s / 3600)} h ago`;
-		const days = Math.round(s / 86400);
-		return `last seen ${days} day${days === 1 ? "" : "s"} ago`;
+		if (s < ACTIVE_SECS) return short ? i18n.settings_active_now_short() : i18n.settings_active_now();
+		if (s < 3600) return (short ? i18n.settings_seen_min_short : i18n.settings_seen_min)({ count: Math.round(s / 60) });
+		if (s < 86400) return (short ? i18n.settings_seen_h_short : i18n.settings_seen_h)({ count: Math.round(s / 3600) });
+		const count = Math.round(s / 86400);
+		if (short) return (count === 1 ? i18n.settings_seen_days_one_short : i18n.settings_seen_days_other_short)({ count });
+		return (count === 1 ? i18n.settings_seen_days_one : i18n.settings_seen_days_other)({ count });
 	}
 
-	const seenShort = (d: Device) => {
-		const s = seen(d).replace(/^last seen /, "");
-		return s.charAt(0).toUpperCase() + s.slice(1);
+	// Stored values stay English (the player's rules read them); only what is shown is translated.
+	const VALUES: Record<string, () => string> = {
+		Auto: i18n.value_auto,
+		Original: i18n.value_original,
+		"Original language": i18n.value_original_language,
+		English: i18n.value_english,
+		French: i18n.value_french,
+		Always: i18n.value_always,
+		None: i18n.value_none,
+		Shadow: i18n.value_shadow,
+		Box: i18n.value_box,
+		White: i18n.value_white,
+		Yellow: i18n.value_yellow,
+		"On start": i18n.value_on_start,
+		"Pass through": i18n.value_pass_through,
+		"Decode here": i18n.value_decode_here,
+	};
+	const shown = (key: ChoiceKey, v: string) => {
+		// Each app language is named in itself, so it can be found from any other.
+		if (key === "language") return v;
+		if (v === "Off") return key === "subsMode" ? i18n.value_off() : i18n.value_frame_off();
+		return VALUES[v]?.() ?? v;
 	};
 
-	const choice = (label: string, key: ChoiceKey, vals: string[], desc?: string): Row => ({ label, desc, value: prefs[key], choice: key, vals });
-	const toggle = (label: string, key: ToggleKey, desc?: string): Row => ({ label, desc, value: prefs[key] ? "On" : "Off", act: () => setPref(key, !prefs[key]) });
+	const choice = (label: string, key: ChoiceKey, vals: string[], desc?: string): Row => ({ label, desc, value: shown(key, prefs[key]), choice: key, vals });
+	const toggle = (label: string, key: ToggleKey, desc?: string): Row => ({ label, desc, value: prefs[key] ? i18n.common_on() : i18n.common_off(), act: () => setPref(key, !prefs[key]) });
 	const show = (label: string, value: string, desc?: string): Row => ({ label, desc, value });
 
 	const sections = $derived.by((): Section[] => {
 		const d = info?.display;
 		const self = devices.find((x) => x.current);
 		return [
-			{ key: "profile", title: "Profile", icon: User, rows: [
-				show("Name", me?.name ?? "", "Other people on this server see this name."),
-				show("Email", me?.email ?? "", "Used to sign in, and for new-device approval emails."),
-				show("Role", me?.role ?? ""),
+			{ key: "profile", title: i18n.settings_profile(), icon: User, rows: [
+				show(i18n.settings_name(), me?.name ?? "", i18n.settings_name_desc()),
+				show(i18n.settings_email(), me?.email ?? "", i18n.settings_email_desc()),
+				show(i18n.settings_role(), me?.role ?? ""),
 			] },
-			{ key: "playback", title: "Playback", icon: CirclePlay, rows: [
-				choice("Quality at home", "qHome", QUALITIES, `On the same network as ${host}. Original plays the file as-is whenever this device can.`),
-				choice("Quality away from home", "qAway", QUALITIES, "Auto picks what your connection can hold and steps down instead of buffering."),
-				toggle("Play the next episode automatically", "autoplay"),
-				toggle("Skip intros automatically", "autoSkip", "Uses the intro markers Streamline finds when it scans an episode."),
+			{ key: "playback", title: i18n.settings_playback(), icon: CirclePlay, rows: [
+				choice(i18n.settings_quality_home(), "qHome", QUALITIES, i18n.settings_quality_home_desc({ host })),
+				choice(i18n.settings_quality_away(), "qAway", QUALITIES, i18n.settings_quality_away_desc()),
+				toggle(i18n.settings_autoplay(), "autoplay"),
+				toggle(i18n.settings_auto_skip(), "autoSkip", i18n.settings_auto_skip_desc()),
 			] },
-			{ key: "subs", title: "Audio & subtitles", icon: Captions, rows: [
-				choice("Audio language", "audioLang", ["Original language", "English", "French"]),
-				choice("Subtitles", "subsMode", ["Auto", "Always", "Off"], "Auto turns on forced subtitles when the audio isn’t in your language."),
-				toggle("Anime in Japanese, with subtitles", "animeRule", `For anime, play the Japanese audio with full ${myLanguage()} subtitles, whatever Audio language and Subtitles say.`),
-				choice("Size", "subSize", ["S", "M", "L", "XL"]),
-				choice("Background", "subBg", ["None", "Shadow", "Box"]),
-				choice("Color", "subColor", ["White", "Yellow"]),
+			{ key: "subs", title: i18n.settings_audio_subs(), icon: Captions, rows: [
+				choice(i18n.settings_audio_language(), "audioLang", ["Original language", "English", "French"]),
+				choice(i18n.settings_subtitles(), "subsMode", ["Auto", "Always", "Off"], i18n.settings_subtitles_desc()),
+				toggle(i18n.settings_anime(), "animeRule", i18n.settings_anime_desc()),
+				choice(i18n.settings_size(), "subSize", ["S", "M", "L", "XL"]),
+				choice(i18n.settings_background(), "subBg", ["None", "Shadow", "Box"]),
+				choice(i18n.settings_color(), "subColor", ["White", "Yellow"]),
 			] },
-			{ key: "display", title: "Display", icon: Eye, rows: [
-				toggle("Show technical details", "techDetails", "Codecs, bitrates, file names, and whether a stream is copied or converted. Off keeps it to 4K, HDR and Atmos."),
+			{ key: "display", title: i18n.settings_display(), icon: Eye, rows: [
+				toggle(i18n.settings_tech_details(), "techDetails", i18n.settings_tech_details_desc()),
 			] },
-			{ key: "language", title: "Language", icon: Languages, rows: [
-				choice("App language", "language", ["English", "Français"], "Menus, buttons, and the emails the server sends you."),
-				show("Titles and synopses", me?.library_language ?? "", "Comes with the library, the same for everyone on this server."),
+			{ key: "language", title: i18n.settings_language(), icon: Languages, rows: [
+				choice(i18n.settings_app_language(), "language", ["English", "Français"], i18n.settings_app_language_desc()),
+				show(i18n.settings_titles_synopses(), me?.library_language ?? "", i18n.settings_titles_synopses_desc()),
 			] },
-			{ key: "devices", title: "Signed-in devices", icon: MonitorSmartphone, rows: [
-				...(self ? [show(self.name, "This device", `${self.platform} · this device`)] : []),
+			{ key: "devices", title: i18n.settings_signed_in_devices(), icon: MonitorSmartphone, rows: [
+				...(self ? [show(self.name, i18n.settings_this_device(), `${self.platform} · ${i18n.settings_this_device_lower()}`)] : []),
 				// The TV only manages itself: other devices are signed out from the web app.
-				...devices.filter((x) => !x.current).map((x) => show(x.name, seenShort(x), `${x.platform} · ${seen(x)}`)),
+				...devices.filter((x) => !x.current).map((x) => show(x.name, seen(x, true), `${x.platform} · ${seen(x)}`)),
 			] },
-			{ key: "device", title: "This device", icon: Tv, rows: [
-				show("Name", info?.name ?? "—"),
-				show("Platform", info?.platform ?? "—"),
-				show("Video player", info?.player ?? "—"),
-				show("Device key", keystore, "Created when you paired. It never leaves secure storage and is never shown to the app’s web layer."),
-				show("What this device can play", caps ? `${playable(caps)} of ${PLAYABLE}` : "—", `Reported by ${info?.player.split(" ")[0] ?? "the player"}. Files in these formats play as-is; the server converts the rest.`),
-				choice("Match frame rate", "frameRate", ["Off", "On start", "Always"], "Switches the TV to the video’s frame rate so motion doesn’t judder; the picture goes dark for a moment. On start switches when a video starts and back when it stops. Always also follows rate changes between episodes."),
-				choice("E-AC-3 and Atmos output", "passEAC3", ["Pass through", "Decode here"], "Pass through sends the original audio to your TV or receiver, Atmos included. Decode here turns it into PCM on this device."),
-				choice("TrueHD output", "passTrueHD", ["Pass through", "Decode here"], "This device can’t decode TrueHD itself: with Decode here, the server converts it to E-AC-3."),
-				choice("DTS output", "passDTS", ["Pass through", "Decode here"], "Only pass DTS through if your receiver supports it. With Decode here, the server converts it to E-AC-3."),
+			{ key: "device", title: i18n.settings_this_device(), icon: Tv, rows: [
+				show(i18n.settings_name(), info?.name ?? "—"),
+				show(i18n.settings_platform(), info?.platform ?? "—"),
+				show(i18n.settings_video_player(), info?.player ?? "—"),
+				show(i18n.settings_device_key(), keystore, i18n.settings_device_key_desc()),
+				show(i18n.settings_can_play(), caps ? i18n.settings_can_play_value({ count: playable(caps), total: PLAYABLE }) : "—", i18n.settings_can_play_desc({ player: info?.player.split(" ")[0] ?? i18n.settings_the_player() })),
+				choice(i18n.settings_frame_rate(), "frameRate", ["Off", "On start", "Always"], i18n.settings_frame_rate_desc()),
+				choice(i18n.settings_eac3(), "passEAC3", ["Pass through", "Decode here"], i18n.settings_eac3_desc()),
+				choice(i18n.settings_truehd(), "passTrueHD", ["Pass through", "Decode here"], i18n.settings_truehd_desc()),
+				choice(i18n.settings_dts(), "passDTS", ["Pass through", "Decode here"], i18n.settings_dts_desc()),
 				show(
-					"HDR and Dolby Vision",
+					i18n.settings_hdr(),
 					d?.hdr.join(" · ") || "—",
-					d && `What ${d.name} reports over HDMI · ${d.width} × ${d.height} · ${Math.round(d.refresh_hz)} Hz.${d.hdr.includes("HDR10+") ? "" : " HDR10+ plays as HDR10."}`,
+					d && i18n.settings_hdr_desc({ display: d.name, width: d.width, height: d.height, hz: Math.round(d.refresh_hz) }) + (d.hdr.includes("HDR10+") ? "" : i18n.settings_hdr10plus_as_hdr10()),
 				),
 			] },
-			{ key: "account", title: "Account", icon: User, rows: [
-				show("Signed in as", me?.email ?? ""),
-				show("Server", host),
-				{ ...show("Sign out of this device", "Sign out", "Removes the device key. You’ll need to pair again."), act: signOut },
+			{ key: "account", title: i18n.settings_account(), icon: User, rows: [
+				show(i18n.settings_signed_in_as(), me?.email ?? ""),
+				show(i18n.settings_server(), host),
+				{ ...show(i18n.settings_sign_out(), i18n.settings_sign_out_value(), i18n.settings_sign_out_desc()), act: signOut },
 			] },
 		];
 	});
@@ -169,7 +190,7 @@
 	{:else}
 		<div class="page">
 			<div class="sections" data-tv-group="1">
-				<h1>Settings</h1>
+				<h1>{i18n.settings_title()}</h1>
 				{#each sections as s (s.key)}
 					<button data-tv="1" data-tv-current={s.key === current ? "1" : undefined} class="section" class:current={s.key === current} onfocus={() => (current = s.key)} onclick={() => (current = s.key)}>
 						<s.icon size={28} strokeWidth={1.75} />{s.title}
@@ -184,7 +205,7 @@
 					</div>
 					{#each picking.vals ?? [] as v}
 						<button data-tv="1" data-tv-default={prefs[pick] === v ? "1" : undefined} class="row" class:on={prefs[pick] === v} onclick={() => choose(v)}>
-							<span class="opt">{v}</span>
+							<span class="opt">{shown(pick, v)}</span>
 							{#if prefs[pick] === v}<Check size={30} strokeWidth={2.5} />{/if}
 						</button>
 					{/each}

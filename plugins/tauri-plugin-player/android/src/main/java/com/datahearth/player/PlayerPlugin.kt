@@ -69,6 +69,11 @@ class CapabilitiesArgs {
 }
 
 @InvokeArg
+class VoiceArgs {
+    var language: String? = null
+}
+
+@InvokeArg
 class VaultArgs {
     lateinit var name: String
     var value: String? = null
@@ -429,9 +434,12 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     /** Android's own listening dialog: it needs no microphone permission of ours. */
     @Command
     fun voice(invoke: Invoke) {
+        val language = invoke.parseArgs(VoiceArgs::class.java).language
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        // The app's language, which can differ from the TV's: French titles are spoken in French.
+        if (language != null) intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
         try {
             startActivityForResult(invoke, intent, "voiceResult")
         } catch (e: ActivityNotFoundException) {

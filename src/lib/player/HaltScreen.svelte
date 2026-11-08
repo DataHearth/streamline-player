@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ChevronRight, RotateCw } from "@lucide/svelte";
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import { orPoster } from "#lib/tv/api.ts";
 	import type { Halt } from "./halt.ts";
 	import "./screen.css";
@@ -39,12 +40,12 @@
 				<div class="msg">
 					<span class="avatar" style:background="oklch(0.36 0.06 {hue(halt.message.by)})" style:color="oklch(0.92 0.04 {hue(halt.message.by)})">{initials(halt.message.by)}</span>
 					<span class="msg-text">
-						<span class="msg-by"><b>{halt.message.by}</b> · Admin · just now</span>
+						<span class="msg-by"><b>{halt.message.by}</b> · {i18n.halt_admin_just_now()}</span>
 						<span class="msg-body">{halt.message.text}</span>
 					</span>
 				</div>
 			{:else if halt.message}
-				<span class="no-msg">No reason was given.</span>
+				<span class="no-msg">{i18n.halt_no_reason()}</span>
 			{/if}
 			{#if halt.count && halt.left && halt.total}
 				<div class="count">
@@ -55,7 +56,7 @@
 			{#if halt.wait}<span class="halt-wait"><span class="wait-dot"></span>{halt.wait}</span>{/if}
 			{#if halt.alts?.length}
 				<div class="alts">
-					<span class="alts-title">Or start now, without a conversion</span>
+					<span class="alts-title">{i18n.halt_alts_title()}</span>
 					{#each halt.alts as alt}
 						<button data-tv="1" class="alt" onclick={alt.run}>
 							<alt.icon size={20} strokeWidth={1.75} />

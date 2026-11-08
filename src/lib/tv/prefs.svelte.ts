@@ -1,3 +1,5 @@
+import { getLocale, setLocale } from "#lib/paraglide/runtime.js";
+
 const DEFAULTS = {
 	qHome: "Original",
 	qAway: "Auto",
@@ -32,11 +34,16 @@ function load(): Prefs {
 	}
 }
 
-/** This device's settings: each TV, phone or computer is set up on its own. */
-export const prefs = $state(load());
+/**
+ * This device's settings: each TV, phone or computer is set up on its own. `language` mirrors
+ * Paraglide's locale (its own localStorage entry, else the TV's language), not the stored value.
+ */
+export const prefs = $state({ ...load(), language: getLocale() === "fr" ? "Français" : "English" });
 
 export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
 	prefs[key] = value;
+	// Reloads the app: messages are read when a page renders, not reactively.
+	if (key === "language") return setLocale(value === "Français" ? "fr" : "en");
 	try {
 		localStorage.setItem(KEY, JSON.stringify(prefs));
 	} catch {

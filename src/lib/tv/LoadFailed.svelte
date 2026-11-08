@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import HaltScreen from "#lib/player/HaltScreen.svelte";
 	import { haltFor, type Halt } from "#lib/player/halt.ts";
 	import { invoke } from "@tauri-apps/api/core";
@@ -53,5 +54,5 @@
 </script>
 
 {#if halt}
-	<HaltScreen {halt} backLabel="Back" onretry={tryAgain} {onback} />
+	<HaltScreen {halt} backLabel={i18n.common_back()} onretry={tryAgain} {onback} />
 {/if}

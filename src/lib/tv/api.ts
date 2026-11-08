@@ -1,3 +1,5 @@
+import { m as i18n } from "#lib/paraglide/messages.js";
+import { getLocale } from "#lib/paraglide/runtime.js";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { decodeHere, prefs } from "./prefs.svelte";
 
@@ -88,20 +90,20 @@ export function monogram(name: string) {
 
 /** Which seasons a series credit covers: "Season 2", "Seasons 2–5", "All 4 seasons". */
 export function seasonSpan(seasons: number[], total: number) {
-	if (seasons.length === total) return total === 1 ? "Season 1" : `All ${total} seasons`;
-	if (seasons.length === 1) return `Season ${seasons[0]}`;
+	if (seasons.length === total) return total === 1 ? i18n.common_season_n({ n: 1 }) : i18n.person_all_seasons({ count: total });
+	if (seasons.length === 1) return i18n.common_season_n({ n: seasons[0]! });
 	const run = seasons.every((n, i) => i === 0 || n === seasons[i - 1]! + 1);
-	return run ? `Seasons ${seasons[0]}\u2013${seasons.at(-1)}` : `Seasons ${seasons.join(", ")}`;
+	return run ? i18n.person_seasons_range({ from: seasons[0]!, to: seasons.at(-1)! }) : i18n.person_seasons_list({ list: seasons.join(", ") });
 }
 
 export const runtime = (min: number) => {
 	const h = Math.floor(min / 60);
 	const m = min % 60;
-	return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+	return h ? i18n.common_runtime_hm({ h, m: String(m).padStart(2, "0") }) : i18n.common_runtime_m({ m });
 };
 export const left = (sec: number) => {
 	const m = Math.max(1, Math.round(sec / 60));
-	return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m left` : `${m}m left`;
+	return m >= 60 ? i18n.common_left_hm({ h: Math.floor(m / 60), m: m % 60 }) : i18n.common_left_m({ m });
 };
 export const inProgress = (w?: Watch) => !!w && !w.watched && w.position_seconds > 0;
 export const pct = (w?: Watch) => (w && w.duration_seconds > 0 ? Math.round((w.position_seconds / w.duration_seconds) * 100) : 0);
@@ -114,10 +116,13 @@ export function badges(q?: FileSummary) {
 	return [res, hdr, q.audio && /Atmos/.test(q.audio) ? "Dolby Atmos" : q.channels].filter((b): b is string => !!b);
 }
 
-export const meta = (kind: Kind, t: Title) =>
-	kind === "series"
-		? `${t.first_aired ? `${t.first_aired.slice(0, 4)}\u2013` : t.year} · ${t.total_seasons ?? t.seasons?.length ?? 0} season${(t.total_seasons ?? t.seasons?.length) === 1 ? "" : "s"} · ★ ${t.rating}`
-		: [t.year, runtime(t.runtime ?? 0), t.certification, `★ ${t.rating}`].filter(Boolean).join(" · ");
+export const meta = (kind: Kind, t: Title) => {
+	const stars = `★ ${t.rating.toLocaleString(getLocale())}`;
+	if (kind !== "series") return [t.year, runtime(t.runtime ?? 0), t.certification, stars].filter(Boolean).join(" · ");
+	const count = t.total_seasons ?? t.seasons?.length ?? 0;
+	const seasons = count === 1 ? i18n.common_seasons_one({ count }) : i18n.common_seasons_other({ count });
+	return `${t.first_aired ? `${t.first_aired.slice(0, 4)}\u2013` : t.year} · ${seasons} · ${stars}`;
+};
 
 /** Episodes in play order, each with its season number. */
 export const episodesOf = (t: Title) => (t.seasons ?? []).flatMap((s) => s.episodes.map((e) => ({ ...e, season: s.number })));

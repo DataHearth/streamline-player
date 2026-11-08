@@ -30,7 +30,9 @@
 		SkipForward,
 		X,
 	} from "@lucide/svelte";
-	import { onMount, tick } from "svelte";
+	import { m as i18n } from "#lib/paraglide/messages.js";
+import { getLocale } from "#lib/paraglide/runtime.js";
+import { onMount, tick } from "svelte";
 
 	type Preview = { bitRate: number; original?: Decision; presets: Record<number, Decision>; audio: Record<number, Decision> };
 	type Next = { code: string; title: string; overview: string; still: string; stillPos: string; label: string; href: string };
@@ -95,7 +97,7 @@
 	// Seconds the bar may run ahead of the last report, should reports stop.
 	const MAX_EXTRAPOLATION = 1;
 	const SEEK_STEP = 10;
-	const TAB_NAMES: Record<Tab, string> = { audio: "Audio", subs: "Subtitles", quality: "Quality", speed: "Speed" };
+	const TAB_NAMES: Record<Tab, () => string> = { audio: i18n.player_audio, subs: i18n.player_subtitles, quality: i18n.player_quality, speed: i18n.player_speed };
 	const CODEC_NAMES: Record<string, string> = {
 		h264: "H.264",
 		hevc: "HEVC",
@@ -132,7 +134,13 @@
 	const MENU_EXIT_MS = 240;
 	const HALT_EXIT_MS = 240;
 	const SEEK_RUN_MS = 900;
-	const MODE_LABEL = { direct: "Direct", remux: "Remux", audio_transcode: "Audio converted", transcode: "Converted" };
+	const MODE_LABEL: Record<Session["mode"], () => string> = { direct: i18n.player_mode_direct, remux: i18n.player_mode_remux, audio_transcode: i18n.player_mode_audio_transcode, transcode: i18n.player_mode_transcode };
+const modeName = (mode: Session["mode"]) => MODE_LABEL[mode]();
+// Prefs hold the English values; only the label shown to the viewer follows the locale.
+const STYLE_LABEL: Record<string, () => string> = { None: i18n.player_style_bg_none, Shadow: i18n.player_style_bg_shadow, Box: i18n.player_style_bg_box, White: i18n.player_style_color_white, Yellow: i18n.player_style_color_yellow };
+const styleText = (v: string) => STYLE_LABEL[v]?.() ?? v;
+const digits = (n: number, d: number) => new Intl.NumberFormat(getLocale(), { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: false }).format(n);
+const times = (x: number) => `${new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 2 }).format(x)}\u00D7`;
 
 	let session = $state<Session | null>(null);
 	// svelte-ignore state_referenced_locally
@@ -251,20 +259,20 @@
 	const originalPlays = $derived(!preview?.original || (!preview.original.error && preview.original.video.action === "copy"));
 	// A file this device can't play as-is has no Original to pick.
 	const qSel = $derived<Quality>(quality === "original" && !originalPlays ? "auto" : quality);
-	const fileMbit = $derived(preview ? `${(preview.bitRate / 1_000_000).toFixed(1)} Mbit/s` : "");
-	const qualText = $derived(qSel === "auto" ? "Auto" : qSel === "original" ? "Original" : `${qSel} Mbit/s`);
+	const fileMbit = $derived(preview ? i18n.player_mbit({ value: digits(preview.bitRate / 1_000_000, 1) }) : "");
+	const qualText = $derived(qSel === "auto" ? i18n.player_auto() : qSel === "original" ? i18n.player_original() : i18n.player_mbit({ value: qSel }));
 	const menuNote = $derived.by(() => {
 		if (!session) return "";
 		const why = (r: Reason[]) => r.map((x) => x.text).join(", ");
 		switch (session.mode) {
 			case "direct":
-				return "Playing the original file as-is. Nothing is converted.";
+				return i18n.player_note_direct();
 			case "remux":
-				return `Original video and audio, repackaged for ${PLAYER_NAME} (${tracks?.container.toUpperCase() ?? ""} \u2192 fMP4). Nothing is converted.`;
+				return i18n.player_note_remux({ player: PLAYER_NAME, container: tracks?.container.toUpperCase() ?? "" });
 			case "audio_transcode":
-				return `Original video. The server converts the audio to ${audioOutName(session)} (${why(session.audio_reasons)}).`;
+				return i18n.player_note_audio_transcode({ audio: audioOutName(session), why: why(session.audio_reasons) });
 			case "transcode":
-				return `The server converts the video to ${videoOutName(session)} (${why(session.video_reasons)}).`;
+				return i18n.player_note_transcode({ video: videoOutName(session), why: why(session.video_reasons) });
 		}
 	});
 
@@ -288,14 +296,23 @@
 		}
 	}
 
-	function subInfo(t: SubTrack): { kind: SubKind; label: string; fmt: string; burnOnly?: boolean } {
-		if (t.codec === "ass" || t.codec === "ssa") return { kind: "styled", label: "Styled (ASS)", fmt: "ASS" };
-		if (t.codec === "hdmv_pgs_subtitle") return { kind: "image", label: "Image (PGS)", fmt: "PGS" };
-		if (t.codec === "dvd_subtitle") return { kind: "image", label: "Image (VobSub)", fmt: "VobSub", burnOnly: true };
-		return { kind: "text", label: t.codec === "webvtt" ? "Text (WebVTT)" : "Text (SRT)", fmt: "SRT" };
+	function languageLabel(code: string) {
+try {
+const name = new Intl.DisplayNames([getLocale()], { type: "language" }).of(code) ?? code;
+return name.charAt(0).toLocaleUpperCase(getLocale()) + name.slice(1);
+} catch {
+return code || i18n.player_unknown_language();
+}
+}
+
+function subInfo(t: SubTrack): { kind: SubKind; label: string; fmt: string; burnOnly?: boolean } {
+		if (t.codec === "ass" || t.codec === "ssa") return { kind: "styled", label: i18n.player_sub_styled(), fmt: "ASS" };
+		if (t.codec === "hdmv_pgs_subtitle") return { kind: "image", label: i18n.player_sub_image({ format: "PGS" }), fmt: "PGS" };
+		if (t.codec === "dvd_subtitle") return { kind: "image", label: i18n.player_sub_image({ format: "VobSub" }), fmt: "VobSub", burnOnly: true };
+		return { kind: "text", label: i18n.player_sub_text({ format: t.codec === "webvtt" ? "WebVTT" : "SRT" }), fmt: "SRT" };
 	}
 
-	const subName = (t: SubTrack) => `${language(t.language)}${t.forced ? " (forced)" : ""}`;
+	const subName = (t: SubTrack) => (t.forced ? i18n.player_sub_forced({ language: languageLabel(t.language) }) : languageLabel(t.language));
 	const channelLayout = (n: number) => (n >= 3 ? `${n - 1}.1` : `${n}.0`);
 	const audioName = (t: AudioTrack) => `${CODEC_NAMES[t.codec] ?? t.codec} ${channelLayout(t.channels)}`;
 
@@ -303,31 +320,31 @@
 		if (!selectedAudio || !session) return "";
 		const name = audioName(selectedAudio);
 		return session.audio.action === "copy"
-			? `${PLAYER_NAME} plays ${name} as-is.`
-			: `${PLAYER_NAME} can\u2019t decode ${name}, so the server converts it to ${audioOutName(session)}.`;
+			? i18n.player_audio_note_as_is({ player: PLAYER_NAME, name })
+			: i18n.player_audio_note_convert({ player: PLAYER_NAME, name, out: audioOutName(session) });
 	});
 
 	const styleNote = $derived(
 		subKind === "styled"
-			? "Styled (ASS) subtitles keep the file\u2019s own fonts, colors and placement. Only Size applies, as a scale."
+			? i18n.player_style_note_styled()
 			: subKind === "image"
-				? "Image subtitles are pictures, shown as they were made. Their look can\u2019t be changed."
+				? i18n.player_style_note_image()
 				: subKind === "burn"
-					? "Burned-in subtitles are part of the picture. Their look can\u2019t be changed."
+					? i18n.player_style_note_burn()
 					: "",
 	);
 	const styleSummary = $derived(
 		subKind === "text"
-			? `${prefs.subSize} \u00B7 ${prefs.subBg} \u00B7 ${prefs.subColor}`
+			? `${prefs.subSize} \u00B7 ${styleText(prefs.subBg)} \u00B7 ${styleText(prefs.subColor)}`
 			: subKind === "styled"
-				? `File\u2019s own look \u00B7 ${prefs.subSize}`
-				: "Drawn as authored",
+				? i18n.player_style_own_look({ size: prefs.subSize })
+				: i18n.player_style_drawn(),
 	);
 	const styleOk = (key: string) => subKind === "text" || (subKind === "styled" && key === "subSize");
 
 	const fmtOffset = (v: number, seconds: boolean) => {
 		const sign = v > 0 ? "+" : v < 0 ? "\u2212" : "";
-		return seconds ? `${sign}${Math.abs(v).toFixed(1)} s` : `${sign}${Math.abs(v)} ms`;
+		return sign + (seconds ? i18n.player_unit_seconds({ value: digits(Math.abs(v), 1) }) : i18n.player_unit_ms({ value: Math.abs(v) }));
 	};
 
 	function flashOsd(text: string) {
@@ -345,17 +362,17 @@
 		subOffset = step === 0 ? 0 : Math.max(-SUB_OFFSET_LIMIT, Math.min(SUB_OFFSET_LIMIT, Math.round((subOffset + step) * 10) / 10));
 		lastMove = Date.now();
 		syncTiming();
-		flashOsd(`Subtitles ${fmtOffset(subOffset, true)}`);
+		flashOsd(i18n.player_osd_subtitles({ offset: fmtOffset(subOffset, true) }));
 	}
 
 	function nudgeAudio(step: number) {
 		audioDelay = step === 0 ? 0 : Math.max(-AUDIO_DELAY_LIMIT, Math.min(AUDIO_DELAY_LIMIT, audioDelay + step));
 		lastMove = Date.now();
 		syncTiming();
-		flashOsd(`Audio ${fmtOffset(audioDelay, false)}`);
+		flashOsd(i18n.player_osd_audio({ offset: fmtOffset(audioDelay, false) }));
 	}
 
-	const mbit = (bits: number) => `${(bits / 1_000_000).toFixed(bits < 1_000_000 ? 2 : 1)} Mbit/s`;
+	const mbit = (bits: number) => i18n.player_mbit({ value: digits(bits / 1_000_000, bits < 1_000_000 ? 2 : 1) });
 	// Wide films are cropped (3840×2076, 1920×800): the width names the class, as on the box.
 	const resName = (w: number, h: number) => `${w >= 7000 || h >= 4000 ? 4320 : w >= 3400 || h >= 2000 ? 2160 : w >= 1800 || h >= 1000 ? 1080 : w >= 1200 || h >= 700 ? 720 : h}p`;
 	const codecName = (codec: string, profile?: string) => `${CODEC_NAMES[codec] ?? codec.toUpperCase()}${profile ? ` ${profile.replace(/\s/g, "")}` : ""}`;
@@ -370,21 +387,21 @@
 	}
 	const originalSub = $derived(tracks?.video ? `${resName(tracks.video.width, tracks.video.height)} ${codecName(tracks.video.codec, tracks.video.profile)}${rangeName(tracks.video.hdr, !!tracks.video.dv)}` : "");
 	const audioOutName = (s: { audio: Session["audio"] }) => `${CODEC_NAMES[s.audio.codec] ?? s.audio.codec} ${channelLayout(s.audio.channels)}`;
-	const modeBadge = (d?: Decision) => (d && !d.error ? MODE_LABEL[d.mode].toLowerCase() : "");
+	const modeBadge = (d?: Decision) => (d && !d.error ? modeName(d.mode).toLocaleLowerCase(getLocale()) : "");
 	const modeTone = (d?: Decision): Tone => (d && !d.error && !d.needs_slot ? "ok" : "conv");
 
 	function qualitySub(d: Decision | undefined) {
 		if (!d || d.error) return d?.error.message ?? "";
-		return d.video.action === "copy" ? `Same as Original \u00B7 the file is ${fileMbit}` : videoName(d.video.codec, d.video.width, d.video.height);
+		return d.video.action === "copy" ? i18n.player_quality_same_as_original({ size: fileMbit }) : videoName(d.video.codec, d.video.width, d.video.height);
 	}
 
 	const autoDecision = $derived(autoPick ? preview?.presets[autoPick] : preview?.original);
 	const autoSub = $derived.by(() => {
 		const d = preview?.original;
-		const why = d && !d.error && !originalPlays ? (d.video_reasons[0]?.text ?? "") : "based on your connection";
-		if (autoPick) return `Now ${autoPick} Mbit/s \u00B7 ${why}`;
-		if (!d || d.error || originalPlays) return measuredOnce ? "Now Original \u00B7 your connection allows it" : "Now Original";
-		return `Now ${videoName(d.video.codec, d.video.width, d.video.height)} \u00B7 ${why}`;
+		const why = d && !d.error && !originalPlays ? (d.video_reasons[0]?.text ?? "") : i18n.player_auto_based_on_connection();
+		if (autoPick) return i18n.player_auto_now({ quality: i18n.player_mbit({ value: autoPick }), why });
+		if (!d || d.error || originalPlays) return measuredOnce ? i18n.player_auto_now({ quality: i18n.player_original(), why: i18n.player_auto_connection_allows() }) : i18n.player_auto_now_only({ quality: i18n.player_original() });
+		return i18n.player_auto_now({ quality: videoName(d.video.codec, d.video.width, d.video.height), why });
 	});
 
 	function currentCap() {
@@ -422,12 +439,12 @@
 		if (orig && !orig.error && !orig.needs_slot) {
 			alts.push({
 				icon: Play,
-				label: "Play the original",
-				sub: `${MODE_LABEL[orig.mode]} \u00B7 ${originalSub} \u00B7 ${fileMbit}`,
+				label: i18n.player_alt_play_original(),
+				sub: `${modeName(orig.mode)} \u00B7 ${originalSub} \u00B7 ${fileMbit}`,
 				run: () => {
 					quality = "original";
 					start();
-					toast(`Playing the original \u00B7 ${MODE_LABEL[orig.mode]}`);
+					toast(i18n.player_toast_playing_original({ mode: modeName(orig.mode) }));
 				},
 			});
 		}
@@ -437,21 +454,21 @@
 				return d && !d.error && !d.needs_slot;
 			});
 			if (t) {
-				const name = `${language(t.language)} \u00B7 ${audioName(t)}`;
+				const name = `${languageLabel(t.language)} \u00B7 ${audioName(t)}`;
 				alts.push({
 					icon: AudioLines,
-					label: `Switch to ${name}`,
-					sub: "Plays as-is on this device",
+					label: i18n.player_alt_switch_audio({ name }),
+					sub: i18n.player_alt_plays_as_is(),
 					run: () => {
 						audioPick = t.index;
 						start();
-						toast(`Playing ${name}`);
+						toast(i18n.player_toast_playing({ name }));
 					},
 				});
 			}
 		}
 		const need = wanted && !wanted.error ? [...wanted.video_reasons, ...wanted.audio_reasons].map((r) => r.text).join(", ") : "";
-		halt = { ...halt, alts, body: `All conversions on ${host} are in use, and this stream needs one${need ? ` (${need})` : ""}.` };
+		halt = { ...halt, alts, body: need ? i18n.halt_busy_body_need({ host, need }) : i18n.halt_busy_body({ host }) };
 	}
 
 	const statRows = $derived.by(() => {
@@ -463,38 +480,38 @@
 		const outName = videoOutName(session);
 		const audioIn = selectedAudio ? audioName(selectedAudio) : "";
 		const audioOut = audioOutName(session);
-		const why = (list: Reason[]): StatRow[] => (list.length ? [{ k: "why", v: list.map((r) => r.text).join(" \u00B7 "), why: true }] : []);
-		const known = [live && live.videoBitrate > 0 && `${mbit(live.videoBitrate)} video`, live && live.audioBitrate > 0 && `${mbit(live.audioBitrate)} audio`].filter(Boolean);
+		const why = (list: Reason[]): StatRow[] => (list.length ? [{ k: i18n.player_stat_why(), v: list.map((r) => r.text).join(" \u00B7 "), why: true }] : []);
+		const known = [live && live.videoBitrate > 0 && i18n.player_stat_bitrate_video({ rate: mbit(live.videoBitrate) }), live && live.audioBitrate > 0 && i18n.player_stat_bitrate_audio({ rate: mbit(live.audioBitrate) })].filter(Boolean);
 		const rows: StatRow[] = [
-			{ k: "Mode", v: `${MODE_LABEL[session.mode]}${direct ? " \u00B7 the original file" : session.mode === "remux" ? " \u00B7 nothing converted" : ""}`, c: full ? "var(--status-available)" : "var(--status-downloading)" },
-			{ k: "Player", v: live?.player ?? PLAYER_NAME },
-			{ k: "Video", v: copy ? `${outName} \u00B7 as-is` : `${inName} \u2192 ${outName}`, c: "var(--player-ink)" },
+			{ k: i18n.player_stat_mode(), v: `${modeName(session.mode)}${direct ? ` \u00B7 ${i18n.player_stat_original_file()}` : session.mode === "remux" ? ` \u00B7 ${i18n.player_stat_nothing_converted()}` : ""}`, c: full ? "var(--status-available)" : "var(--status-downloading)" },
+			{ k: i18n.player_stat_player(), v: live?.player ?? PLAYER_NAME },
+			{ k: i18n.player_stat_video(), v: copy ? `${outName} \u00B7 ${i18n.player_stat_as_is()}` : `${inName} \u2192 ${outName}`, c: "var(--player-ink)" },
 			...(copy ? [] : why(session.video_reasons)),
-			{ k: "Audio", v: session.audio.action === "copy" ? `${audioIn} \u00B7 as-is` : `${audioIn} \u2192 ${audioOut}`, c: "var(--player-ink)" },
+			{ k: i18n.player_audio(), v: session.audio.action === "copy" ? `${audioIn} \u00B7 ${i18n.player_stat_as_is()}` : `${audioIn} \u2192 ${audioOut}`, c: "var(--player-ink)" },
 			...(session.audio.action === "copy" ? [] : why(session.audio_reasons)),
-			{ k: "Container", v: direct ? `${box} \u00B7 the file itself` : `${box} \u2192 fMP4 \u00B7 HLS` },
-			...(session.mode === "remux" ? [{ k: "why", v: `${box} not playable by ${PLAYER_NAME}`, why: true }] : []),
+			{ k: i18n.player_stat_container(), v: direct ? `${box} \u00B7 ${i18n.player_stat_file_itself()}` : `${box} \u2192 fMP4 \u00B7 HLS` },
+			...(session.mode === "remux" ? [{ k: i18n.player_stat_why(), v: i18n.player_stat_not_playable({ container: box, player: PLAYER_NAME }), why: true }] : []),
 			...(encodeSpeed === null
 				? []
-				: [{ k: "Encode", v: `${encodeSpeed.toFixed(1)}\u00D7 realtime \u00B7 ${copy ? "audio only" : session.hw.toUpperCase()}`, c: encodeSpeed >= 1.2 ? "var(--status-available)" : encodeSpeed >= 1 ? "var(--status-warning)" : "var(--status-failed)" }]),
-			{ k: "Subtitles", v: tracks?.preparing ? "Preparing\u2026" : selectedSub ? `${subName(selectedSub)} \u00B7 ${subInfo(selectedSub).fmt} \u00B7 ${burn ? "burned in by the server" : subRenderer(subInfo(selectedSub).kind)}` : "Off" },
-			...(subOffset || audioDelay ? [{ k: "Offsets", v: `subtitles ${fmtOffset(subOffset, true)} \u00B7 audio ${fmtOffset(audioDelay, false)}` }] : []),
-			...(known.length ? [{ k: "Bitrate", v: known.join(" \u00B7 ") }] : []),
+				: [{ k: i18n.player_stat_encode(), v: `${i18n.player_stat_realtime({ speed: digits(encodeSpeed, 1) })} \u00B7 ${copy ? i18n.player_stat_audio_only() : session.hw.toUpperCase()}`, c: encodeSpeed >= 1.2 ? "var(--status-available)" : encodeSpeed >= 1 ? "var(--status-warning)" : "var(--status-failed)" }]),
+			{ k: i18n.player_subtitles(), v: tracks?.preparing ? i18n.player_preparing() : selectedSub ? `${subName(selectedSub)} \u00B7 ${subInfo(selectedSub).fmt} \u00B7 ${burn ? i18n.player_stat_burned_in() : subRenderer(subInfo(selectedSub).kind)}` : i18n.player_subtitles_off() },
+			...(subOffset || audioDelay ? [{ k: i18n.player_stat_offsets(), v: i18n.player_stat_offsets_value({ subtitles: fmtOffset(subOffset, true), audio: fmtOffset(audioDelay, false) }) }] : []),
+			...(known.length ? [{ k: i18n.player_stat_bitrate(), v: known.join(" \u00B7 ") }] : []),
 		];
 		if (live) {
 			const speed = measured ?? (network && rememberedThroughput(network));
 			rows.push(
-				{ k: "Throughput", v: speed === null ? "Measuring\u2026" : mbit(speed), c: speed !== null && speed < SLOW_THROUGHPUT ? "var(--status-warning)" : undefined },
-				{ k: "Buffer", v: `${live.buffer.toFixed(1)} s ahead` },
-				{ k: "Frames", v: `${live.dropped.toLocaleString("en-US")} dropped / ${live.rendered.toLocaleString("en-US")}` },
-				{ k: "Display", v: `${Math.round(live.displayHz * 1000) / 1000} Hz \u00B7 not matched` },
+				{ k: i18n.player_stat_throughput(), v: speed === null ? i18n.player_measuring() : mbit(speed), c: speed !== null && speed < SLOW_THROUGHPUT ? "var(--status-warning)" : undefined },
+				{ k: i18n.player_stat_buffer(), v: i18n.player_stat_buffer_ahead({ seconds: digits(live.buffer, 1) }) },
+				{ k: i18n.player_stat_frames(), v: i18n.player_stat_frames_value({ dropped: live.dropped.toLocaleString(getLocale()), rendered: live.rendered.toLocaleString(getLocale()) }) },
+				{ k: i18n.player_stat_display(), v: i18n.player_stat_display_value({ hz: (Math.round(live.displayHz * 1000) / 1000).toLocaleString(getLocale()) }) },
 			);
 		}
-		rows.push({ k: "Speed", v: `${speed}\u00D7` }, { k: "Server", v: `${new URL(session.url).host} \u00B7 ${direct ? "/file" : "/hls"}` });
+		rows.push({ k: i18n.player_speed(), v: times(speed) }, { k: i18n.player_stat_server(), v: `${new URL(session.url).host} \u00B7 ${direct ? "/file" : "/hls"}` });
 		return rows;
 	});
 
-	const subRenderer = (kind: SubKind) => (kind === "styled" ? "libass" : kind === "image" ? (PLAYER_NAME === "mpv" ? "mpv" : "Media3") : "web view");
+	const subRenderer = (kind: SubKind) => (kind === "styled" ? "libass" : kind === "image" ? (PLAYER_NAME === "mpv" ? "mpv" : "Media3") : i18n.player_renderer_web_view());
 
 	$effect(() => {
 		if (!stats) return;
@@ -581,7 +598,7 @@
 		const info = t && subInfo(t);
 		const wantsBurn = !!info?.burnOnly;
 		const changedBurn = wantsBurn !== burn || (wantsBurn && subPick !== t?.index);
-		if (wantsBurn && !burn && session) burnBack = MODE_LABEL[session.mode];
+		if (wantsBurn && !burn && session) burnBack = modeName(session.mode);
 		subPick = t?.index ?? null;
 		burn = wantsBurn;
 		cues = [];
@@ -599,7 +616,7 @@
 			}
 			syncTiming();
 		} catch {
-			flashOsd("Subtitles unavailable");
+			flashOsd(i18n.player_subtitles_unavailable());
 		}
 	}
 
@@ -699,9 +716,9 @@
 	}
 
 	function resumedToast(after: Halt["kind"] | undefined, s: Session) {
-		if (after === "unreachable") toast("Reconnected \u00B7 playback resumed");
-		else if (after === "offline") toast("Back online \u00B7 playback resumed", { icon: "wifi" });
-		else if (after === "busy" && s.mode !== "direct" && s.mode !== "remux") toast("Conversion started", { icon: "cpu", text: s.video.action === "copy" ? `Audio \u2192 ${audioOutName(s)}` : `${s.video.height}p ${CODEC_NAMES[s.video.codec] ?? s.video.codec}` });
+		if (after === "unreachable") toast(i18n.player_toast_reconnected());
+		else if (after === "offline") toast(i18n.player_toast_back_online(), { icon: "wifi" });
+		else if (after === "busy" && s.mode !== "direct" && s.mode !== "remux") toast(i18n.player_toast_conversion_started(), { icon: "cpu", text: s.video.action === "copy" ? i18n.player_toast_audio_to({ audio: audioOutName(s) }) : `${s.video.height}p ${CODEC_NAMES[s.video.codec] ?? s.video.codec}` });
 	}
 
 	async function start(at = position) {
@@ -747,7 +764,7 @@
 		const at = position;
 		await stop();
 		await start(at);
-		if (session && (!halt || haltLeaving)) toast("Reconnected \u00B7 playback resumed");
+		if (session && (!halt || haltLeaving)) toast(i18n.player_toast_reconnected());
 	}
 
 	const sessionGone = (raw: string) => raw.includes('"not_found"');
@@ -891,7 +908,7 @@
 		const target = stepDown(measuredInStall, session.bandwidth / MBIT, guess);
 		if (target === null || !(await moveAuto(target))) return;
 		stepUpHold = Math.min(stepUpHold * 2, STEP_UP_HOLD_MAX_MS);
-		toast(`Quality lowered to ${target} Mbit/s to stop buffering`, { icon: "gauge", warning: true, text: "Auto steps back up when your connection recovers." });
+		toast(i18n.player_toast_quality_lowered({ value: target }), { icon: "gauge", warning: true, text: i18n.player_toast_quality_lowered_note() });
 	}
 
 	function considerStepUp() {
@@ -1056,7 +1073,7 @@
 					return;
 				}
 				buffering = false;
-				showHalt({ kind: "error", eyebrow: "Playback error", icon: CircleAlert, title: "This stream stopped", mono: `${e.code}: ${e.message}`, failed: true, retryLabel: "Try now" });
+				showHalt({ kind: "error", eyebrow: i18n.halt_error_eyebrow(), icon: CircleAlert, title: i18n.halt_stream_stopped_title(), mono: `${e.code}: ${e.message}`, failed: true, retryLabel: i18n.halt_try_now() });
 			}),
 			addPluginListener<{ bitrate: number; source: "meter" | "reads" }>("player", "bandwidth", (e) => {
 				// Reads stop at what a converted stream's encoder produces, so only the meter sees its link.
@@ -1069,7 +1086,7 @@
 				considerStepUp();
 			}),
 			addPluginListener("player", "back", back),
-			addPluginListener("player", "subtitleFailed", () => flashOsd("Subtitles unavailable")),
+			addPluginListener("player", "subtitleFailed", () => flashOsd(i18n.player_subtitles_unavailable())),
 		];
 		start(startAt);
 		const cueTimer = setInterval(updateCue, 100);
@@ -1124,11 +1141,11 @@
 			{#if !zero}<span class="stepper-desc">{desc}</span>{/if}
 		</span>
 		<div class="stepper-box" style:pointer-events={disabled ? "none" : "auto"}>
-			<button data-tv="1" disabled={disabled} class="step" aria-label="{what} earlier" onclick={dec}><Minus size={14} strokeWidth={2.25} /></button>
+			<button data-tv="1" disabled={disabled} class="step" aria-label={i18n.player_step_earlier({ what })} onclick={dec}><Minus size={14} strokeWidth={2.25} /></button>
 			<span class="stepper-value" style:color={zero ? "var(--player-ink-muted)" : "var(--player-accent-text)"}>{value}</span>
-			<button data-tv="1" disabled={disabled} class="step" aria-label="{what} later" onclick={inc}><Plus size={14} strokeWidth={2.25} /></button>
+			<button data-tv="1" disabled={disabled} class="step" aria-label={i18n.player_step_later({ what })} onclick={inc}><Plus size={14} strokeWidth={2.25} /></button>
 		</div>
-		<button data-tv="1" disabled={zero} class="reset" style:opacity={zero ? 0 : 1} aria-label="Reset {what.toLowerCase()} timing" onclick={reset}>Reset</button>
+		<button data-tv="1" disabled={zero} class="reset" style:opacity={zero ? 0 : 1} aria-label={i18n.player_reset_timing({ what: what.toLocaleLowerCase(getLocale()) })} onclick={reset}>{i18n.player_reset()}</button>
 	</div>
 {/snippet}
 
@@ -1147,7 +1164,7 @@
 				style:opacity={idx < 0 ? 0 : 1}
 			></span>
 			{#each values as v}
-				<button data-tv="1" disabled={!on} class="seg-opt" style:color={prefs[key] === v && on ? "var(--fg-on-accent)" : "var(--player-ink-muted)"} onclick={() => setPref(key, v)}>{v}</button>
+				<button data-tv="1" disabled={!on} class="seg-opt" style:color={prefs[key] === v && on ? "var(--fg-on-accent)" : "var(--player-ink-muted)"} onclick={() => setPref(key, v)}>{styleText(v)}</button>
 			{/each}
 		</div>
 	</div>
@@ -1156,7 +1173,7 @@
 <div class="stage" bind:this={stage}>
 	<div class="scrim" style:opacity={controlsOn ? 1 : 0}></div>
 
-	{#if buffering}<div class="sl-spin" role="status" aria-label="Buffering"></div>{/if}
+	{#if buffering}<div class="sl-spin" role="status" aria-label={i18n.player_buffering()}></div>{/if}
 
 	{#if cueText}
 		<div class="cue-wrap" style:bottom="{controlsOn ? 400 : 90}px">
@@ -1189,23 +1206,23 @@
 					<span class="tv-heading"><span class="tv-eyebrow">{eyebrow}</span><span class="tv-title">{heading}</span></span>
 					<span class="mode">{modeLabel}</span>
 				</div>
-				<button data-tv="1" data-scrub="1" class="scrub" aria-label="Seek">
+				<button data-tv="1" data-scrub="1" class="scrub" aria-label={i18n.player_seek()}>
 					<div class="track">{#each segs as g}<div class="seg" style:flex={g.flex}><div class="buf" style:width="{g.buf}%"></div><div class="fill" style:width="{g.fill}%"></div></div>{/each}</div>
 					<div class="thumb" style:left="{pct}%"></div>
 				</button>
 				<div class="times"><span class="cur">{fmt(position)}</span><span>{chapterName}</span><span>-{fmt(duration - position)}</span></div>
 				<div class="row">
-					<button data-tv="1" data-tv-default="1" class="play" aria-label={playing ? "Pause" : "Play"} onclick={togglePlay}>
+					<button data-tv="1" data-tv-default="1" class="play" aria-label={playing ? i18n.player_pause() : i18n.player_play()} onclick={togglePlay}>
 						{#if playing}<Pause size={36} fill="currentColor" />{:else}<Play size={36} fill="currentColor" />{/if}
 					</button>
 					<button data-tv="1" class="pill" onclick={() => openMenu("subs")}>
-						{#if selectedSub}<Captions size={28} strokeWidth={1.9} />{subName(selectedSub)}{:else}<CaptionsOff size={28} strokeWidth={1.9} />Subtitles{/if}
+						{#if selectedSub}<Captions size={28} strokeWidth={1.9} />{subName(selectedSub)}{:else}<CaptionsOff size={28} strokeWidth={1.9} />{i18n.player_subtitles()}{/if}
 					</button>
-					<button data-tv="1" class="pill" onclick={() => openMenu("audio")}><AudioLines size={28} strokeWidth={1.9} />Audio</button>
+					<button data-tv="1" class="pill" onclick={() => openMenu("audio")}><AudioLines size={28} strokeWidth={1.9} />{i18n.player_audio()}</button>
 					<button data-tv="1" class="pill" onclick={() => openMenu("quality")}><Settings size={28} strokeWidth={1.9} />{qualText}</button>
-					<button data-tv="1" class="pill" onclick={() => openMenu("speed")}><Gauge size={28} strokeWidth={1.9} />{speed}&times;</button>
-					<button data-tv="1" class="pill" onclick={() => (stats = !stats)}><Activity size={28} strokeWidth={1.9} />Stats</button>
-					{#if next}<button data-tv="1" class="pill" onclick={() => leave().then(onnext)}><SkipForward size={28} strokeWidth={1.9} />Next episode</button>{/if}
+					<button data-tv="1" class="pill" onclick={() => openMenu("speed")}><Gauge size={28} strokeWidth={1.9} />{times(speed)}</button>
+					<button data-tv="1" class="pill" onclick={() => (stats = !stats)}><Activity size={28} strokeWidth={1.9} />{i18n.player_stats()}</button>
+					{#if next}<button data-tv="1" class="pill" onclick={() => leave().then(onnext)}><SkipForward size={28} strokeWidth={1.9} />{i18n.player_next_episode()}</button>{/if}
 				</div>
 			</div>
 		{/if}
@@ -1215,26 +1232,26 @@
 		<div class="menu-scrim" class:vis={menuVis}></div>
 		<div class="menu" class:vis={menuVis} data-tv-trap={menu ? "1" : undefined} inert={!menu}>
 			<div class="menu-head">
-				<span class="menu-title">{TAB_NAMES[tab]}</span>
+				<span class="menu-title">{TAB_NAMES[tab]()}</span>
 				<div class="grow"></div>
-				<button data-tv="1" class="close" aria-label="Close" onclick={closeMenu}><X size={16} strokeWidth={2} /></button>
+				<button data-tv="1" class="close" aria-label={i18n.player_close()} onclick={closeMenu}><X size={16} strokeWidth={2} /></button>
 			</div>
 			<div class="menu-body">
 				{#if tab === "quality"}
 					<div class="note"><span class="note-dot" style:background={full ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{menuNote}</span></div>
-					{@render option("Auto", qSel === "auto", () => pickQuality("auto"), autoSub, modeBadge(autoDecision), modeTone(autoDecision))}
+					{@render option(i18n.player_auto(), qSel === "auto", () => pickQuality("auto"), autoSub, modeBadge(autoDecision), modeTone(autoDecision))}
 					{#if originalPlays}
-						{@render option("Original", qSel === "original", () => pickQuality("original"), `${originalSub}${fileMbit ? ` \u00B7 ${fileMbit}` : ""}`, modeBadge(preview?.original), modeTone(preview?.original))}
+						{@render option(i18n.player_original(), qSel === "original", () => pickQuality("original"), `${originalSub}${fileMbit ? ` \u00B7 ${fileMbit}` : ""}`, modeBadge(preview?.original), modeTone(preview?.original))}
 					{:else}
-						{@render option("Original", false, () => {}, `Not on this device \u00B7 ${preview?.original && !preview.original.error ? (preview.original.video_reasons[0]?.text ?? "") : ""}`, "", "ok", false, "", true)}
+						{@render option(i18n.player_original(), false, () => {}, i18n.player_original_unavailable({ reason: preview?.original && !preview.original.error ? (preview.original.video_reasons[0]?.text ?? "") : "" }), "", "ok", false, "", true)}
 					{/if}
 					{#each PRESETS as n}
 						{@const d = preview?.presets[n]}
 						{@const converted = !!d && !d.error && d.video.action !== "copy"}
-						{@render option(`${n} Mbit/s`, qSel === n, () => pickQuality(n), qualitySub(d), modeBadge(d), modeTone(d), false, converted && !d.error && d.video.hdr !== "sdr" ? "HDR" : "")}
+						{@render option(i18n.player_mbit({ value: n }), qSel === n, () => pickQuality(n), qualitySub(d), modeBadge(d), modeTone(d), false, converted && !d.error && d.video.hdr !== "sdr" ? "HDR" : "")}
 					{/each}
 				{:else if tab === "speed"}
-					{#each SPEEDS as x}{@render option(x === 1 ? "Normal" : `${x}\u00D7`, speed === x, () => pickSpeed(x))}{/each}
+					{#each SPEEDS as x}{@render option(x === 1 ? i18n.player_speed_normal() : times(x), speed === x, () => pickSpeed(x))}{/each}
 				{:else if tab === "audio"}
 					<div class="note"><span class="note-dot" style:background={session?.audio.action === "copy" ? "var(--status-available)" : "var(--status-downloading)"}></span><span>{audioNote}</span></div>
 					{#each tracks?.audio ?? [] as t, i}
@@ -1242,52 +1259,52 @@
 						{@const out = d && !d.error ? d : t.index === selectedAudio?.index ? session : null}
 						{@const asIs = out?.audio.action === "copy"}
 						{@render option(
-							`${language(t.language)}${i === 0 ? " (original)" : ""}`,
+							i === 0 ? i18n.player_audio_original({ language: languageLabel(t.language) }) : languageLabel(t.language),
 							t.index === selectedAudio?.index,
 							() => pickAudio(t),
 							out && !asIs ? `${audioName(t)} \u2192 ${audioOutName(out)}` : audioName(t),
-							out ? (asIs ? "as-is" : "converted") : "",
+							out ? (asIs ? i18n.player_badge_as_is() : i18n.player_badge_converted()) : "",
 							asIs ? "ok" : "conv",
 						)}
 					{/each}
 					{@render stepper(
-						"Audio delay",
-						audioDelay > 0 ? "Sound plays later than the picture." : "Sound plays earlier than the picture.",
+						i18n.player_audio_delay(),
+						audioDelay > 0 ? i18n.player_audio_delay_later() : i18n.player_audio_delay_earlier(),
 						fmtOffset(audioDelay, false),
 						audioDelay === 0,
-						"Audio",
+						i18n.player_audio(),
 						() => nudgeAudio(-10),
 						() => nudgeAudio(10),
 						() => nudgeAudio(0),
 					)}
 					<div class="night">
 						<Moon size={16} strokeWidth={1.75} />
-						<span class="night-text"><span class="night-title">Night mode</span><span>Evens out loud and quiet scenes</span></span>
-						<span class="night-later">Later</span>
+						<span class="night-text"><span class="night-title">{i18n.player_night_mode()}</span><span>{i18n.player_night_mode_desc()}</span></span>
+						<span class="night-later">{i18n.player_night_later()}</span>
 					</div>
 				{:else}
 					{#if tracks?.preparing}
-						<div class="note"><span class="note-dot" style:background="var(--status-downloading)"></span><span>This file was just added. Streamline is still preparing its subtitles; they show up here in about a minute.</span></div>
+						<div class="note"><span class="note-dot" style:background="var(--status-downloading)"></span><span>{i18n.player_subtitles_preparing_note()}</span></div>
 					{:else if burn && selectedSub}
-						<div class="note"><span class="note-dot" style:background="var(--status-warning)"></span><span>{PLAYER_NAME} can&rsquo;t draw {subInfo(selectedSub).fmt} subtitles, so the server burns {subName(selectedSub)} into the picture. That converts the video; any other track goes back to {burnBack}.</span></div>
+						<div class="note"><span class="note-dot" style:background="var(--status-warning)"></span><span>{i18n.player_subtitles_burn_note({ player: PLAYER_NAME, format: subInfo(selectedSub).fmt, name: subName(selectedSub), back: burnBack })}</span></div>
 					{/if}
-					{@render option("Off", subPick === null, () => pickSub(null))}
+					{@render option(i18n.player_subtitles_off(), subPick === null, () => pickSub(null))}
 					{#each tracks?.subtitles ?? [] as t}
 						{@const info = subInfo(t)}
 						{#if tracks?.preparing && !info.burnOnly}
-							{@render option(subName(t), false, () => {}, "Preparing\u2026", "", "ok", true)}
+							{@render option(subName(t), false, () => {}, i18n.player_preparing(), "", "ok", true)}
 						{:else if info.burnOnly}
-							{@render option(subName(t), subPick === t.index, () => pickSub(t), `${info.label} \u00B7 burn in`, "converts the video", "warn")}
+							{@render option(subName(t), subPick === t.index, () => pickSub(t), i18n.player_sub_burn_in({ label: info.label }), i18n.player_badge_converts_video(), "warn")}
 						{:else}
-							{@render option(subName(t), subPick === t.index, () => pickSub(t), `${info.label}${t.sdh ? " \u00B7 sound descriptions" : ""}`)}
+							{@render option(subName(t), subPick === t.index, () => pickSub(t), t.sdh ? i18n.player_sub_sdh({ label: info.label }) : info.label)}
 						{/if}
 					{/each}
 					{@render stepper(
-						"Sync",
-						subOffset > 0 ? "Subtitles show later than in the file." : "Subtitles show earlier than in the file.",
+						i18n.player_sync(),
+						subOffset > 0 ? i18n.player_sync_later() : i18n.player_sync_earlier(),
 						fmtOffset(subOffset, true),
 						subOffset === 0,
-						"Subtitles",
+						i18n.player_subtitles(),
 						() => nudgeSub(-0.1),
 						() => nudgeSub(0.1),
 						() => nudgeSub(0),
@@ -1295,15 +1312,15 @@
 					)}
 					<div class="style-box">
 						<button data-tv="1" class="style-head" aria-expanded={styleOpen} onclick={() => (styleOpen = !styleOpen)}>
-							<span class="style-eyebrow">Subtitle style</span>
+							<span class="style-eyebrow">{i18n.player_style_title()}</span>
 							<span class="style-summary">{styleSummary}</span>
 							<span class="style-chevron" style:transform={styleOpen ? "rotate(180deg)" : "none"}><ChevronDown size={15} strokeWidth={2} /></span>
 						</button>
 						{#if styleOpen}
 							{#if styleNote}<div class="style-note">{styleNote}</div>{/if}
-							{@render styleGroup("Size", "subSize", ["S", "M", "L", "XL"])}
-							{@render styleGroup("Background", "subBg", ["None", "Shadow", "Box"])}
-							{@render styleGroup("Color", "subColor", ["White", "Yellow"])}
+							{@render styleGroup(i18n.player_style_size(), "subSize", ["S", "M", "L", "XL"])}
+							{@render styleGroup(i18n.player_style_background(), "subBg", ["None", "Shadow", "Box"])}
+							{@render styleGroup(i18n.player_style_color(), "subColor", ["White", "Yellow"])}
 						{/if}
 					</div>
 				{/if}
@@ -1313,7 +1330,7 @@
 
 	{#if skipOn}
 		<div class="card-slot skip-slot" style:bottom="{cardBottom}px" transition:pop={{ y: 10, scale: 0.96 }}>
-			<button data-tv="1" class="sl-skip" onclick={skip}><ChevronsRight size={18} strokeWidth={2} />{introOn ? "Skip intro" : "Skip credits"}</button>
+			<button data-tv="1" class="sl-skip" onclick={skip}><ChevronsRight size={18} strokeWidth={2} />{introOn ? i18n.player_skip_intro() : i18n.player_skip_credits()}</button>
 		</div>
 	{/if}
 
@@ -1323,16 +1340,16 @@
 				<img src={next.still} alt="" style:object-position={next.stillPos} onerror={orPoster(poster)} />
 				<div class="upnext-fade"></div>
 				<div class="upnext-cap">
-					<span class="upnext-code">UP NEXT &middot; {next.code}</span>
+					<span class="upnext-code">{i18n.player_up_next_card({ code: next.code })}</span>
 					<span class="upnext-title">{next.title}</span>
 				</div>
-				{#if prefs.autoplay}<div class="upnext-timer" role="progressbar" aria-label="Next episode starts when this fills" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(upNextFrac * 100)}>
+				{#if prefs.autoplay}<div class="upnext-timer" role="progressbar" aria-label={i18n.player_next_starts_when_filled()} aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(upNextFrac * 100)}>
 					<div style:transform="scaleX({upNextFrac})"></div>
 				</div>{/if}
 			</div>
 			<div class="upnext-row">
-				<button data-tv="1" data-tv-default="1" class="btn-ink" onclick={() => leave().then(onnext)}><Play size={15} fill="currentColor" /><span>Play now</span></button>
-				<button data-tv="1" class="btn-outline" onclick={() => { upNextDismissed = true; focusDefault(); }}>Watch credits</button>
+				<button data-tv="1" data-tv-default="1" class="btn-ink" onclick={() => leave().then(onnext)}><Play size={15} fill="currentColor" /><span>{i18n.player_play_now()}</span></button>
+				<button data-tv="1" class="btn-outline" onclick={() => { upNextDismissed = true; focusDefault(); }}>{i18n.player_watch_credits()}</button>
 			</div>
 		</div>
 	{/if}
@@ -1340,8 +1357,8 @@
 	{#if stats}
 		<div class="sl-stats" style:bottom="{controlsOn ? 220 : 50}px" transition:pop>
 			<div class="stats-head">
-				<span>Playback stats</span>
-				<button data-tv="1" class="stats-close" aria-label="Close stats" onclick={() => { stats = false; focusDefault(); }}><X size={14} strokeWidth={2} /></button>
+				<span>{i18n.player_stats_title()}</span>
+				<button data-tv="1" class="stats-close" aria-label={i18n.player_close_stats()} onclick={() => { stats = false; focusDefault(); }}><X size={14} strokeWidth={2} /></button>
 			</div>
 			{#each statRows as r}
 				<div class="stats-row">
@@ -1359,12 +1376,12 @@
 				{#if next}
 					<div class="end-next">
 						<div class="halt-col end-col">
-							<span class="eyebrow" style:color="var(--player-accent-text)">Up next &middot; {next.code}</span>
+							<span class="eyebrow" style:color="var(--player-accent-text)">{i18n.player_up_next({ code: next.code })}</span>
 							<span class="halt-title">{next.title}</span>
 							{#if next.overview}<span class="end-syn">{next.overview}</span>{/if}
 							<div class="actions">
 								<button data-tv="1" data-tv-default="1" class="primary" onclick={onnext}><Play size={16} fill="currentColor" />{next.label}</button>
-								<button data-tv="1" class="secondary" onclick={exit}>Done</button>
+								<button data-tv="1" class="secondary" onclick={exit}>{i18n.player_done()}</button>
 							</div>
 						</div>
 						<div class="end-still"><img src={next.still} alt="" style:object-position={next.stillPos} onerror={orPoster(poster)} /></div>
@@ -1372,16 +1389,16 @@
 				{:else}
 					<div class="end-done-col">
 						<div class="halt-col end-col">
-							<span class="eyebrow" style:color="var(--player-accent-text)">{isEpisode ? `Finished \u00B7 ${eyebrow.split(" \u00B7 ").at(-1)}` : "Finished"}</span>
+							<span class="eyebrow" style:color="var(--player-accent-text)">{isEpisode ? i18n.player_finished_episode({ episode: eyebrow.split(" \u00B7 ").at(-1) ?? "" }) : i18n.player_finished()}</span>
 							<span class="halt-title">{isEpisode ? eyebrow.split(" \u00B7 ")[0] : heading}</span>
 							<div class="actions">
-								<button data-tv="1" data-tv-default="1" class="primary end-done" onclick={exit}>Done</button>
-								<button data-tv="1" class="secondary end-again" onclick={replay}><RotateCcw size={16} strokeWidth={2} />Watch again</button>
+								<button data-tv="1" data-tv-default="1" class="primary end-done" onclick={exit}>{i18n.player_done()}</button>
+								<button data-tv="1" class="secondary end-again" onclick={replay}><RotateCcw size={16} strokeWidth={2} />{i18n.player_watch_again()}</button>
 							</div>
 						</div>
 						{#if more.length}
 							<div class="end-more">
-								<span class="more-title">More like this</span>
+								<span class="more-title">{i18n.player_more_like_this()}</span>
 								<div class="more-row">
 									{#each more as it (it.href)}
 										<button data-tv="1" class="more-card" aria-label={it.title} onclick={() => onopen(it.href)}><img src={it.poster} alt="" loading="lazy" onerror={hideBroken} /></button>
@@ -1396,7 +1413,7 @@
 	{/if}
 
 	{#if halt}
-		<HaltScreen {halt} leaving={haltLeaving} {frame} {poster} {framePos} backLabel="Back to {titleName}" onretry={() => start()} onback={exit} />
+		<HaltScreen {halt} leaving={haltLeaving} {frame} {poster} {framePos} backLabel={i18n.player_back_to({ title: titleName })} onretry={() => start()} onback={exit} />
 	{/if}
 </div>
 

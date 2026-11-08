@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m as i18n } from "#lib/paraglide/messages.js";
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import { autoCap, PRESETS, presetOf, rememberedThroughput } from "#lib/player/auto.ts";
@@ -20,7 +21,7 @@
 	let heroBlur = $state(false);
 	let failed = $state<string | null>(null);
 	let playback = $state.raw<Decision | null>(null);
-	const PLAIN = { direct: "Plays as-is", remux: "Plays in original quality", audio_transcode: "Original picture, converted sound", transcode: "Converted for this device" };
+	const PLAIN = { direct: i18n.detail_plays_as_is(), remux: i18n.detail_plays_original(), audio_transcode: i18n.detail_audio_converted(), transcode: i18n.detail_converted() };
 	const seasonParam = $derived(Number(page.url.searchParams.get("s")) || null);
 	let loadId = 0;
 
@@ -61,8 +62,8 @@
 	const watched = $derived(kind === "series" ? available.length > 0 && available.every((e) => stateOf(e.media_file_id)?.watched) : !!movieWatch?.watched);
 	const hasRestart = $derived(kind === "movies" && inProgress(movieWatch));
 	const primary = $derived.by(() => {
-		if (kind === "series") return nextEp ? `${progressEp ? "Resume" : "Play"} S${nextEp.season} · E${nextEp.number}` : "Play";
-		return movieWatch && hasRestart ? `Resume · ${left(movieWatch.duration_seconds - movieWatch.position_seconds)}` : "Play";
+		if (kind === "series") return nextEp ? (progressEp ? i18n.detail_resume_episode : i18n.detail_play_episode)({ season: nextEp.season, episode: nextEp.number }) : i18n.common_play();
+		return movieWatch && hasRestart ? i18n.detail_resume_left({ left: left(movieWatch.duration_seconds - movieWatch.position_seconds) }) : i18n.common_play();
 	});
 	const playMedia = $derived(kind === "series" ? nextEp?.media_file_id : movieMedia);
 	const full = $derived(playback && !playback.error && (playback.mode === "direct" || playback.mode === "remux"));
@@ -103,13 +104,13 @@
 		const was = watched;
 		await Promise.all(list.map((m) => setWatched(m, !was)));
 		watch = await watchState();
-		toast(`${kind === "series" ? "Series marked" : "Marked"} as ${was ? "unwatched" : "watched"}`);
+		toast(kind === "series" ? (was ? i18n.detail_marked_series_unwatched() : i18n.detail_marked_series_watched()) : was ? i18n.detail_marked_unwatched() : i18n.detail_marked_watched());
 	}
 </script>
 
 {#snippet castRow()}
 	{#if castShown.length}
-		<div class="more-title">{kind === "series" ? `Cast · Season ${curSeason}` : "Cast"}<span class="count">{castShown.length}</span></div>
+		<div class="more-title">{kind === "series" ? i18n.detail_cast_season({ n: curSeason }) : i18n.detail_cast()}<span class="count">{castShown.length}</span></div>
 		<div class="cast">
 			{#each castShown.slice(0, MAX_CAST) as c (c.id)}
 				{@const m = monogram(c.name)}
@@ -155,10 +156,10 @@
 				<div class="actions">
 					<button data-tv="1" data-tv-default="1" class="act main" onclick={play}><Play size={28} fill="currentColor" />{primary}</button>
 					{#if hasRestart}
-						<button data-tv="1" class="act" onclick={() => goto(`/player/movies/${id}`)}><RotateCcw size={26} strokeWidth={2} />From the start</button>
+						<button data-tv="1" class="act" onclick={() => goto(`/player/movies/${id}`)}><RotateCcw size={26} strokeWidth={2} />{i18n.detail_from_start()}</button>
 					{/if}
 					<button data-tv="1" class="act mark" style:color={watched ? "var(--status-available)" : "var(--fg)"} onclick={toggleWatched}>
-						{#if watched}<CheckCheck size={26} strokeWidth={2.2} />Watched{:else}<Eye size={26} strokeWidth={2.2} />Mark watched{/if}
+						{#if watched}<CheckCheck size={26} strokeWidth={2.2} />{i18n.detail_watched()}{:else}<Eye size={26} strokeWidth={2.2} />{i18n.detail_mark_watched()}{/if}
 					</button>
 				</div>
 				{#if playback && !playback.error}
@@ -172,7 +173,7 @@
 				{#if kind === "series"}
 					<div class="seasons">
 						{#each t.seasons ?? [] as s}
-							<button data-tv="1" class="season" class:on={s.number === curSeason} onclick={() => (season = s.number)} onfocus={() => (season = s.number)}>Season {s.number}</button>
+							<button data-tv="1" class="season" class:on={s.number === curSeason} onclick={() => (season = s.number)} onfocus={() => (season = s.number)}>{i18n.common_season_n({ n: s.number })}</button>
 						{/each}
 					</div>
 					<div class="eps">
@@ -185,7 +186,7 @@
 									{#if w?.watched}<span class="done"><Check size={22} strokeWidth={2.5} /></span>{/if}
 								</span>
 								<span class="ep-text">
-									<span class="ep-num">E{String(e.number).padStart(2, "0")} &middot; {runtime(e.runtime)}</span>
+									<span class="ep-num">{i18n.detail_episode_number({ n: String(e.number).padStart(2, "0") })} &middot; {runtime(e.runtime)}</span>
 									<span class="ep-title">{e.title}</span>
 								</span>
 							</button>
@@ -194,7 +195,7 @@
 					{@render castRow()}
 				{:else}
 					{@render castRow()}
-					<div class="more-title">More like this</div>
+					<div class="more-title">{i18n.detail_more_like_this()}</div>
 					<div class="similar">
 						{#each similar as it (`${it.kind}:${it.id}`)}
 							<button data-tv="1" class="sim" aria-label={it.title} onclick={() => goto(`/detail/${it.kind}/${it.id}`)}><img src={artwork(it.kind, it.id, "poster")} alt={it.title} loading="lazy" onerror={hideBroken} /></button>
