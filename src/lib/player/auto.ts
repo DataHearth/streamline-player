@@ -18,7 +18,11 @@ export function presetOf(label: string): Quality {
 const usableMbit = (bitsPerSecond: number) => (bitsPerSecond / MBIT) * USABLE_SHARE;
 
 /** No measurement yet means no reason to hold back: a stall corrects it. */
-export function autoCap(throughput: number | null, fileMbit: number | null, originalPlays: boolean) {
+export function autoCap(
+	throughput: number | null,
+	fileMbit: number | null,
+	originalPlays: boolean,
+) {
 	const usable = throughput === null ? Infinity : usableMbit(throughput);
 	if (originalPlays && usable >= (fileMbit ?? Infinity) * ORIGINAL_MARGIN) return null;
 	return PRESETS.find((n) => n <= usable) ?? 1;

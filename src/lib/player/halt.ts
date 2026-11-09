@@ -20,7 +20,12 @@ export type Halt = {
 	retryLabel?: string;
 	/** What the admin wrote, and who; `by` without a message says no reason was given. */
 	message?: { by: string; text: string };
-	alts?: { icon: Component<{ size?: number; strokeWidth?: number }>; label: string; sub: string; run: () => void }[];
+	alts?: {
+		icon: Component<{ size?: number; strokeWidth?: number }>;
+		label: string;
+		sub: string;
+		run: () => void;
+	}[];
 	left?: number;
 	total?: number;
 };
@@ -28,7 +33,10 @@ export type Halt = {
 type Context = { host: string; at?: string; titleName?: string };
 
 /** `raw` is what Rust returned: the server's error as JSON, anything else means no answer at all. */
-export function haltFor(raw: string, { host, at, titleName }: Context): { halt: Halt; retryIn?: number } {
+export function haltFor(
+	raw: string,
+	{ host, at, titleName }: Context,
+): { halt: Halt; retryIn?: number } {
 	let error: { code?: string; message?: string; retry_after?: number; by?: string } | null = null;
 	try {
 		const parsed = JSON.parse(raw);
@@ -59,7 +67,8 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 				icon: RotateCw,
 				title: i18n.halt_restart_title(),
 				message: error.message ? { by: error.by ?? "", text: error.message } : undefined,
-				count: (left) => (at ? i18n.halt_restart_count_at({ left, at }) : i18n.halt_restart_count({ left })),
+				count: (left) =>
+					at ? i18n.halt_restart_count_at({ left, at }) : i18n.halt_restart_count({ left }),
 				failed: false,
 			},
 		};
@@ -143,7 +152,8 @@ export function haltFor(raw: string, { host, at, titleName }: Context): { halt: 
 			icon: Server,
 			title: i18n.halt_unreachable_title({ host }),
 			body: i18n.halt_unreachable_body(),
-			count: (left) => (at ? i18n.halt_unreachable_count_at({ left, at }) : i18n.halt_count_retry({ left })),
+			count: (left) =>
+				at ? i18n.halt_unreachable_count_at({ left, at }) : i18n.halt_count_retry({ left }),
 			failed: true,
 			retryLabel: i18n.halt_try_now(),
 		},

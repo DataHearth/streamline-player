@@ -1,7 +1,8 @@
 type Dir = "left" | "right" | "up" | "down";
 
 const remembered = new Map<string, string>();
-const zoom = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tv-zoom")) || 1;
+const zoom = () =>
+	parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tv-zoom")) || 1;
 
 function scopeOf(root: HTMLElement) {
 	return root.querySelector<HTMLElement>("[data-tv-trap]") ?? root;
@@ -42,12 +43,14 @@ function reveal(el: HTMLElement, root: HTMLElement) {
 		if (canX) {
 			const [l, r, pad] = [(er.left - pr.left) / k, (er.right - pr.left) / k, 96];
 			if (l < pad) p.scrollBy({ left: l - pad, behavior: "smooth" });
-			else if (r > p.clientWidth - pad) p.scrollBy({ left: r - p.clientWidth + pad, behavior: "smooth" });
+			else if (r > p.clientWidth - pad)
+				p.scrollBy({ left: r - p.clientWidth + pad, behavior: "smooth" });
 		}
 		if (canY) {
 			const [t, b, padT, padB] = [(er.top - pr.top) / k, (er.bottom - pr.top) / k, 220, 90];
 			if (t < padT) p.scrollBy({ top: Math.max(t - padT, -p.scrollTop), behavior: "smooth" });
-			else if (b > p.clientHeight - padB) p.scrollBy({ top: b - p.clientHeight + padB, behavior: "smooth" });
+			else if (b > p.clientHeight - padB)
+				p.scrollBy({ top: b - p.clientHeight + padB, behavior: "smooth" });
 		}
 	}
 }
@@ -67,8 +70,12 @@ export function focusDefault(root: HTMLElement, attempt = 0) {
 	const scope = scopeOf(root);
 	const back = remembered.get(location.pathname);
 	const el =
-		(back && !scope.hasAttribute("data-tv-trap") ? scope.querySelector<HTMLElement>(`[data-fid="${CSS.escape(back)}"]`) : null) ??
-		[...scope.querySelectorAll<HTMLElement>("[data-tv-default]")].find((e) => !e.closest("[data-tv-nav]") && e.getBoundingClientRect().width > 0) ??
+		(back && !scope.hasAttribute("data-tv-trap")
+			? scope.querySelector<HTMLElement>(`[data-fid="${CSS.escape(back)}"]`)
+			: null) ??
+		[...scope.querySelectorAll<HTMLElement>("[data-tv-default]")].find(
+			(e) => !e.closest("[data-tv-nav]") && e.getBoundingClientRect().width > 0,
+		) ??
 		focusable(root).find((e) => !e.closest("[data-tv-nav]"));
 	if (!el && attempt < 15) {
 		setTimeout(() => focusDefault(root, attempt + 1), 120);
@@ -81,7 +88,13 @@ export function move(key: string, root: HTMLElement) {
 	const dir = key.slice(5).toLowerCase() as Dir;
 	const cur = document.activeElement as HTMLElement | null;
 	const els = focusable(root);
-	if (!cur || !root.contains(cur) || !cur.hasAttribute("data-tv") || !els.includes(cur as HTMLButtonElement)) return focusDefault(root);
+	if (
+		!cur ||
+		!root.contains(cur) ||
+		!cur.hasAttribute("data-tv") ||
+		!els.includes(cur as HTMLButtonElement)
+	)
+		return focusDefault(root);
 	const a = layoutRect(cur);
 	const [ax, ay] = [(a.left + a.right) / 2, (a.top + a.bottom) / 2];
 	const row = dir === "left" || dir === "right" ? cur.closest("[data-tv-row]") : null;
@@ -120,6 +133,7 @@ export function move(key: string, root: HTMLElement) {
 	best ??= bestNav;
 	// Entering a list of sections lands on the current one, not the nearest.
 	const group = best?.closest("[data-tv-group]");
-	if (group && !group.contains(cur)) best = group.querySelector<HTMLElement>("[data-tv-current]") ?? best;
+	if (group && !group.contains(cur))
+		best = group.querySelector<HTMLElement>("[data-tv-current]") ?? best;
 	if (best) focus(best, root);
 }

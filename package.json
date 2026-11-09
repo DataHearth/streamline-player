@@ -1,33 +1,33 @@
 {
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
-    "check": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --is-server false --emit-ts-declarations --strategy localStorage preferredLanguage baseLocale --silent && node dev/messages-check.ts && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "prepare": "svelte-kit sync || true"
-  },
-  "devDependencies": {
-    "@inlang/paraglide-js": "2.29.3",
-    "@inlang/plugin-message-format": "^4.6.0",
-    "@sveltejs/adapter-static": "^4.0.1",
-    "@sveltejs/kit": "^3.1.1",
-    "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "@types/node": "^24.19.2",
-    "svelte": "^5.57.3",
-    "svelte-check": "^4.7.7",
-    "typescript": "~6.0.3",
-    "vite": "^8.3.5"
-  },
-  "dependencies": {
-    "@lucide/svelte": "^1.67.0",
-    "@tauri-apps/api": "^2.12.4"
-  },
-  "imports": {
-    "#lib/*": "./src/lib/*"
-  },
-  "engines": {
-    "node": ">=24.21.0"
-  },
-  "packageManager": "pnpm@12.9.0"
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"check": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --is-server false --emit-ts-declarations --strategy localStorage preferredLanguage baseLocale --silent && node dev/messages-check.ts && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"prepare": "svelte-kit sync || true"
+	},
+	"devDependencies": {
+		"@inlang/paraglide-js": "2.29.3",
+		"@inlang/plugin-message-format": "^4.6.0",
+		"@sveltejs/adapter-static": "^4.0.1",
+		"@sveltejs/kit": "^3.1.1",
+		"@sveltejs/vite-plugin-svelte": "^7.3.1",
+		"@types/node": "^24.19.2",
+		"svelte": "^5.57.3",
+		"svelte-check": "^4.7.7",
+		"typescript": "~6.0.3",
+		"vite": "^8.3.5"
+	},
+	"dependencies": {
+		"@lucide/svelte": "^1.67.0",
+		"@tauri-apps/api": "^2.12.4"
+	},
+	"imports": {
+		"#lib/*": "./src/lib/*"
+	},
+	"engines": {
+		"node": ">=24.21.0"
+	},
+	"packageManager": "pnpm@12.9.0"
 }

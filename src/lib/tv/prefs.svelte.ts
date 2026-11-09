@@ -28,7 +28,11 @@ const OLD_STYLE_KEY = "subtitle-style";
 
 function load(): Prefs {
 	try {
-		return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(OLD_STYLE_KEY) ?? "{}"), ...JSON.parse(localStorage.getItem(KEY) ?? "{}") };
+		return {
+			...DEFAULTS,
+			...JSON.parse(localStorage.getItem(OLD_STYLE_KEY) ?? "{}"),
+			...JSON.parse(localStorage.getItem(KEY) ?? "{}"),
+		};
 	} catch {
 		return { ...DEFAULTS };
 	}
@@ -56,6 +60,18 @@ export const myLanguage = () => (prefs.language === "Français" ? "French" : "En
 
 /** Codecs the viewer wants decoded on this device instead of passed through to the TV or receiver. */
 export const decodeHere = () =>
-	([["eac3", prefs.passEAC3], ["truehd", prefs.passTrueHD], ["dts", prefs.passDTS]] as const).filter(([, v]) => v === "Decode here").map(([c]) => c);
+	(
+		[
+			["eac3", prefs.passEAC3],
+			["truehd", prefs.passTrueHD],
+			["dts", prefs.passDTS],
+		] as const
+	)
+		.filter(([, v]) => v === "Decode here")
+		.map(([c]) => c);
 
-export const FRAME_RATE_MODE: Record<string, "off" | "start" | "always"> = { Off: "off", "On start": "start", Always: "always" };
+export const FRAME_RATE_MODE: Record<string, "off" | "start" | "always"> = {
+	Off: "off",
+	"On start": "start",
+	Always: "always",
+};
