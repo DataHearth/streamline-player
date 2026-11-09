@@ -1,0 +1,22 @@
+export default async ({ app, shot, wait, key, focused }) => {
+  const r = {};
+  await app.goto("http://localhost:1420/settings");
+  await wait(3000);
+  r.focus0 = await focused();
+  await shot("settings-profile");
+  await key("ArrowDown"); r.down1 = await focused();
+  await shot("settings-playback");
+  await key("ArrowRight"); r.right = await focused();
+  await key("Enter"); await wait(300); r.pickFocus = await focused();
+  await shot("settings-pick");
+  await key("ArrowDown"); await key("Enter"); await wait(300);
+  r.afterChoose = await focused();
+  r.rowValue = await app.evaluate(() => document.querySelector("[data-pick-row=qHome] .value")?.textContent);
+  await key("ArrowDown", 2); await key("Enter"); r.autoplayValue = await app.evaluate(() => [...document.querySelectorAll(".row .value")].map((e) => e.textContent));
+  await key("ArrowLeft"); r.backToSection = await focused();
+  await key("ArrowDown", 5); await shot("settings-device"); r.deviceText = (await app.evaluate(() => document.querySelector(".rows").innerText)).replace(/\s+/g, " ").slice(0, 900);
+  await key("ArrowUp"); await shot("settings-devices");
+  await key("Escape"); r.esc = await focused();
+  r.stored = await app.evaluate(() => localStorage.getItem("prefs"));
+  return r;
+};

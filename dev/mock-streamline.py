@@ -47,8 +47,18 @@ p.add_argument("--clip", action="append", default=[], help="file the library's t
 p.add_argument("--demo-markers", action="store_true", help="give episodes an intro and credits, to see the cards")
 p.add_argument("--art", default="", help="directory holding the artwork")
 p.add_argument("--network", choices=["home", "away"], default="away", help="where Streamline places this device; away is what a missing answer means")
+p.add_argument("--now", type=float, help="epoch seconds shown timestamps count from (token expiry stays real), to pin dates for screenshot runs")
 p.add_argument("--heartbeat-timeout", type=float, default=90, help="seconds without a heartbeat before a session is stopped")
 args = p.parse_args()
+
+
+def shown_now():
+    return time.time() if args.now is None else args.now
+
+
+def stamp():
+    return datetime.datetime.fromtimestamp(shown_now(), datetime.UTC).isoformat()
+
 FILES = dict(m.split("=", 1) for m in args.media)
 MEDIA = dict(FILES)
 ANALYSIS = {}
@@ -80,7 +90,7 @@ for number, media_id in enumerate(FILES):
     MOVIES.insert(number, {
         "id": 1000 + number, "slug": media_id, "title": media_id, "original_title": media_id, "year": 2026,
         "overview": "", "runtime": 0, "status": "available", "monitored": True, "tmdb_id": 0, "genres": ["Test"],
-        "rating": 0, "added_at": datetime.datetime.now(datetime.UTC).isoformat(), "file_summary": {"file_count": 1},
+        "rating": 0, "added_at": stamp(), "file_summary": {"file_count": 1},
         "media_files": [{"id": media_id}],
     })
 for movie in MOVIES:
@@ -140,7 +150,7 @@ def note_progress(sid, position):
     WATCH[media_id] = {
         **REFS.get(media_id, {}), "media_id": media_id, "position_seconds": position, "duration_seconds": duration,
         "watched": duration > 0 and position >= WATCHED_AT * duration,
-        "updated_at": datetime.datetime.now(datetime.UTC).isoformat(),
+        "updated_at": stamp(),
     }
 
 
@@ -288,7 +298,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/v1/me":
             return self.reply(200, {"name": "Antoine Langlois", "email": "antoine@example.net", "role": "Admin", "library_language": "English"})
         if self.path == "/api/v1/devices":
-            now = time.time()
+            now = shown_now()
             ago = lambda s: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - s))
             me = KEYS.get(self.headers.get("X-API-Key"), {"name": "Living room", "platform": "android-tv"})
             return self.reply(200, {"items": [
@@ -416,7 +426,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(404, {"error": {"code": "not_found"}})
         WATCH[m[1]] = {
             **REFS.get(m[1], {}), "media_id": m[1], "position_seconds": 0, "duration_seconds": 0,
-            "watched": self.body().get("watched", False), "updated_at": datetime.datetime.now(datetime.UTC).isoformat(),
+            "watched": self.body().get("watched", False), "updated_at": stamp(),
         }
         self.reply(200, WATCH[m[1]])
 

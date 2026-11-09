@@ -1,0 +1,20 @@
+export default async ({ app, shot, wait, key, focused }) => {
+  const r = {};
+  await app.addInitScript(() => localStorage.setItem("PARAGLIDE_LOCALE", "fr"));
+  const text = () => app.evaluate(() => document.body.innerText.replace(/\s+/g, " ").slice(0, 260));
+  const visit = async (name, url, ms = 3000) => { await app.goto(`http://localhost:1420${url}`); await wait(ms); await shot(`fr-${name}`); r[name] = await text(); };
+  await visit("home", "/");
+  await visit("detail", "/detail/movies/1");
+  await visit("series", "/detail/series/3");
+  await visit("search", "/search");
+  await visit("settings", "/settings");
+  await key("ArrowDown", 3); await wait(500); await shot("fr-settings-subs"); r.settingsSubs = await text();
+  await key("ArrowDown", 3); await wait(500); await shot("fr-settings-device");
+  await visit("person", "/person/pedro-pascal");
+  await app.addInitScript(() => { window.__auth = { paired: false, server: null }; });
+  await visit("welcome", "/welcome");
+  await visit("library", "/library/series");
+  await visit("player", "/player/movies/1", 5000);
+  await key("ArrowUp"); await wait(600); await shot("fr-player-controls"); r.playerControls = await text();
+  return r;
+};

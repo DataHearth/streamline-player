@@ -1,0 +1,31 @@
+export default async ({ app, shot, wait, key, focused }) => {
+  const r = {};
+  await app.addInitScript(() => { window.__auth = { paired: false, server: null }; });
+  await app.goto("http://localhost:1420/");
+  await wait(2500);
+  r.landed = await app.evaluate(() => location.pathname);
+  r.serverFocus = await focused();
+  const press = (label) => app.evaluate((l) => [...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === l)?.click(), label);
+  for (const ch of "streamline") await press(ch);
+  await press("home.arpa");
+  await wait(300);
+  await shot("welcome-server");
+  r.field = await app.evaluate(() => document.querySelector(".field").innerText);
+  // D-pad: up from Continue... walk the keyboard a bit
+  await key("ArrowRight"); r.rightOfContinue = await focused();
+  await key("ArrowDown"); r.down = await focused();
+  await key("ArrowLeft", 3); r.left3 = await focused();
+  await app.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Continue").click());
+  await wait(200);
+  r.checking = await app.evaluate(() => document.querySelector(".help").innerText);
+  await wait(2000);
+  r.pairFocus = await focused();
+  await shot("welcome-pair");
+  r.pairText = (await app.evaluate(() => document.body.innerText)).replace(/\s+/g, " ").replace(/expires in \d+:\d\d/, "expires in T").slice(0, 300);
+  await app.evaluate(() => { window.__pairAnswer = "paired"; });
+  await wait(2500);
+  r.pairedFocus = await focused();
+  await shot("welcome-paired");
+  r.pairedText = (await app.evaluate(() => document.body.innerText)).replace(/\s+/g, " ").slice(0, 300);
+  return r;
+};
