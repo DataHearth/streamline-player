@@ -1,0 +1,18 @@
+version: "3"
+
+tasks:
+  default:
+    desc: Run every test
+    cmds:
+      - task: rust
+      - task: js
+
+  rust:
+    desc: Run the Rust tests of the whole workspace
+    cmd: cargo test --workspace
+
+  js:
+    desc: Run the UI's rule and message checks
+    cmds:
+      - node dev/auto-check.ts
+      - node dev/messages-check.ts

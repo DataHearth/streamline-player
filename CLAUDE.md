@@ -51,8 +51,17 @@ updates `../streamline`.
 
 ## Commands
 
-- `cargo tauri dev` — run the app (starts the Vite dev server on :1420)
-- `pnpm build` / `pnpm check` — bundle / svelte-check
-- `lint` — clippy, `-D warnings`; `nix flake check` — rustfmt
+The Taskfile holds every command; `task` lists them. Run them inside the
+devshell (direnv), or `nix develop .#android` for the Android ones.
+
+- `task dev:desktop` / `dev:web` / `dev:engine` / `dev:mock` / `dev:android` —
+  run the app (Vite on :1420), the UI alone, the engine (:8097), the mock
+  Streamline (:8081), the TV emulator
+- `task build:<target>` — `engine`, `desktop:linux`, `desktop:windows`,
+  `android`, `web`, `image`, … (`desktop:appimage` fails on NixOS by design)
+- `task check` — everything CI runs: `fmt:check`, `lint` (clippy `-D warnings`,
+  biome, svelte-check), `test`; `task fmt` writes the formatting
+- `nix flake check` — the same checks plus package builds, the NixOS VM test
+  and the home-manager evaluation
 - Add JS deps with `pnpm add`, never by editing `package.json`. TypeScript stays
   on 6: svelte-check 4.7 refuses 7 without the tsgo dual install.

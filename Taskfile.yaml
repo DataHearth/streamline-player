@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+# A file per namespace: `build:engine` lives in .taskfiles/build.yaml as
+# `engine`. Inside an included file a bare name resolves within its own
+# namespace; a leading colon reaches the root one.
+includes:
+  dev: ./.taskfiles/dev.yaml
+  build: ./.taskfiles/build.yaml
+  test: ./.taskfiles/test.yaml
+  lint: ./.taskfiles/lint.yaml
+
+tasks:
+  default:
+    desc: List every task
+    cmd: task --list
+    silent: true
+
+  fmt:
+    desc: Format Rust, TypeScript/Svelte and Nix
+    cmds:
+      - cargo fmt --all
+      - biome format --write .
+      - nixfmt flake.nix nix/*.nix
+
+  fmt:check:
+    desc: Check formatting without writing
+    cmds:
+      - cargo fmt --all --check
+      - biome format .
+      - nixfmt --check flake.nix nix/*.nix
+
+  check:
+    desc: Everything CI must pass, writing nothing (formatting, lints, tests)
+    # In sequence, not as deps: parallel tasks interleave their output.
+    cmds:
+      - task: fmt:check
+      - task: lint
+      - task: test
+
+  clean:
+    desc: Remove build output
+    cmd: rm -rf build .svelte-kit target result result-*

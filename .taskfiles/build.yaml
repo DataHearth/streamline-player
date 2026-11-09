@@ -1,0 +1,49 @@
+version: "3"
+
+vars:
+  ANDROID_SHELL: run inside `nix develop .#android`
+
+tasks:
+  engine:
+    desc: Build the engine in release (TARGET=<triple> to cross-compile)
+    cmd: cargo build --release -p engine {{if .TARGET}}--target {{.TARGET}}{{end}}
+
+  desktop:linux:
+    desc: Bundle the desktop app as .deb and .rpm
+    cmd: cargo tauri build --bundles deb,rpm
+
+  desktop:appimage:
+    # Tauri downloads and runs a generic-Linux linuxdeploy, which NixOS cannot
+    # execute without nix-ld or an FHS env. It works on other distributions.
+    desc: Bundle the desktop app as an AppImage (fails on NixOS by design)
+    cmd: cargo tauri build --bundles appimage
+
+  desktop:windows:
+    desc: Cross-build the Windows desktop app from Linux
+    cmd: cargo tauri build --target x86_64-pc-windows-gnu --no-bundle
+
+  desktop:macos:
+    desc: Bundle the macOS desktop app
+    platforms: [darwin]
+    cmd: cargo tauri build
+
+  web:
+    desc: Build the static UI into build/
+    cmd: pnpm build
+
+  android:
+    desc: Build the Android APK and AAB (phones and Android TV)
+    preconditions:
+      - sh: test -n "$ANDROID_HOME"
+        msg: "{{.ANDROID_SHELL}}"
+    cmd: cargo tauri android build --apk --aab
+
+  ios:
+    desc: Build the iOS app
+    platforms: [darwin]
+    cmd: cargo tauri ios build
+
+  image:
+    # dockerTools is how the image is made, so this one task goes through Nix.
+    desc: Build the engine's OCI image
+    cmd: nix build .#engine-image

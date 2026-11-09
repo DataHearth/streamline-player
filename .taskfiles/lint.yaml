@@ -1,0 +1,21 @@
+version: "3"
+
+tasks:
+  default:
+    desc: Run every linter
+    cmds:
+      - task: rust
+      - task: js
+      - task: svelte
+
+  rust:
+    desc: Lint the Rust workspace (clippy, warnings are errors)
+    cmd: cargo clippy --workspace --all-targets -- -D warnings
+
+  js:
+    desc: Lint TypeScript and Svelte (biome)
+    cmd: biome lint .
+
+  svelte:
+    desc: Typecheck the UI and check its messages (svelte-check, Paraglide)
+    cmd: pnpm check

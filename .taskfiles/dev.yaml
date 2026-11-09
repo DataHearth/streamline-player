@@ -1,0 +1,49 @@
+version: "3"
+
+vars:
+  ANDROID_SHELL: run inside `nix develop .#android`
+
+tasks:
+  engine:
+    desc: Run the engine on dev/engine.yaml (:8097)
+    cmd: cargo run -p engine -- --config dev/engine.yaml
+    interactive: true
+
+  mock:
+    desc: Run the mock Streamline on :8081 (pass --clip/--media/--art after --)
+    cmd: python3 dev/mock-streamline.py --listen 127.0.0.1:8081 --secret dev-secret-0123456789abcdef {{.CLI_ARGS}}
+    interactive: true
+
+  desktop:
+    desc: Run the desktop app with live reload
+    cmd: cargo tauri dev
+    interactive: true
+
+  web:
+    desc: Run the UI alone in a browser (Vite on :1420)
+    cmd: pnpm dev
+    interactive: true
+
+  android:
+    desc: Boot the streamline-tv emulator and run the app on it
+    preconditions:
+      - sh: test -n "$ANDROID_HOME"
+        msg: "{{.ANDROID_SHELL}}"
+    # One script, not one cmd per line: each cmd is its own shell, which would
+    # orphan the emulator. An emulator already running is reused and left up.
+    cmd: |
+      if ! adb -e get-state >/dev/null 2>&1; then
+        emulator -avd streamline-tv -no-window &
+        trap 'adb -e emu kill' EXIT
+      fi
+      adb -e wait-for-device
+      # wait-for-device returns once adbd answers, long before Android boots.
+      until [ "$(adb -e shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; do sleep 2; done
+      cargo tauri android dev
+    interactive: true
+
+  ios:
+    desc: Run the app on the iOS simulator
+    platforms: [darwin]
+    cmd: cargo tauri ios dev
+    interactive: true
