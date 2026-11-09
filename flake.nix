@@ -10,12 +10,45 @@
       url = "github:numtide/devshell";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Only evaluated by checks.home-manager; nothing a consumer imports needs it.
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
     inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [ inputs.devshell.flakeModule ];
+
+      # Each module defaults its package to this flake's build, so importing
+      # one works without also applying the overlay.
+      flake.nixosModules = {
+        engine =
+          { lib, pkgs, ... }:
+          {
+            imports = [ ./nix/module.nix ];
+            services.streamline-engine.package =
+              lib.mkDefault
+                inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.engine;
+          };
+        default = inputs.self.nixosModules.engine;
+      };
+
+      flake.homeModules = {
+        engine =
+          { lib, pkgs, ... }:
+          let
+            own = inputs.self.packages.${pkgs.stdenv.hostPlatform.system};
+          in
+          {
+            imports = [ ./nix/hm-module.nix ];
+            services.streamline-engine.package = lib.mkDefault own.engine;
+            programs.streamline-player.package = lib.mkDefault own.streamline-player;
+          };
+        default = inputs.self.homeModules.engine;
+      };
 
       # The flake's own builds, so a consumer gets the pinned toolchains rather
       # than whatever its nixpkgs carries.
@@ -138,6 +171,34 @@
               grep -q 'GIO_EXTRA_MODULES.*glib-networking' "$launcher" || { echo "launcher sets no glib-networking GIO_EXTRA_MODULES"; exit 1; }
               touch $out
             '';
+
+            nixos = pkgs.testers.runNixOSTest {
+              imports = [ ./nix/test.nix ];
+              node.specialArgs.engineModule = inputs.self.nixosModules.engine;
+            };
+
+            # The home-manager module shares options.nix and common.nix with
+            # the NixOS one; building its activation catches a unit that no
+            # longer evaluates.
+            home-manager =
+              (inputs.home-manager.lib.homeManagerConfiguration {
+                inherit pkgs;
+                modules = [
+                  inputs.self.homeModules.engine
+                  {
+                    home = {
+                      username = "viewer";
+                      homeDirectory = "/home/viewer";
+                      stateVersion = "26.05";
+                    };
+                    services.streamline-engine = {
+                      enable = true;
+                      secretFile = "/home/viewer/.config/streamline-engine/secret";
+                    };
+                    programs.streamline-player.enable = true;
+                  }
+                ];
+              }).activationPackage;
 
             # Runtime closures must not carry the build toolchain: a rustc with
             # rust-src maps std's panic locations onto its own store path.
