@@ -119,6 +119,7 @@ onMount(() => {
 			<div class="tabs" data-tv-row="1">
 				{#each TABS as t}
 					<button
+						type="button"
 						data-tv="1"
 						data-tv-active={t.id === tab ? "1" : undefined}
 						class="pill"

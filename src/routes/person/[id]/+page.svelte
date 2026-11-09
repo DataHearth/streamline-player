@@ -73,6 +73,7 @@ const open = (c: Pick<Credit, "kind" | "id" | "seasons">) =>
 		<div class="grid">
 			{#each list as c, i (`${c.kind}:${c.id}`)}
 				<button
+					type="button"
 					data-tv="1"
 					data-fid="{c.kind}:{c.id}"
 					data-tv-default={first && i === 0 && firstKnown < 0 ? "1" : undefined}
@@ -134,6 +135,7 @@ const open = (c: Pick<Credit, "kind" | "id" | "seasons">) =>
 									{@const kid = k.id}
 									{@const kk = k.kind}
 									<button
+										type="button"
 										data-tv="1"
 										data-fid="known:{i}"
 										data-tv-default={i === firstKnown ? "1" : undefined}

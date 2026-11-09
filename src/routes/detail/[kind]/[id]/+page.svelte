@@ -202,6 +202,7 @@ async function toggleWatched() {
 			{#each castShown.slice(0, MAX_CAST) as c (c.id)}
 				{@const m = monogram(c.name)}
 				<button
+					type="button"
 					data-tv="1"
 					data-fid="cast:{c.id}"
 					class="castc"
@@ -253,15 +254,21 @@ async function toggleWatched() {
 				</div>
 				<p>{t.overview}</p>
 				<div class="actions">
-					<button data-tv="1" data-tv-default="1" class="act main" onclick={play}>
+					<button type="button" data-tv="1" data-tv-default="1" class="act main" onclick={play}>
 						<Play size={28} fill="currentColor" />{primary}
 					</button>
 					{#if hasRestart}
-						<button data-tv="1" class="act" onclick={() => goto(`/player/movies/${id}`)}>
+						<button
+							type="button"
+							data-tv="1"
+							class="act"
+							onclick={() => goto(`/player/movies/${id}`)}
+						>
 							<RotateCcw size={26} strokeWidth={2} />{i18n.detail_from_start()}
 						</button>
 					{/if}
 					<button
+						type="button"
 						data-tv="1"
 						class="act mark"
 						style:color={watched ? "var(--status-available)" : "var(--fg)"}
@@ -292,6 +299,7 @@ async function toggleWatched() {
 					<div class="seasons">
 						{#each t.seasons ?? [] as s}
 							<button
+								type="button"
 								data-tv="1"
 								class="season"
 								class:on={s.number === curSeason}
@@ -306,6 +314,7 @@ async function toggleWatched() {
 						{#each shown as e}
 							{@const w = stateOf(e.media_file_id)}
 							<button
+								type="button"
 								data-tv="1"
 								class="ep"
 								style:opacity={e.has_file ? 1 : 0.55}
@@ -347,6 +356,7 @@ async function toggleWatched() {
 					<div class="similar">
 						{#each similar as it (`${it.kind}:${it.id}`)}
 							<button
+								type="button"
 								data-tv="1"
 								class="sim"
 								aria-label={it.title}

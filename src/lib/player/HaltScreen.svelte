@@ -104,7 +104,7 @@ const hue = (name: string) =>
 				<div class="alts">
 					<span class="alts-title">{i18n.halt_alts_title()}</span>
 					{#each halt.alts as alt}
-						<button data-tv="1" class="alt" onclick={alt.run}>
+						<button type="button" data-tv="1" class="alt" onclick={alt.run}>
 							<alt.icon size={20} strokeWidth={1.75} />
 							<span class="alt-text"
 								><span class="alt-label">{alt.label}</span
@@ -120,12 +120,13 @@ const hue = (name: string) =>
 			{/if}
 			<div class="actions">
 				{#if halt.retryLabel}
-					<button data-tv="1" data-tv-default="1" class="primary" onclick={onretry}>
+					<button type="button" data-tv="1" data-tv-default="1" class="primary" onclick={onretry}>
 						<RotateCw size={16} strokeWidth={2} />{halt.retryLabel}
 					</button>
 				{/if}
 				{#if onback}
 					<button
+						type="button"
 						data-tv="1"
 						data-tv-default={halt.retryLabel ? undefined : "1"}
 						class="secondary"

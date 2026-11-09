@@ -382,6 +382,7 @@ function choose(value: string) {
 				<h1>{i18n.settings_title()}</h1>
 				{#each sections as s (s.key)}
 					<button
+						type="button"
 						data-tv="1"
 						data-tv-current={s.key === current ? "1" : undefined}
 						class="section"
@@ -403,6 +404,7 @@ function choose(value: string) {
 					</div>
 					{#each picking.vals ?? [] as v}
 						<button
+							type="button"
 							data-tv="1"
 							data-tv-default={prefs[pick] === v ? "1" : undefined}
 							class="row"
@@ -420,6 +422,7 @@ function choose(value: string) {
 				<div class="rows" data-tv-group="1">
 					{#each section.rows as r, i}
 						<button
+							type="button"
 							data-tv="1"
 							data-tv-current={i === 0 ? "1" : undefined}
 							data-pick-row={r.choice}

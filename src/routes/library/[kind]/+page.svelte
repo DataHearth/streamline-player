@@ -123,6 +123,7 @@ function toggle(f: Flag) {
 				<div class="filters">
 					{#each FLAGS as [f, label]}
 						<button
+							type="button"
 							data-tv="1"
 							class="filter"
 							class:on={flags.includes(f)}
@@ -136,6 +137,7 @@ function toggle(f: Flag) {
 					{#each items as t (t.id)}
 						<div class="item">
 							<button
+								type="button"
 								data-tv="1"
 								data-fid={String(t.id)}
 								class="card"

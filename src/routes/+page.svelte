@@ -97,7 +97,9 @@ onMount(() => {
 						focusDefault(document.querySelector<HTMLElement>("[data-tv-screen]") ?? document.body),
 				);
 		},
-		(e) => !cached && (failed = String(e)),
+		(e) => {
+			if (!cached) failed = String(e);
+		},
 	);
 });
 
@@ -262,6 +264,7 @@ const onFocus = (it: Item, ri: number) => {
 						{#each r.items as it, ii (it.key)}
 							{#if r.wide}
 								<button
+									type="button"
 									data-tv="1"
 									data-tv-default={ri === 0 && ii === 0 ? "1" : undefined}
 									data-fid={it.key}
@@ -285,6 +288,7 @@ const onFocus = (it: Item, ri: number) => {
 								</button>
 							{:else}
 								<button
+									type="button"
 									data-tv="1"
 									data-tv-default={ri === 0 && ii === 0 ? "1" : undefined}
 									data-fid={it.key}

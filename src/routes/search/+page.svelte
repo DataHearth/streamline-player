@@ -62,6 +62,7 @@ const heading = $derived(
 				<div class="keys">
 					{#each KEYS as k, i}
 						<button
+							type="button"
 							data-tv="1"
 							data-tv-default={i === 0 && !q ? "1" : undefined}
 							class="key"
@@ -72,10 +73,11 @@ const heading = $derived(
 					{/each}
 				</div>
 				<div class="wide">
-					<button data-tv="1" class="key" onclick={() => (search.q += " ")}>
+					<button type="button" data-tv="1" class="key" onclick={() => (search.q += " ")}>
 						{i18n.keyboard_space()}
 					</button>
 					<button
+						type="button"
 						data-tv="1"
 						class="key"
 						aria-label={i18n.keyboard_delete()}
@@ -83,7 +85,7 @@ const heading = $derived(
 					>
 						<Delete size="1em" strokeWidth={1.5} />
 					</button>
-					<button data-tv="1" class="key" onclick={() => (search.q = "")}>
+					<button type="button" data-tv="1" class="key" onclick={() => (search.q = "")}>
 						{i18n.keyboard_clear()}
 					</button>
 				</div>
@@ -94,6 +96,7 @@ const heading = $derived(
 				<div class="grid">
 					{#each results.slice(0, MAX_RESULTS) as t (`${t.kind}:${t.id}`)}
 						<button
+							type="button"
 							data-tv="1"
 							data-fid="{t.kind}:{t.id}"
 							class="card"

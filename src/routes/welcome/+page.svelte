@@ -110,9 +110,14 @@ function type(k: { aria: string; type: string }) {
 async function submit() {
 	if (checking || found) return;
 	const typed = url.trim();
-	if (!typed) return (error = i18n.welcome_enter_address());
-	if (!/^([a-z]+:\/\/)?[a-z0-9.-]+(:\d+)?(\/.*)?$/i.test(typed))
-		return (error = i18n.welcome_bad_address());
+	if (!typed) {
+		error = i18n.welcome_enter_address();
+		return;
+	}
+	if (!/^([a-z]+:\/\/)?[a-z0-9.-]+(:\d+)?(\/.*)?$/i.test(typed)) {
+		error = i18n.welcome_bad_address();
+		return;
+	}
 	checking = true;
 	error = "";
 	try {
@@ -154,7 +159,10 @@ function poll(id: number, interval: number) {
 		if (id !== generation) return;
 		if (answer === "paired") return approved();
 		if (answer === "expired") return newCode();
-		if (answer === "denied") return (status = "denied");
+		if (answer === "denied") {
+			status = "denied";
+			return;
+		}
 		poll(id, answer === "slow_down" ? interval + SLOW_DOWN_SECS : interval);
 	}, interval * 1000);
 }
@@ -225,7 +233,7 @@ onMount(() => {
 						<span>{tvHelp}</span>
 					</div>
 					<div class="actions">
-						<button data-tv="1" data-tv-default="1" class="tvbtn" onclick={submit}>
+						<button type="button" data-tv="1" data-tv-default="1" class="tvbtn" onclick={submit}>
 							{checking
 								? i18n.welcome_checking()
 								: found
@@ -251,10 +259,10 @@ onMount(() => {
 						{/if}
 					</div>
 					<div class="actions">
-						<button data-tv="1" data-tv-default="1" class="tvbtn" onclick={newCode}>
+						<button type="button" data-tv="1" data-tv-default="1" class="tvbtn" onclick={newCode}>
 							{i18n.welcome_new_code()}
 						</button>
-						<button data-tv="1" class="tvbtn" onclick={changeServer}>
+						<button type="button" data-tv="1" class="tvbtn" onclick={changeServer}>
 							{i18n.welcome_change_server()}
 						</button>
 					</div>
@@ -266,6 +274,7 @@ onMount(() => {
 					</div>
 					<div>
 						<button
+							type="button"
 							data-tv="1"
 							data-tv-default="1"
 							class="tvbtn"
@@ -284,6 +293,7 @@ onMount(() => {
 							<div class="keys">
 								{#each keys as k}
 									<button
+										type="button"
 										data-tv="1"
 										class="tvkey"
 										aria-label={KEY_NAMES[k.aria]?.() ?? k.aria}

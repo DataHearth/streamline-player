@@ -1526,7 +1526,7 @@ onMount(() => {
 		clearInterval(hide);
 		clearInterval(retryTimer);
 		clearTimeout(menuTimer);
-		listeners.forEach((l) => l.then((h) => h.unregister()));
+		for (const l of listeners) l.then((h) => h.unregister());
 		startId++;
 		leave();
 	};
@@ -1566,6 +1566,7 @@ onMount(() => {
 	off = false,
 )}
 	<button
+		type="button"
 		data-tv="1"
 		data-tv-default={selected ? "1" : undefined}
 		class="opt"
@@ -1619,6 +1620,7 @@ onMount(() => {
 		</span>
 		<div class="stepper-box" style:pointer-events={disabled ? "none" : "auto"}>
 			<button
+				type="button"
 				data-tv="1"
 				{disabled}
 				class="step"
@@ -1633,6 +1635,7 @@ onMount(() => {
 				>{value}</span
 			>
 			<button
+				type="button"
 				data-tv="1"
 				{disabled}
 				class="step"
@@ -1643,6 +1646,7 @@ onMount(() => {
 			</button>
 		</div>
 		<button
+			type="button"
 			data-tv="1"
 			disabled={zero}
 			class="reset"
@@ -1671,6 +1675,7 @@ onMount(() => {
 			></span>
 			{#each values as v}
 				<button
+					type="button"
 					data-tv="1"
 					disabled={!on}
 					class="seg-opt"
@@ -1734,7 +1739,13 @@ onMount(() => {
 					>
 					<span class="mode">{modeLabel}</span>
 				</div>
-				<button data-tv="1" data-scrub="1" class="scrub" aria-label={i18n.player_seek()}>
+				<button
+					type="button"
+					data-tv="1"
+					data-scrub="1"
+					class="scrub"
+					aria-label={i18n.player_seek()}
+				>
 					<div class="track">
 						{#each segs as g}
 							<div class="seg" style:flex={g.flex}>
@@ -1751,6 +1762,7 @@ onMount(() => {
 				</div>
 				<div class="row">
 					<button
+						type="button"
 						data-tv="1"
 						data-tv-default="1"
 						class="play"
@@ -1763,27 +1775,27 @@ onMount(() => {
 							<Play size={36} fill="currentColor" />
 						{/if}
 					</button>
-					<button data-tv="1" class="pill" onclick={() => openMenu("subs")}>
+					<button type="button" data-tv="1" class="pill" onclick={() => openMenu("subs")}>
 						{#if selectedSub}
 							<Captions size={28} strokeWidth={1.9} />{subName(selectedSub)}
 						{:else}
 							<CaptionsOff size={28} strokeWidth={1.9} />{i18n.player_subtitles()}
 						{/if}
 					</button>
-					<button data-tv="1" class="pill" onclick={() => openMenu("audio")}>
+					<button type="button" data-tv="1" class="pill" onclick={() => openMenu("audio")}>
 						<AudioLines size={28} strokeWidth={1.9} />{i18n.player_audio()}
 					</button>
-					<button data-tv="1" class="pill" onclick={() => openMenu("quality")}>
+					<button type="button" data-tv="1" class="pill" onclick={() => openMenu("quality")}>
 						<Settings size={28} strokeWidth={1.9} />{qualText}
 					</button>
-					<button data-tv="1" class="pill" onclick={() => openMenu("speed")}>
+					<button type="button" data-tv="1" class="pill" onclick={() => openMenu("speed")}>
 						<Gauge size={28} strokeWidth={1.9} />{times(speed)}
 					</button>
-					<button data-tv="1" class="pill" onclick={() => (stats = !stats)}>
+					<button type="button" data-tv="1" class="pill" onclick={() => (stats = !stats)}>
 						<Activity size={28} strokeWidth={1.9} />{i18n.player_stats()}
 					</button>
 					{#if next}
-						<button data-tv="1" class="pill" onclick={() => leave().then(onnext)}>
+						<button type="button" data-tv="1" class="pill" onclick={() => leave().then(onnext)}>
 							<SkipForward size={28} strokeWidth={1.9} />{i18n.player_next_episode()}
 						</button>
 					{/if}
@@ -1798,7 +1810,13 @@ onMount(() => {
 			<div class="menu-head">
 				<span class="menu-title">{TAB_NAMES[tab]()}</span>
 				<div class="grow"></div>
-				<button data-tv="1" class="close" aria-label={i18n.player_close()} onclick={closeMenu}>
+				<button
+					type="button"
+					data-tv="1"
+					class="close"
+					aria-label={i18n.player_close()}
+					onclick={closeMenu}
+				>
 					<X size={16} strokeWidth={2} />
 				</button>
 			</div>
@@ -1962,6 +1980,7 @@ onMount(() => {
 					)}
 					<div class="style-box">
 						<button
+							type="button"
 							data-tv="1"
 							class="style-head"
 							aria-expanded={styleOpen}
@@ -1997,7 +2016,7 @@ onMount(() => {
 			style:bottom="{cardBottom}px"
 			transition:pop={{ y: 10, scale: 0.96 }}
 		>
-			<button data-tv="1" class="sl-skip" onclick={skip}>
+			<button type="button" data-tv="1" class="sl-skip" onclick={skip}>
 				<ChevronsRight size={18} strokeWidth={2} />
 				{introOn ? i18n.player_skip_intro() : i18n.player_skip_credits()}
 			</button>
@@ -2033,6 +2052,7 @@ onMount(() => {
 			</div>
 			<div class="upnext-row">
 				<button
+					type="button"
 					data-tv="1"
 					data-tv-default="1"
 					class="btn-ink"
@@ -2041,6 +2061,7 @@ onMount(() => {
 					<Play size={15} fill="currentColor" /><span>{i18n.player_play_now()}</span>
 				</button>
 				<button
+					type="button"
 					data-tv="1"
 					class="btn-outline"
 					onclick={() => {
@@ -2059,6 +2080,7 @@ onMount(() => {
 			<div class="stats-head">
 				<span>{i18n.player_stats_title()}</span>
 				<button
+					type="button"
 					data-tv="1"
 					class="stats-close"
 					aria-label={i18n.player_close_stats()}
@@ -2105,10 +2127,18 @@ onMount(() => {
 								<span class="end-syn">{next.overview}</span>
 							{/if}
 							<div class="actions">
-								<button data-tv="1" data-tv-default="1" class="primary" onclick={onnext}>
+								<button
+									type="button"
+									data-tv="1"
+									data-tv-default="1"
+									class="primary"
+									onclick={onnext}
+								>
 									<Play size={16} fill="currentColor" />{next.label}
 								</button>
-								<button data-tv="1" class="secondary" onclick={exit}>{i18n.player_done()}</button>
+								<button type="button" data-tv="1" class="secondary" onclick={exit}>
+									{i18n.player_done()}
+								</button>
 							</div>
 						</div>
 						<div class="end-still">
@@ -2132,10 +2162,16 @@ onMount(() => {
 							>
 							<span class="halt-title">{isEpisode ? eyebrow.split(" \u00B7 ")[0] : heading}</span>
 							<div class="actions">
-								<button data-tv="1" data-tv-default="1" class="primary end-done" onclick={exit}>
+								<button
+									type="button"
+									data-tv="1"
+									data-tv-default="1"
+									class="primary end-done"
+									onclick={exit}
+								>
 									{i18n.player_done()}
 								</button>
-								<button data-tv="1" class="secondary end-again" onclick={replay}>
+								<button type="button" data-tv="1" class="secondary end-again" onclick={replay}>
 									<RotateCcw size={16} strokeWidth={2} />{i18n.player_watch_again()}
 								</button>
 							</div>
@@ -2146,6 +2182,7 @@ onMount(() => {
 								<div class="more-row">
 									{#each more as it (it.href)}
 										<button
+											type="button"
 											data-tv="1"
 											class="more-card"
 											aria-label={it.title}
