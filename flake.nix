@@ -110,6 +110,32 @@
           };
           web = pkgs.callPackage ./nix/web.nix { inherit nodejs pnpm; };
           engine = pkgs.callPackage ./nix/engine.nix { inherit rustPlatform; };
+
+          # `task lint:rust` and `task test:rust` over the whole workspace, on the
+          # engine's derivation so the vendored crates are reused. src-tauri is a
+          # member, so the desktop libraries come too, and tauri's
+          # generate_context! needs the frontend dir to exist.
+          workspaceCheck =
+            name: command:
+            engine.overrideAttrs (old: {
+              pname = "streamline-workspace-${name}";
+              src = (pkgs.callPackage ./nix/source.nix { }).app;
+              nativeBuildInputs = old.nativeBuildInputs ++ [
+                pkgs.pkg-config
+                pkgs.ffmpeg-full
+                pkgs.dovi-tool
+              ];
+              buildInputs = desktop.libs ++ desktop.gstPlugins;
+              buildPhase = ''
+                runHook preBuild
+                mkdir -p build
+                ${command}
+                runHook postBuild
+              '';
+              doCheck = false;
+              installPhase = "touch $out";
+              dontFixup = true;
+            });
           androidSdk = android.androidsdk;
           androidHome = "${androidSdk}/libexec/android-sdk";
         in
@@ -227,11 +253,33 @@
               touch $out
             '';
 
-            fmt = pkgs.runCommandLocal "check-rust-fmt" { nativeBuildInputs = [ rust ]; } ''
+            # The same three formatters as `task fmt:check`. The flake source has
+            # no .git, so biome's VCS integration is off here.
+            fmt =
+              pkgs.runCommandLocal "check-fmt"
+                {
+                  nativeBuildInputs = [
+                    rust
+                    pkgs.biome
+                    pkgs.nixfmt
+                  ];
+                }
+                ''
+                  cd ${./.}
+                  cargo fmt --all --check
+                  biome format --vcs-enabled=false .
+                  nixfmt --check flake.nix nix/*.nix
+                  touch $out
+                '';
+
+            biome-lint = pkgs.runCommandLocal "check-biome-lint" { nativeBuildInputs = [ pkgs.biome ]; } ''
               cd ${./.}
-              cargo fmt --check
+              biome lint --vcs-enabled=false .
               touch $out
             '';
+
+            clippy = workspaceCheck "clippy" "cargo clippy --workspace --all-targets -- -D warnings";
+            cargo-test = workspaceCheck "test" "cargo test --workspace";
 
             # Enters the shell from an empty environment: a terminal that never
             # loaded direnv is where missing search paths show up.
