@@ -101,7 +101,12 @@ async fn serve(cfg: Config, secret: Vec<u8>) -> anyhow::Result<()> {
             );
         }
     }
-    tracing::info!(backend = ?hw.backend, libplacebo = hw.libplacebo, "hardware probed");
+    tracing::info!(
+        backend = ?hw.backend,
+        libplacebo = hw.libplacebo,
+        libplacebo_sw = hw.libplacebo_sw,
+        "hardware probed"
+    );
 
     let hw = Arc::new(hw);
     let sessions = Sessions::new(cfg.clone(), hw.clone());
