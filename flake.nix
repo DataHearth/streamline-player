@@ -61,6 +61,8 @@
             };
           };
 
+          packages = import ./nix/engine.nix { inherit pkgs; };
+
           checks.fmt = pkgs.runCommandLocal "check-rust-fmt" { nativeBuildInputs = [ rust ]; } ''
             cd ${./.}
             cargo fmt --check
