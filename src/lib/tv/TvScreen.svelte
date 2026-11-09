@@ -1,12 +1,12 @@
 <script lang="ts">
 import { afterNavigate, goto } from "$app/navigation";
-import { addPluginListener, invoke } from "@tauri-apps/api/core";
 import { m as i18n } from "#lib/paraglide/messages.js";
 import { getLocale } from "#lib/paraglide/runtime.js";
+import { search } from "#lib/core/search.svelte.ts";
+import { onPlayer, voice as hear } from "#lib/platform/native.ts";
 import { Film, House, Search, Settings, TvMinimal } from "@lucide/svelte";
 import { onMount, type Snippet } from "svelte";
 import { focus, focusDefault, forgetFocus, move } from "./focus";
-import { search } from "./search.svelte";
 
 type Tab = "search" | "home" | "movies" | "series" | "settings";
 let {
@@ -81,9 +81,7 @@ async function listen() {
 	const language =
 		navigator.languages.find((l) => l.startsWith(getLocale())) ??
 		(getLocale() === "fr" ? "fr-FR" : "en-US");
-	const { text } = await invoke<{ text: string }>("plugin:player|voice", { language }).catch(
-		() => ({ text: "" }),
-	);
+	const { text } = await hear(language).catch(() => ({ text: "" }));
 	if (!text.trim()) return;
 	search.q = text.trim();
 	if (location.pathname !== "/search") goto("/search");
@@ -95,13 +93,13 @@ onMount(() => {
 	focusTimer = setTimeout(() => focusDefault(stage), FOCUS_DELAY_MS);
 	tick();
 	const timer = setInterval(tick, 10_000);
-	const listener = addPluginListener("player", "back", back);
-	const voice = addPluginListener("player", "voiceKey", listen);
+	const listener = onPlayer("back", back);
+	const voice = onPlayer("voiceKey", listen);
 	return () => {
 		clearTimeout(focusTimer);
 		clearInterval(timer);
-		listener.then((h) => h.unregister());
-		voice.then((h) => h.unregister());
+		listener.then((off) => off());
+		voice.then((off) => off());
 	};
 });
 </script>

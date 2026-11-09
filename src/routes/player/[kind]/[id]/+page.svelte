@@ -5,16 +5,9 @@ import { m as i18n } from "#lib/paraglide/messages.js";
 import TvPlayer from "#lib/player/TvPlayer.svelte";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
-import {
-	artwork,
-	episodesOf,
-	everything,
-	stillPos,
-	title as fetchTitle,
-	watchState,
-	type Kind,
-	type Title,
-} from "#lib/tv/api.ts";
+import type { Kind, Title } from "#lib/core/types.ts";
+import { episodesOf, stillPos } from "#lib/core/format.ts";
+import { artwork, everything, title as fetchTitle, watchState } from "#lib/platform/native.ts";
 
 type Play = {
 	key: string;

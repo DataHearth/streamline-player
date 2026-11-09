@@ -1,8 +1,8 @@
 <script lang="ts">
 import { m as i18n } from "#lib/paraglide/messages.js";
 import HaltScreen from "#lib/player/HaltScreen.svelte";
-import { haltFor, type Halt } from "#lib/player/halt.ts";
-import { invoke } from "@tauri-apps/api/core";
+import { haltFor, type Halt } from "#lib/core/playback/halt.ts";
+import { PLAYER_NAME, serverHost } from "#lib/platform/native.ts";
 import { onMount } from "svelte";
 import { focusDefault } from "./focus";
 
@@ -21,7 +21,7 @@ let timer: ReturnType<typeof setInterval> | undefined;
 let root: HTMLElement;
 
 function show(raw: string) {
-	const { halt: h, retryIn } = haltFor(raw, { host });
+	const { halt: h, retryIn } = haltFor(raw, { host }, PLAYER_NAME);
 	clearInterval(timer);
 	halt = retryIn ? { ...h, left: retryIn, total: retryIn } : h;
 	if (retryIn) {
@@ -45,7 +45,7 @@ function tryAgain() {
 
 onMount(() => {
 	root = document.querySelector<HTMLElement>("[data-tv-screen]") ?? document.body;
-	invoke<string>("server_host").then((h) => {
+	serverHost().then((h) => {
 		host = h;
 		// svelte-ignore state_referenced_locally
 		show(error);

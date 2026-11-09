@@ -2,36 +2,34 @@
 import { m as i18n } from "#lib/paraglide/messages.js";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { autoCap, PRESETS, presetOf, rememberedThroughput } from "#lib/player/auto.ts";
-import { prefs } from "#lib/tv/prefs.svelte.ts";
+import { autoCap, PRESETS, presetOf, rememberedThroughput } from "#lib/core/playback/auto.ts";
+import { prefs } from "#lib/core/prefs.svelte.ts";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
+import type { Decision, Kind, Title, Watch } from "#lib/core/types.ts";
 import {
-	artwork,
 	badges,
-	headshot,
 	monogram,
-	hideBroken,
-	decisions,
-	network as whereAmI,
 	episodesOf,
-	everything,
 	inProgress,
 	left,
 	meta,
-	orPoster,
 	pct,
 	runtime,
-	setWatched,
 	stillPos,
+} from "#lib/core/format.ts";
+import {
+	artwork,
+	headshot,
+	decisions,
+	network as whereAmI,
+	everything,
+	setWatched,
 	title as fetchTitle,
 	watchState,
-	type Decision,
-	type Kind,
-	type Title,
-	type Watch,
-} from "#lib/tv/api.ts";
-import { toast } from "#lib/tv/toast.svelte.ts";
+} from "#lib/platform/native.ts";
+import { hideBroken, orPoster } from "#lib/ui/img.ts";
+import { toast } from "#lib/core/toast.svelte.ts";
 import { Check, CheckCheck, Eye, Play, RotateCcw } from "@lucide/svelte";
 
 const MAX_SIMILAR = 10;

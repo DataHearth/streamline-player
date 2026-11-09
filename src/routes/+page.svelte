@@ -1,5 +1,8 @@
 <script module lang="ts">
-import type { Kind, Title } from "#lib/tv/api.ts";
+import type { Kind, Title } from "#lib/core/types.ts";
+import { badges, episodesOf, inProgress, left, meta, pct, stillPos } from "#lib/core/format.ts";
+import { artwork, library, title as fetchTitle, watchState } from "#lib/platform/native.ts";
+import { hideBroken, orPoster } from "#lib/ui/img.ts";
 
 type Item = {
 	key: string;
@@ -24,21 +27,6 @@ import { m as i18n } from "#lib/paraglide/messages.js";
 import { goto } from "$app/navigation";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
-import {
-	artwork,
-	badges,
-	hideBroken,
-	episodesOf,
-	inProgress,
-	left,
-	library,
-	meta,
-	orPoster,
-	pct,
-	stillPos,
-	title as fetchTitle,
-	watchState,
-} from "#lib/tv/api.ts";
 import { focusDefault } from "#lib/tv/focus.ts";
 import { onMount, tick } from "svelte";
 

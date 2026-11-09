@@ -4,19 +4,10 @@ import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
-import {
-	artwork,
-	episodesOf,
-	hideBroken,
-	inProgress,
-	library,
-	pct,
-	title as fetchTitle,
-	watchState,
-	type Kind,
-	type Title,
-	type Watch,
-} from "#lib/tv/api.ts";
+import type { Kind, Title, Watch } from "#lib/core/types.ts";
+import { episodesOf, inProgress, pct } from "#lib/core/format.ts";
+import { artwork, library, title as fetchTitle, watchState } from "#lib/platform/native.ts";
+import { hideBroken } from "#lib/ui/img.ts";
 import { Check } from "@lucide/svelte";
 
 type Flag = "unwatched" | "progress" | "uhd" | "hdr";

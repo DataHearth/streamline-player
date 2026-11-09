@@ -3,20 +3,12 @@ import { m as i18n } from "#lib/paraglide/messages.js";
 import { goto } from "$app/navigation";
 import { focusDefault } from "#lib/tv/focus.ts";
 import TvScreen from "#lib/tv/TvScreen.svelte";
-import { invoke } from "@tauri-apps/api/core";
+import type { Pairing } from "#lib/core/types.ts";
+import { authState, connect, me as whoAmI, pairPoll, pairStart } from "#lib/platform/native.ts";
 import { Check, CircleCheck } from "@lucide/svelte";
 import { onMount, tick } from "svelte";
 
 type Step = "server" | "pair" | "paired";
-type Pairing = {
-	code: string;
-	name: string;
-	uri: string;
-	expires_in: number;
-	interval: number;
-	qr: string;
-};
-
 const FOUND_PAUSE_MS = 750;
 const APPROVED_PAUSE_MS = 700;
 const SLOW_DOWN_SECS = 5;
@@ -121,7 +113,7 @@ async function submit() {
 	checking = true;
 	error = "";
 	try {
-		await invoke("connect", { url: typed });
+		await connect(typed);
 		found = true;
 		setTimeout(() => go("pair").then(newCode), FOUND_PAUSE_MS);
 	} catch (e) {
@@ -139,7 +131,7 @@ async function newCode() {
 	clearTimeout(pollTimer);
 	status = "waiting";
 	try {
-		const p = await invoke<Pairing>("pair_start");
+		const p = await pairStart();
 		if (id !== generation) return;
 		pairing = p;
 		left = p.expires_in;
@@ -155,7 +147,7 @@ async function newCode() {
 
 function poll(id: number, interval: number) {
 	pollTimer = setTimeout(async () => {
-		const answer = await invoke<string>("pair_poll").catch(() => "pending");
+		const answer = await pairPoll().catch(() => "pending");
 		if (id !== generation) return;
 		if (answer === "paired") return approved();
 		if (answer === "expired") return newCode();
@@ -169,10 +161,7 @@ function poll(id: number, interval: number) {
 
 async function approved() {
 	status = "approved";
-	const [me, state] = await Promise.all([
-		invoke<{ name: string }>("me").catch(() => ({ name: "" })),
-		invoke<{ keystore: string; store_error: string | null }>("auth_state"),
-	]);
+	const [me, state] = await Promise.all([whoAmI().catch(() => ({ name: "" })), authState()]);
 	account = { name: me.name, short: me.name.split(" ")[0] ?? "" };
 	keystore = state.store_error
 		? i18n.common_key_not_stored({ error: state.store_error })
@@ -188,7 +177,7 @@ function changeServer() {
 }
 
 onMount(() => {
-	invoke<{ server: string | null; paired: boolean }>("auth_state").then((s) => {
+	authState().then((s) => {
 		url = (s.server ?? "").replace(/^https:\/\//, "");
 		if (s.paired) goto("/", { replace: true });
 		else if (s.server) go("pair").then(newCode);

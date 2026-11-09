@@ -1,6 +1,6 @@
 // node dev/auto-check.ts
 import { strictEqual as eq } from "node:assert";
-import { autoCap, stepDown } from "../src/lib/player/auto.ts";
+import { autoCap, stepDown } from "../src/lib/core/playback/auto.ts";
 
 const M = 1_000_000;
 

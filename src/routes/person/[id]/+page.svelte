@@ -4,16 +4,10 @@ import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
-import {
-	artwork,
-	headshot,
-	hideBroken,
-	monogram,
-	person as fetchPerson,
-	seasonSpan,
-	type Credit,
-	type Person,
-} from "#lib/tv/api.ts";
+import type { Credit, Person } from "#lib/core/types.ts";
+import { monogram, seasonSpan } from "#lib/core/format.ts";
+import { artwork, headshot, person as fetchPerson } from "#lib/platform/native.ts";
+import { hideBroken } from "#lib/ui/img.ts";
 
 const id = $derived(page.params.id ?? "");
 let p = $state.raw<Person | null>(null);

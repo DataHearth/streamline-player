@@ -1,0 +1,89 @@
+import { decodeHere } from "#lib/core/prefs.svelte.ts";
+import type {
+	AuthState,
+	Decision,
+	DecisionOption,
+	Device,
+	DeviceInfo,
+	Kind,
+	Me,
+	Pairing,
+	Person,
+	Title,
+	Watch,
+} from "#lib/core/types.ts";
+import { addPluginListener, convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+
+let capabilities: { decode: string; value: Promise<unknown> } | null = null;
+// ponytail: mpv is the only desktop backend so far (Linux); macOS and Windows will need their own name.
+export const PLAYER_NAME = /Android/.test(navigator.userAgent) ? "ExoPlayer" : "mpv";
+/** What this device plays, as the server needs it; it changes with the pass-through settings. */
+export function playerCapabilities() {
+	const decode = decodeHere();
+	if (capabilities?.decode !== decode.join())
+		capabilities = {
+			decode: decode.join(),
+			value: invoke("plugin:player|capabilities", { decode }),
+		};
+	return capabilities.value;
+}
+
+/** What the engine would do for each option, without starting anything. */
+export const decisions = async (mediaId: string, options: DecisionOption[]) =>
+	invoke<{ bit_rate: number; decisions: Decision[] }>("decisions", {
+		mediaId,
+		capabilities: await playerCapabilities(),
+		options,
+	});
+
+/** Where Streamline places this device right now; anything but a clear "home" is away. */
+export const network = () =>
+	playbackStatus()
+		.then((st) => (st.network === "home" ? "home" : "away") as "home" | "away")
+		.catch(() => "away" as const);
+
+const listOf = <T>(page: { items: T[] }) => page.items;
+
+export const library = (kind: Kind) => invoke<{ items: Title[] }>("library", { kind }).then(listOf);
+export const title = (kind: Kind, id: number) => invoke<Title>("title", { kind, id });
+export const person = (id: string) => invoke<Person>("person", { id });
+export const watchState = () => invoke<{ items: Watch[] }>("watch_state").then(listOf);
+export const setWatched = (mediaId: string, watched: boolean) =>
+	invoke("set_watched", { mediaId, watched });
+
+// `convertFileSrc` would percent-encode the slashes of a whole path.
+const ARTWORK = convertFileSrc("", "artwork");
+export const artwork = (kind: Kind, id: number, name: "poster" | "backdrop") =>
+	`${ARTWORK}${kind}/${id}/${name}.jpg`;
+export const headshot = (person: string) => `${ARTWORK}people/${person}/photo.jpg`;
+
+/** Movies and shows together; ids are only unique within a kind. */
+export const everything = async () => {
+	const [movies, shows] = await Promise.all([library("movies"), library("series")]);
+	return [
+		...movies.map((t) => ({ ...t, kind: "movies" as Kind })),
+		...shows.map((t) => ({ ...t, kind: "series" as Kind })),
+	];
+};
+
+export const authState = () => invoke<AuthState>("auth_state");
+export const connect = (url: string) => invoke("connect", { url });
+export const pairStart = () => invoke<Pairing>("pair_start");
+export const pairPoll = () => invoke<string>("pair_poll");
+export const signOut = () => invoke("sign_out");
+export const me = () => invoke<Me>("me");
+export const devices = () => invoke<{ items: Device[] }>("devices").then(listOf);
+export const playbackStatus = () => invoke<{ network?: string }>("playback_status");
+export const serverHost = () => invoke<string>("server_host");
+export const deviceInfo = () => invoke<DeviceInfo>("plugin:player|deviceInfo");
+
+/** Rust drops a revoked key on the first 401 and says so with this event. */
+export const onSignedOut = (cb: () => void): Promise<() => void> => listen("signed-out", cb);
+
+/** What the TV's microphone heard, in `language`; empty text when nothing was recognized. */
+export const voice = (language: string) =>
+	invoke<{ text: string }>("plugin:player|voice", { language });
+
+export const onPlayer = <T = undefined>(event: string, cb: (e: T) => void) =>
+	addPluginListener<T>("player", event, cb).then((h) => () => h.unregister());

@@ -1,13 +1,12 @@
 <script lang="ts">
+import type { Decision } from "#lib/core/types.ts";
 import {
 	decisions,
-	hideBroken,
 	network as whereAmI,
-	orPoster,
 	PLAYER_NAME,
 	playerCapabilities,
-	type Decision,
-} from "#lib/tv/api.ts";
+} from "#lib/platform/native.ts";
+import { hideBroken, orPoster } from "#lib/ui/img.ts";
 import { focusDefault as focusStageDefault, move } from "#lib/tv/focus.ts";
 import HaltScreen from "./HaltScreen.svelte";
 import {
@@ -18,17 +17,17 @@ import {
 	rememberThroughput,
 	stepDown,
 	type Quality,
-} from "./auto.ts";
-import { haltFor, type Halt } from "./halt.ts";
+} from "#lib/core/playback/auto.ts";
+import { haltFor, type Halt } from "#lib/core/playback/halt.ts";
 import "./screen.css";
-import { toast } from "#lib/tv/toast.svelte.ts";
+import { toast } from "#lib/core/toast.svelte.ts";
 import {
 	decodeHere,
 	FRAME_RATE_MODE,
 	myLanguage,
 	prefs,
 	setPref as savePref,
-} from "#lib/tv/prefs.svelte.ts";
+} from "#lib/core/prefs.svelte.ts";
 import { addPluginListener, invoke } from "@tauri-apps/api/core";
 import {
 	Activity,
@@ -38,7 +37,6 @@ import {
 	Check,
 	ChevronDown,
 	ChevronsRight,
-	CircleAlert,
 	Gauge,
 	LoaderCircle,
 	Minus,
@@ -668,7 +666,7 @@ async function offerAlternatives() {
 	const orig = preview.original;
 	if (orig && !orig.error && !orig.needs_slot) {
 		alts.push({
-			icon: Play,
+			icon: "play",
 			label: i18n.player_alt_play_original(),
 			sub: `${modeName(orig.mode)} \u00B7 ${originalSub} \u00B7 ${fileMbit}`,
 			run: () => {
@@ -686,7 +684,7 @@ async function offerAlternatives() {
 		if (t) {
 			const name = `${languageLabel(t.language)} \u00B7 ${audioName(t)}`;
 			alts.push({
-				icon: AudioLines,
+				icon: "audio-lines",
 				label: i18n.player_alt_switch_audio({ name }),
 				sub: i18n.player_alt_plays_as_is(),
 				run: () => {
@@ -1170,7 +1168,7 @@ function serverStopped(e: unknown) {
 }
 
 function failedToStart(raw: string) {
-	let { halt: h, retryIn } = haltFor(raw, { host, at: fmt(position), titleName });
+	let { halt: h, retryIn } = haltFor(raw, { host, at: fmt(position), titleName }, PLAYER_NAME);
 	if (h.kind === "busy" && halt?.kind === "busy") h = { ...h, alts: halt.alts, body: halt.body };
 	if (retryIn) haltWithRetry(h, retryIn);
 	else showHalt(h);
@@ -1482,7 +1480,7 @@ onMount(() => {
 			showHalt({
 				kind: "error",
 				eyebrow: i18n.halt_error_eyebrow(),
-				icon: CircleAlert,
+				icon: "alert",
 				title: i18n.halt_stream_stopped_title(),
 				mono: `${e.code}: ${e.message}`,
 				failed: true,

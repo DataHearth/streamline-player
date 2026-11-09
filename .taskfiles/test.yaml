@@ -15,4 +15,5 @@ tasks:
     desc: Run the UI's rule and message checks
     cmds:
       - node dev/auto-check.ts
+      - node dev/halt-check.ts
       - node dev/messages-check.ts

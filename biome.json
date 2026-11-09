@@ -122,12 +122,7 @@
 			}
 		},
 		{
-			"includes": [
-				"src/lib/tv/**",
-				"!src/lib/tv/LoadFailed.svelte",
-				"!src/lib/tv/TvScreen.svelte",
-				"!src/lib/tv/api.ts"
-			],
+			"includes": ["src/lib/tv/**"],
 			"linter": {
 				"rules": {
 					"style": {

@@ -7,8 +7,7 @@ import "#lib/design/shape.css";
 import "#lib/design/typography.css";
 import { goto } from "$app/navigation";
 import Toast from "#lib/tv/Toast.svelte";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { authState, onSignedOut } from "#lib/platform/native.ts";
 import { onMount } from "svelte";
 
 const STAGE_WIDTH = 1920;
@@ -26,8 +25,8 @@ onMount(() => {
 	resize();
 	window.addEventListener("resize", resize);
 	// Rust drops a revoked key on the first 401 and says so here.
-	const signedOut = listen("signed-out", toWelcome);
-	invoke<{ paired: boolean }>("auth_state")
+	const signedOut = onSignedOut(toWelcome);
+	authState()
 		.then(async (s) => {
 			if (!s.paired && location.pathname !== "/welcome") await toWelcome();
 		})

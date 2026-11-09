@@ -1,8 +1,20 @@
 <script lang="ts">
-import { ChevronRight, RotateCw } from "@lucide/svelte";
+import {
+	AudioLines,
+	Ban,
+	ChevronRight,
+	CircleAlert,
+	Cpu,
+	Folder,
+	Play,
+	RotateCw,
+	Server,
+	WifiOff,
+} from "@lucide/svelte";
+import type { Component } from "svelte";
 import { m as i18n } from "#lib/paraglide/messages.js";
-import { orPoster } from "#lib/tv/api.ts";
-import type { Halt } from "./halt.ts";
+import type { Halt, HaltIcon } from "#lib/core/playback/halt.ts";
+import { orPoster } from "#lib/ui/img.ts";
 import "./screen.css";
 
 let {
@@ -24,6 +36,20 @@ let {
 	onretry: () => void;
 	onback?: () => void;
 } = $props();
+
+const ICONS: Record<HaltIcon, Component<{ size?: number; strokeWidth?: number }>> = {
+	"audio-lines": AudioLines,
+	ban: Ban,
+	alert: CircleAlert,
+	cpu: Cpu,
+	folder: Folder,
+	play: Play,
+	retry: RotateCw,
+	server: Server,
+	"wifi-off": WifiOff,
+};
+
+const Icon = $derived(ICONS[halt.icon]);
 
 const initials = (name: string) => {
 	const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -59,7 +85,7 @@ const hue = (name: string) =>
 				class="eyebrow"
 				style:color={halt.failed ? "var(--status-failed)" : "var(--status-warning)"}
 			>
-				<halt.icon size={14} strokeWidth={2} />
+				<Icon size={14} strokeWidth={2} />
 				{halt.eyebrow}
 			</span>
 			<span class="halt-title">{halt.title}</span>
@@ -104,8 +130,9 @@ const hue = (name: string) =>
 				<div class="alts">
 					<span class="alts-title">{i18n.halt_alts_title()}</span>
 					{#each halt.alts as alt}
+						{@const AltIcon = ICONS[alt.icon]}
 						<button type="button" data-tv="1" class="alt" onclick={alt.run}>
-							<alt.icon size={20} strokeWidth={1.75} />
+							<AltIcon size={20} strokeWidth={1.75} />
 							<span class="alt-text"
 								><span class="alt-label">{alt.label}</span
 								><span class="alt-sub">{alt.sub}</span></span

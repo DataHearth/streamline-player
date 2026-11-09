@@ -3,10 +3,18 @@ import { m as i18n } from "#lib/paraglide/messages.js";
 import { goto } from "$app/navigation";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
-import { playerCapabilities } from "#lib/tv/api.ts";
 import { focus, focusDefault } from "#lib/tv/focus.ts";
-import { prefs, setPref, type ChoiceKey, type ToggleKey } from "#lib/tv/prefs.svelte.ts";
-import { invoke } from "@tauri-apps/api/core";
+import { prefs, setPref, type ChoiceKey, type ToggleKey } from "#lib/core/prefs.svelte.ts";
+import {
+	authState,
+	deviceInfo,
+	devices as listDevices,
+	me as whoAmI,
+	playerCapabilities,
+	serverHost,
+	signOut as signOutNow,
+} from "#lib/platform/native.ts";
+import type { Device, DeviceInfo, Me } from "#lib/core/types.ts";
 import {
 	Captions,
 	Check,
@@ -20,22 +28,6 @@ import {
 } from "@lucide/svelte";
 import { tick, type Component } from "svelte";
 
-type Me = { name: string; email: string; role: string; library_language?: string };
-type Device = {
-	id: string;
-	name: string;
-	platform: string;
-	last_seen: string;
-	streaming: boolean;
-	current: boolean;
-};
-type DeviceInfo = {
-	name: string;
-	model: string;
-	platform: string;
-	player: string;
-	display: { name: string; width: number; height: number; refresh_hz: number; hdr: string[] };
-};
 type Caps = {
 	video: { codec: string }[];
 	hdr: { formats: string[] };
@@ -67,15 +59,15 @@ let pick = $state<ChoiceKey | null>(null);
 
 async function load() {
 	[me, devices, host, keystore] = await Promise.all([
-		invoke<Me>("me"),
-		invoke<{ items: Device[] }>("devices").then((d) => d.items),
-		invoke<string>("server_host"),
-		invoke<{ keystore: string; store_error: string | null }>("auth_state").then((a) =>
+		whoAmI(),
+		listDevices(),
+		serverHost(),
+		authState().then((a) =>
 			a.store_error ? i18n.common_key_not_stored({ error: a.store_error }) : a.keystore,
 		),
 	]);
 	// Only a native player can answer these; the rows show a dash without them.
-	invoke<DeviceInfo>("plugin:player|deviceInfo")
+	deviceInfo()
 		.then((i) => (info = i))
 		.catch(() => {});
 	refreshCaps();
@@ -83,7 +75,7 @@ async function load() {
 load().catch((e) => (failed = String(e)));
 
 async function signOut() {
-	await invoke("sign_out");
+	await signOutNow();
 	goto("/welcome", { replace: true });
 }
 
