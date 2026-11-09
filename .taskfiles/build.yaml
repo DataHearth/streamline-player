@@ -45,5 +45,5 @@ tasks:
 
   image:
     # dockerTools is how the image is made, so this one task goes through Nix.
-    desc: Build the engine's OCI image
+    desc: Build the script that streams the engine's OCI image (./result | docker load)
     cmd: nix build .#engine-image

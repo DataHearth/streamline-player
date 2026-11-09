@@ -17,6 +17,13 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [ inputs.devshell.flakeModule ];
 
+      # The flake's own builds, so a consumer gets the pinned toolchains rather
+      # than whatever its nixpkgs carries.
+      flake.overlays.default = final: _prev: {
+        streamline-engine = inputs.self.packages.${final.stdenv.hostPlatform.system}.engine;
+        streamline-player = inputs.self.packages.${final.stdenv.hostPlatform.system}.streamline-player;
+      };
+
       systems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -56,6 +63,20 @@
             systemImageTypes = [ "android-tv" ];
             abiVersions = [ "x86_64" ];
           };
+          # The devshell's toolchain minus rust-src and the cross targets. With
+          # rust-src present, rustc maps std's /rustc/<hash> panic locations
+          # onto that local copy, and every binary then references the whole
+          # multi-GB toolchain at runtime.
+          rustBuild = rust.override {
+            extensions = [ ];
+            targets = [ ];
+          };
+          rustPlatform = pkgs.makeRustPlatform {
+            cargo = rustBuild;
+            rustc = rustBuild;
+          };
+          web = pkgs.callPackage ./nix/web.nix { inherit nodejs pnpm; };
+          engine = pkgs.callPackage ./nix/engine.nix { inherit rustPlatform; };
           androidSdk = android.androidsdk;
           androidHome = "${androidSdk}/libexec/android-sdk";
         in
@@ -68,8 +89,6 @@
               allowUnfree = true;
             };
           };
-
-          packages = import ./nix/engine.nix { inherit pkgs; };
 
           # numtide's shell is a bare `derivation` that only symlinks its
           # profile, without preferLocalBuild. A machine with remote builders
@@ -88,7 +107,65 @@
             )
           ) config.devshells;
 
+          packages = {
+            inherit engine web;
+            streamline-player = pkgs.callPackage ./nix/app.nix {
+              inherit
+                rustPlatform
+                nodejs
+                pnpm
+                desktop
+                web
+                ;
+            };
+            engine-image = pkgs.callPackage ./nix/image.nix { inherit engine; };
+            default = self'.packages.streamline-player;
+          };
+
+          formatter = pkgs.nixfmt-tree;
+
           checks = {
+            build-engine = self'.packages.engine;
+            build-web = self'.packages.web;
+            build-streamline-player = self'.packages.streamline-player;
+            build-engine-image = self'.packages.engine-image;
+
+            # The launcher must carry what the devshell computes by hand: without
+            # these the webview finds no codecs and no TLS.
+            app-wrapped = pkgs.runCommandLocal "check-app-wrapped" { } ''
+              launcher=${lib.getExe self'.packages.streamline-player}
+              grep -q 'GST_PLUGIN_SYSTEM_PATH_1_0.*gst-libav' "$launcher" || { echo "launcher has no gst-libav on GST_PLUGIN_SYSTEM_PATH_1_0"; exit 1; }
+              grep -q 'GIO_EXTRA_MODULES.*glib-networking' "$launcher" || { echo "launcher sets no glib-networking GIO_EXTRA_MODULES"; exit 1; }
+              touch $out
+            '';
+
+            # Runtime closures must not carry the build toolchain: a rustc with
+            # rust-src maps std's panic locations onto its own store path.
+            closures-without-toolchain =
+              pkgs.runCommandLocal "check-closures-without-toolchain"
+                {
+                  closure = pkgs.closureInfo {
+                    rootPaths = [
+                      self'.packages.engine
+                      self'.packages.streamline-player
+                    ];
+                  };
+                }
+                ''
+                  if grep -E -- '-rust-(default|std|src)-' "$closure/store-paths"; then
+                    echo "a package's runtime closure holds the Rust toolchain"
+                    exit 1
+                  fi
+                  touch $out
+                '';
+
+            engine-tools = pkgs.runCommandLocal "check-engine-tools" { } ''
+              for tool in ffmpeg ffprobe dovi_tool; do
+                test -x ${engine.tools}/bin/$tool || { echo "engine tools lack $tool"; exit 1; }
+              done
+              touch $out
+            '';
+
             fmt = pkgs.runCommandLocal "check-rust-fmt" { nativeBuildInputs = [ rust ]; } ''
               cd ${./.}
               cargo fmt --check
