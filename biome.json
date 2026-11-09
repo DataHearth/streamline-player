@@ -36,5 +36,135 @@
 			"enabled": true
 		},
 		"experimentalFullSupportEnabled": true
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["src/lib/core/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"#lib/platform/**",
+											"#lib/ui/**",
+											"#lib/tv/**",
+											"#lib/shells/**",
+											"#lib/screens/**",
+											"@tauri-apps/**",
+											"@lucide/**",
+											"**/*.svelte",
+											"../**"
+										],
+										"message": "core is plain TypeScript: no layers above it, no Tauri, no icons, no components; use #lib/ for the rest."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/lib/platform/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"#lib/ui/**",
+											"#lib/tv/**",
+											"#lib/shells/**",
+											"#lib/screens/**",
+											"../**"
+										],
+										"message": "platform sits below the UI layers."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/lib/ui/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"#lib/platform/**",
+											"#lib/tv/**",
+											"#lib/shells/**",
+											"#lib/screens/**",
+											"@tauri-apps/**",
+											"../**"
+										],
+										"message": "ui components take data and callbacks; they do not reach platform, shells or screens."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"src/lib/tv/**",
+				"!src/lib/tv/LoadFailed.svelte",
+				"!src/lib/tv/TvScreen.svelte",
+				"!src/lib/tv/api.ts"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["#lib/shells/**", "#lib/screens/**", "@tauri-apps/**", "../**"],
+										"message": "tv does not import shells or screens, and only platform touches Tauri."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/lib/shells/**", "src/lib/screens/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["@tauri-apps/**", "../**"],
+										"message": "Only platform imports Tauri."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		}
+	]
 }
