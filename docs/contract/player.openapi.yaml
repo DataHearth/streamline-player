@@ -13,6 +13,7 @@ servers:
 
 security:
   - deviceKey: []
+  - bearer: []
 
 paths:
   /movies:
@@ -177,6 +178,95 @@ paths:
       description: Settings, Sign out. Revokes the calling device's key.
       responses:
         "204": { description: The key is revoked. }
+        default: { $ref: "#/components/responses/Error" }
+  /devices/{deviceId}:
+    delete:
+      operationId: revokeDevice
+      description: Settings, Devices. Signs out any device of the user, a browser or an app.
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
+      responses:
+        "204": { description: The device is revoked. }
+        default: { $ref: "#/components/responses/Error" }
+  /auth/methods:
+    get:
+      operationId: authMethods
+      description: Web sign-in. The ways this server lets a browser sign in.
+      security: []
+      responses:
+        "200":
+          description: The sign-in methods.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sso, email, register_url]
+                properties:
+                  sso:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, label]
+                      properties:
+                        id: { type: string }
+                        label: { type: string }
+                  email: { type: boolean }
+                  register_url: { type: string, nullable: true }
+        default: { $ref: "#/components/responses/Error" }
+  /auth/authorize:
+    get:
+      operationId: authorize
+      description: Web sign-in. The browser is sent here to sign in with a provider (PKCE); it comes back to redirect_uri with a code, or with error=access_denied.
+      security: []
+      parameters:
+        - { name: provider, in: query, required: true, schema: { type: string } }
+        - { name: redirect_uri, in: query, required: true, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+        - { name: code_challenge, in: query, required: true, schema: { type: string } }
+        - { name: code_challenge_method, in: query, required: true, schema: { type: string, enum: [S256] } }
+      responses:
+        "302":
+          description: Back to redirect_uri.
+          headers:
+            Location: { schema: { type: string } }
+        default: { $ref: "#/components/responses/Error" }
+  /auth/token:
+    post:
+      operationId: token
+      description: Web sign-in. Exchanges a code, a password or a refresh token for a browser's tokens; every refresh rotates the refresh token, and replaying a rotated one revokes the browser.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [grant_type, code, code_verifier, redirect_uri, device_name]
+                  properties:
+                    grant_type: { type: string, enum: [authorization_code] }
+                    code: { type: string }
+                    code_verifier: { type: string }
+                    redirect_uri: { type: string }
+                    device_name: { type: string }
+                - type: object
+                  required: [grant_type, email, password, device_name]
+                  properties:
+                    grant_type: { type: string, enum: [password] }
+                    email: { type: string }
+                    password: { type: string }
+                    device_name: { type: string }
+                - type: object
+                  required: [grant_type, refresh_token]
+                  properties:
+                    grant_type: { type: string, enum: [refresh_token] }
+                    refresh_token: { type: string }
+      responses:
+        "200":
+          description: The browser's tokens.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tokens" }
         default: { $ref: "#/components/responses/Error" }
   /auth/device/code:
     post:
@@ -416,6 +506,9 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+    bearer:
+      type: http
+      scheme: bearer
 
   parameters:
     Id:
@@ -423,6 +516,11 @@ components:
       in: path
       required: true
       schema: { type: integer }
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema: { type: string }
     MediaId:
       name: mediaId
       in: path
@@ -595,11 +693,23 @@ components:
         email: { type: string }
         role: { type: string }
         library_language: { type: string }
+    Tokens:
+      type: object
+      required: [access_token, token_type, expires_in, refresh_token, refresh_expires_in, device_id]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, enum: [Bearer] }
+        expires_in: { type: integer }
+        refresh_token: { type: string }
+        refresh_expires_in: { type: integer }
+        device_id: { type: string }
     Device:
       type: object
-      required: [id, name, platform, last_seen, streaming, current]
+      required: [id, kind, name, platform, last_seen, streaming, current]
       properties:
         id: { type: string }
+        kind: { type: string, enum: [app, browser] }
+        expires_at: { type: string }
         name: { type: string }
         platform: { type: string }
         last_seen: { type: string }

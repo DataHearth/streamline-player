@@ -19,6 +19,7 @@ The public URL defaults to 10.0.2.2, the Android emulator's alias for the host.
 """
 
 import argparse
+import base64
 import hashlib
 import hmac
 import datetime
@@ -48,8 +49,15 @@ p.add_argument("--demo-markers", action="store_true", help="give episodes an int
 p.add_argument("--art", default="", help="directory holding the artwork")
 p.add_argument("--network", choices=["home", "away"], default="away", help="where Streamline places this device; away is what a missing answer means")
 p.add_argument("--now", type=float, help="epoch seconds shown timestamps count from (token expiry stays real), to pin dates for screenshot runs")
+p.add_argument("--cors-origin", action="append", help="origin a browser may call from, repeatable")
+p.add_argument("--access-ttl", type=int, default=900, help="seconds a browser's access token lasts")
+p.add_argument("--refresh-ttl", type=int, default=2592000, help="seconds a browser's refresh token lasts")
+p.add_argument("--password", default="streamline", help="password of the email sign-in")
+p.add_argument("--sso-deny", action="store_true", help="have the SSO provider refuse every sign-in")
 p.add_argument("--heartbeat-timeout", type=float, default=90, help="seconds without a heartbeat before a session is stopped")
 args = p.parse_args()
+CORS_ORIGINS = args.cors_origin or ["http://localhost:1430", "http://127.0.0.1:1430"]
+USER_EMAIL = "antoine@example.net"
 
 
 def shown_now():
@@ -76,6 +84,12 @@ PAIR_TTL = 600
 PAIR_INTERVAL = 5
 # The design's codes: 6 characters shown as XXX-XXX, no vowels, no 0/O or 1/I.
 CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ23456789"
+# Browser sign-in: one-time codes, access tokens, and a device per browser holding its refresh token chain.
+CODES = {}
+ACCESS = {}
+BROWSERS = {}
+REFRESH = {}
+SSO = [{"id": "authentik", "label": "Authentik"}]
 WATCH = {}
 WATCHED_AT = 0.9
 
@@ -229,7 +243,65 @@ def with_url(sid, resp):
     return {"session_id": sid, **resp, "url": f"{args.public}/{path}?exp={exp}&sig={sig}"}
 
 
+def issue_tokens(device_id):
+    """A new access token and the next refresh token of a browser device."""
+    device = BROWSERS[device_id]
+    access = secrets.token_urlsafe(32)
+    ACCESS[access] = {"device": device_id, "exp": time.monotonic() + args.access_ttl}
+    device["used"].add(device["refresh"])
+    device["refresh"] = secrets.token_urlsafe(32)
+    device["expires"] = time.time() + args.refresh_ttl
+    REFRESH[device["refresh"]] = device_id
+    return {"access_token": access, "token_type": "Bearer", "expires_in": args.access_ttl,
+            "refresh_token": device["refresh"], "refresh_expires_in": args.refresh_ttl, "device_id": device_id}
+
+
+def new_browser(name):
+    device_id = "web-" + secrets.token_hex(8)
+    BROWSERS[device_id] = {"name": name[:64] or "Web browser", "refresh": None, "used": set(), "expires": 0, "seen": time.time()}
+    BROWSERS[device_id]["refresh"] = secrets.token_urlsafe(32)
+    return issue_tokens(device_id)
+
+
+def revoke_browser(device_id):
+    if BROWSERS.pop(device_id, None) is None:
+        return False
+    for token, owner in list(ACCESS.items()):
+        if owner["device"] == device_id:
+            del ACCESS[token]
+    return True
+
+
+def bearer_device(headers):
+    """The browser device a Bearer header names, or None when absent, expired or revoked."""
+    value = headers.get("Authorization", "")
+    if not value.startswith("Bearer "):
+        return None
+    found = ACCESS.get(value[7:])
+    if found is None or time.monotonic() > found["exp"] or found["device"] not in BROWSERS:
+        return None
+    return found["device"]
+
+
+def pkce_matches(verifier, challenge):
+    digest = hashlib.sha256(verifier.encode()).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode() == challenge
+
+
 class Handler(BaseHTTPRequestHandler):
+    def end_headers(self):
+        origin = self.headers.get("Origin")
+        if origin in CORS_ORIGINS and self.path.startswith("/api/v1"):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+            if self.command == "OPTIONS":
+                self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.reply(204)
+
     def reply(self, status, body=None):
         data = b"" if body is None else json.dumps(body).encode()
         self.send_response(status)
@@ -243,11 +315,64 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n) or b"{}")
 
     def refused(self):
+        if self.path.startswith("/api/v1/auth/"):
+            return False
+        if self.headers.get("Authorization") is not None:
+            if bearer_device(self.headers) is not None:
+                return False
+            self.reply(401, {"error": {"code": "unauthorized"}})
+            return True
         key = self.headers.get("X-API-Key")
         if key is None or key in KEYS:
             return False
         self.reply(401, {"error": {"code": "unauthorized"}})
         return True
+
+    def authorize(self, q):
+        """The SSO provider's side: send the browser back to its redirect_uri with a one-time code, or the denial."""
+        one = lambda name: q.get(name, [""])[0]
+        target = urllib.parse.urlsplit(one("redirect_uri"))
+        origin = f"{target.scheme}://{target.netloc}"
+        if one("provider") not in [s["id"] for s in SSO] or origin not in CORS_ORIGINS or one("code_challenge_method") != "S256" or not one("code_challenge"):
+            return self.reply(400, {"error": {"code": "invalid_request"}})
+        if args.sso_deny:
+            params = {"error": "access_denied", "state": one("state")}
+        else:
+            code = secrets.token_urlsafe(32)
+            CODES[code] = {"challenge": one("code_challenge"), "redirect_uri": one("redirect_uri")}
+            params = {"code": code, "state": one("state")}
+        self.send_response(302)
+        self.send_header("Location", f"{one('redirect_uri')}?{urllib.parse.urlencode(params)}")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return None
+
+    def token(self):
+        b = self.body()
+        invalid = lambda: self.reply(400, {"error": {"code": "invalid_grant"}})
+        grant = b.get("grant_type")
+        if grant == "authorization_code":
+            found = CODES.pop(b.get("code", ""), None)
+            if not found or found["redirect_uri"] != b.get("redirect_uri") or not pkce_matches(b.get("code_verifier", ""), found["challenge"]):
+                return invalid()
+            return self.reply(200, new_browser(b.get("device_name", "")))
+        if grant == "password":
+            if b.get("email") != USER_EMAIL or b.get("password") != args.password:
+                return self.reply(401, {"error": {"code": "invalid_credentials"}})
+            return self.reply(200, new_browser(b.get("device_name", "")))
+        if grant == "refresh_token":
+            token = b.get("refresh_token", "")
+            device_id = REFRESH.get(token)
+            device = BROWSERS.get(device_id)
+            if device is None:
+                return invalid()
+            if device["refresh"] != token:
+                revoke_browser(device_id)
+                return invalid()
+            if time.time() > device["expires"]:
+                return invalid()
+            return self.reply(200, issue_tokens(device_id))
+        return self.reply(400, {"error": {"code": "unsupported_grant_type"}})
 
     def pairing(self, code):
         """The pairing a /dev route names, or the newest one still waiting."""
@@ -295,17 +420,29 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/v1/playback/status":
             st, _ = engine("GET", "/v1/health")
             return self.reply(200, {"available": st == 200, "media": sorted(MEDIA), "network": args.network})
+        url = urllib.parse.urlsplit(self.path)
+        if url.path == "/api/v1/auth/methods":
+            return self.reply(200, {"sso": SSO, "email": True, "register_url": None})
+        if url.path == "/api/v1/auth/authorize":
+            return self.authorize(urllib.parse.parse_qs(url.query))
         if self.path == "/api/v1/me":
-            return self.reply(200, {"name": "Antoine Langlois", "email": "antoine@example.net", "role": "Admin", "library_language": "English"})
+            return self.reply(200, {"name": "Antoine Langlois", "email": USER_EMAIL, "role": "Admin", "library_language": "English"})
         if self.path == "/api/v1/devices":
             now = shown_now()
             ago = lambda s: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - s))
             me = KEYS.get(self.headers.get("X-API-Key"), {"name": "Living room", "platform": "android-tv"})
+            caller = bearer_device(self.headers)
+            browsers = [
+                {"id": i, "kind": "browser", "name": b["name"], "platform": "Web browser", "last_seen": ago(0), "streaming": False,
+                 "current": i == caller, "expires_at": datetime.datetime.fromtimestamp(b["expires"], datetime.UTC).isoformat()}
+                for i, b in BROWSERS.items()
+            ]
             return self.reply(200, {"items": [
-                {"id": "dev-self", "name": me["name"], "platform": me["platform"], "last_seen": ago(0), "streaming": False, "current": True},
-                {"id": "dev-phone", "name": "Pixel 9", "platform": "Android", "last_seen": ago(120), "streaming": True, "current": False},
-                {"id": "dev-laptop", "name": "framework-13", "platform": "Linux", "last_seen": ago(3 * 86400), "streaming": False, "current": False},
-                {"id": "dev-parents", "name": "Parents' TV", "platform": "Android TV", "last_seen": ago(9 * 86400), "streaming": False, "current": False},
+                {"id": "dev-self", "kind": "app", "name": me["name"], "platform": me["platform"], "last_seen": ago(0), "streaming": False, "current": caller is None},
+                {"id": "dev-phone", "kind": "app", "name": "Pixel 9", "platform": "Android", "last_seen": ago(120), "streaming": True, "current": False},
+                {"id": "dev-laptop", "kind": "app", "name": "framework-13", "platform": "Linux", "last_seen": ago(3 * 86400), "streaming": False, "current": False},
+                {"id": "dev-parents", "kind": "app", "name": "Parents' TV", "platform": "Android TV", "last_seen": ago(9 * 86400), "streaming": False, "current": False},
+                *browsers,
             ]})
         m = re.fullmatch(r"/api/v1/playback/media/([^/]+)/tracks", self.path)
         if m and m[1] in MEDIA:
@@ -353,6 +490,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/dev/revoke":
             KEYS.clear()
             return self.reply(204)
+        if self.path == "/api/v1/auth/token":
+            return self.token()
         if self.path == "/api/v1/auth/device/code":
             b = self.body()
             code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(6))
@@ -443,8 +582,17 @@ class Handler(BaseHTTPRequestHandler):
         if self.refused():
             return
         if self.path == "/api/v1/devices/current":
-            KEYS.pop(self.headers.get("X-API-Key"), None)
+            caller = bearer_device(self.headers)
+            if caller:
+                revoke_browser(caller)
+            else:
+                KEYS.pop(self.headers.get("X-API-Key"), None)
             return self.reply(204)
+        m = re.fullmatch(r"/api/v1/devices/([\w-]+)", self.path)
+        if m:
+            if revoke_browser(m[1]) or m[1] in ("dev-phone", "dev-laptop", "dev-parents"):
+                return self.reply(204)
+            return self.reply(404, {"error": {"code": "not_found"}})
         m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})", self.path)
         if not m:
             return self.reply(404, {"error": {"code": "not_found"}})
@@ -464,6 +612,10 @@ def reap_silent():
                 print(f"stopped silent session {sid}: engine {st}", flush=True)
 
 
+host, port = args.listen.rsplit(":", 1)
+server = ThreadingHTTPServer((host, int(port)), Handler)
+print(f"listening on {host}:{server.server_address[1]}", flush=True)
+
 threading.Thread(target=reap_silent, daemon=True).start()
 
 for media_path in set(MEDIA.values()):
@@ -476,6 +628,5 @@ for show in SERIES:
         break
     break
 
-host, port = args.listen.rsplit(":", 1)
 print(f"mock streamline on {args.listen}, engine {args.engine}, media {sorted(MEDIA)}", flush=True)
-ThreadingHTTPServer((host, int(port)), Handler).serve_forever()
+server.serve_forever()
