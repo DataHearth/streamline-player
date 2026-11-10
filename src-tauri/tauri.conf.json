@@ -13,10 +13,12 @@
     "windows": [
       {
         "title": "Streamline",
-        "width": 800,
-        "height": 600,
+        "width": 1280,
+        "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "minWidth": 900,
+        "minHeight": 600
       }
     ],
     "security": {

@@ -8,11 +8,17 @@ const pw = require(
     "/nix/store/aj40wwnxy1jjd4vrb1pp0l0ch7v3h4fi-playwright-test-1.64.1/lib/node_modules/playwright-core",
 );
 const [, , engine = "webkit", scenario = "home"] = process.argv;
+// A scenario module may export target = "tv" | "desktop" | "web": "desktop" is the desktop build on :1440 behind
+// the Tauri shim, "web" the browser build on :1430 with no shim, "tv" (the default) the TV build on :1420.
+const scenarioModule = await import(`./scenarios/${scenario}.mjs`);
+const target = scenarioModule.target ?? "tv";
 const browser = await pw[engine].launch({ headless: true });
 const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
 const app = await ctx.newPage();
-await app.addInitScript({ path: fileURLToPath(new URL("./qrcode-init.js", import.meta.url)) });
-await app.addInitScript({ path: fileURLToPath(new URL("./shim.js", import.meta.url)) });
+if (target !== "web") {
+  await app.addInitScript({ path: fileURLToPath(new URL("./qrcode-init.js", import.meta.url)) });
+  await app.addInitScript({ path: fileURLToPath(new URL("./shim.js", import.meta.url)) });
+}
 await app.clock.install({ time: new Date("2026-11-09T12:00:00Z") });
 const log = [];
 app.on("console", (m) => m.type() === "error" && log.push(m.text()));
@@ -45,7 +51,7 @@ app.goto = async (...a) => {
 };
 const key = async (k, n = 1) => { for (let i = 0; i < n; i++) { await app.keyboard.press(k); await wait(350); } };
 const focused = () => app.evaluate(() => { const a = document.activeElement; return a ? (a.getAttribute("aria-label") || a.getAttribute("data-fid") || a.textContent.trim().slice(0, 40)) : null; });
-const steps = (await import(`./scenarios/${scenario}.mjs`)).default;
+const steps = scenarioModule.default;
 try {
   const out = JSON.stringify(await steps({ app, shot, wait, key, focused, log }), null, 1).replace(/\b(in|dans) \d+ s\b/g, "$1 N s");
   writeFileSync(`${dir}/${engine}-${scenario}.json`, `${out}\n`);

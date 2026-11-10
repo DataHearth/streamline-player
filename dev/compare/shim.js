@@ -85,6 +85,7 @@
     convertFileSrc(path, proto) { return `${B}/${proto}/${path}`; },
     async invoke(cmd, args = {}) {
       window.__calls.push(cmd);
+      if (cmd.startsWith("plugin:window|")) return null;
       if (cmd.startsWith("plugin:player|")) { const f = plugin[cmd.slice(14)]; if (!f) throw `no ${cmd}`; return f(args); }
       const f = cmds[cmd];
       if (!f) throw `unknown command ${cmd}`;

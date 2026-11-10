@@ -24,6 +24,13 @@ tasks:
     cmd: pnpm dev --port 1430
     interactive: true
 
+  desktop-web:
+    desc: Serve the desktop build in a browser (Vite on :1440), for the compare harness
+    env:
+      TAURI_ENV_PLATFORM: linux
+    cmd: pnpm dev --port 1440
+    interactive: true
+
   tv-web:
     desc: Serve the TV build in a browser (Vite on :1420), for the compare harness
     env:
