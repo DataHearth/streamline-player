@@ -40,7 +40,7 @@ const help = presence(() => helpOpen, 240);
 
 const route = $derived(page.route.id ?? "");
 const kind = $derived(page.params.kind);
-const onboarding = $derived(route === "/welcome");
+const onboarding = $derived(route === "/welcome" || route.startsWith("/signin"));
 const inPlayer = $derived(route.startsWith("/player"));
 const showBar = $derived(!onboarding && !inPlayer);
 const narrow = $derived(web && width < MIN_WIDTH);
@@ -113,7 +113,7 @@ async function leave() {
 	menuOpen = false;
 	await signOut();
 	toast(web ? i18n.shell_signed_out() : i18n.shell_signed_out_key_removed());
-	await goto(web ? "/" : "/welcome", { replace: true });
+	await (web ? goto("/signin", { replace: true }) : goto("/welcome", { replace: true }));
 }
 
 const items = $derived([

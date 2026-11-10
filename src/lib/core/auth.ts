@@ -48,3 +48,7 @@ export function browserDeviceName(userAgent: string): string {
 						: "unknown OS";
 	return `${browser} on ${os}`;
 }
+
+/** Only a path on this site may be the place sign-in returns to. */
+export const safeNext = (next: string | null | undefined): string =>
+	next?.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";

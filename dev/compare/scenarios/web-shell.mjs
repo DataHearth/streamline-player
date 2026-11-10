@@ -1,10 +1,11 @@
 // The same shell in a browser: no window buttons, no downloads button, and below 900 px a note instead of the content.
+import { signInWithSso } from "./web-lib.mjs";
+
 export const target = "web";
 
 export default async ({ app, shot, wait, key }) => {
   await app.setViewportSize({ width: 1440, height: 900 });
-  await app.goto("http://localhost:1430/");
-  await wait(1000);
+  await signInWithSso(app, wait);
   await shot("web-shell");
   const out = {};
   out.windowButtons = await app.locator('.win button, .gnome button').count();

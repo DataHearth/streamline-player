@@ -53,7 +53,7 @@ const key = async (k, n = 1) => { for (let i = 0; i < n; i++) { await app.keyboa
 const focused = () => app.evaluate(() => { const a = document.activeElement; return a ? (a.getAttribute("aria-label") || a.getAttribute("data-fid") || a.textContent.trim().slice(0, 40)) : null; });
 const steps = scenarioModule.default;
 try {
-  const out = JSON.stringify(await steps({ app, shot, wait, key, focused, log }), null, 1).replace(/\b(in|dans) \d+ s\b/g, "$1 N s");
+  const out = JSON.stringify(await steps({ app, ctx, engine, shot, wait, key, focused, log }), null, 1).replace(/\b(in|dans) \d+ s\b/g, "$1 N s");
   writeFileSync(`${dir}/${engine}-${scenario}.json`, `${out}\n`);
   console.log(out);
 } finally {

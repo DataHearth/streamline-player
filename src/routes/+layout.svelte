@@ -6,6 +6,8 @@ import "#lib/design/motion.css";
 import "#lib/design/shape.css";
 import "#lib/design/typography.css";
 import { goto } from "$app/navigation";
+import { toast } from "#lib/core/toast.svelte.ts";
+import { m as i18n } from "#lib/paraglide/messages.js";
 import { FORM_FACTOR, IS_WEB } from "#lib/platform/target.ts";
 import DesktopShell from "#lib/shells/desktop/Shell.svelte";
 import TvShell from "#lib/shells/tv/Shell.svelte";
@@ -15,16 +17,27 @@ import { onMount } from "svelte";
 let { children } = $props();
 let ready = $state(false);
 
-// The web's sign-in screen arrives with its route; until then a signed-out browser stays on Home.
-const toWelcome = () => (IS_WEB ? Promise.resolve() : goto("/welcome", { replace: true }));
+const onSignIn = () => location.pathname.startsWith("/signin");
+
+const toSignIn = () => {
+	const next = `${location.pathname}${location.search}`;
+	return goto(`/signin?next=${encodeURIComponent(next)}`, { replace: true });
+};
 
 onMount(() => {
-	// Rust drops a revoked key on the first 401 and says so here.
-	const signedOut = onSignedOut(toWelcome);
+	// A revoked key or browser session is dropped on the first 401, and said so here.
+	const signedOut = onSignedOut(() => {
+		if (!IS_WEB) return goto("/welcome", { replace: true });
+		toast(i18n.shell_signed_out());
+		return goto("/signin", { replace: true });
+	});
 	init()
 		.then(authState)
 		.then(async (s) => {
-			if (!s.paired && location.pathname !== "/welcome") await toWelcome();
+			if (s.paired) return;
+			if (IS_WEB) {
+				if (!onSignIn()) await toSignIn();
+			} else if (location.pathname !== "/welcome") await goto("/welcome", { replace: true });
 		})
 		.finally(() => (ready = true));
 	return () => {

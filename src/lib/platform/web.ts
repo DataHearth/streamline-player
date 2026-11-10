@@ -52,9 +52,52 @@ const store = {
 	},
 };
 
+// Firefox serves a tab localStorage writes from another tab late, so a tab that waited on the refresh lock can still
+// read the token the other tab just spent. An IndexedDB transaction that commits before the lock is released is
+// always seen by the next one.
+const refreshStore = {
+	open: () =>
+		new Promise<IDBDatabase>((done, fail) => {
+			const req = indexedDB.open("streamline-auth", 1);
+			req.onupgradeneeded = () => req.result.createObjectStore("kv");
+			req.onsuccess = () => done(req.result);
+			req.onerror = () => fail(req.error);
+		}),
+	run: async <T>(mode: IDBTransactionMode, job: (kv: IDBObjectStore) => IDBRequest<T>) => {
+		try {
+			const db = await refreshStore.open();
+			return await new Promise<T | null>((done) => {
+				const tx = db.transaction("kv", mode);
+				const req = job(tx.objectStore("kv"));
+				tx.oncomplete = () => {
+					db.close();
+					done(req.result ?? null);
+				};
+				tx.onerror = tx.onabort = () => {
+					db.close();
+					done(null);
+				};
+			});
+		} catch {
+			return null;
+		}
+	},
+	get: () => refreshStore.run<string>("readonly", (kv) => kv.get(REFRESH)),
+	set: (token: string) => refreshStore.run("readwrite", (kv) => kv.put(token, REFRESH)),
+	clear: () => refreshStore.run("readwrite", (kv) => kv.delete(REFRESH)),
+};
+
 const notOnWeb = () => Promise.reject(new Error("not on this target"));
 
-export async function init() {
+let loaded: Promise<void> | null = null;
+
+/** Every request waits on this: the Shell asks for `me` while the layout is still reading config.json. */
+export const init = () => {
+	loaded ??= load();
+	return loaded;
+};
+
+async function load() {
 	try {
 		const res = await fetch(`${resolve("/")}config.json`);
 		const config = res.ok ? await res.json() : null;
@@ -72,6 +115,7 @@ const signedOut = () => {
 	access = null;
 	store.remove(REFRESH);
 	store.remove(DEVICE);
+	void refreshStore.clear();
 	for (const cb of [...signedOutListeners]) cb();
 };
 
@@ -92,6 +136,7 @@ const fail = (text: string): never => {
 };
 
 async function tokenRequest(body: Record<string, string>): Promise<Response> {
+	await init();
 	try {
 		return await fetch(url("/auth/token"), {
 			method: "POST",
@@ -103,17 +148,18 @@ async function tokenRequest(body: Record<string, string>): Promise<Response> {
 	}
 }
 
-function keep(tokens: Tokens) {
+async function keep(tokens: Tokens) {
 	access = tokens.access_token;
 	store.set(REFRESH, tokens.refresh_token);
 	store.set(DEVICE, tokens.device_id);
+	await refreshStore.set(tokens.refresh_token);
 }
 
 /** `stale` is the access token the caller's request used: another call may have replaced it since. */
 function refresh(stale: string | null): Promise<boolean> {
 	return inLock(async () => {
 		if (access !== stale) return true;
-		const token = store.get(REFRESH);
+		const token = store.get(REFRESH) && ((await refreshStore.get()) ?? store.get(REFRESH));
 		if (!token) return false;
 		let res: Response;
 		try {
@@ -122,7 +168,7 @@ function refresh(stale: string | null): Promise<boolean> {
 			return false;
 		}
 		if (res.ok) {
-			keep(await res.json());
+			await keep(await res.json());
 			return true;
 		}
 		if (res.status >= 400 && res.status < 500) signedOut();
@@ -131,6 +177,7 @@ function refresh(stale: string | null): Promise<boolean> {
 }
 
 async function call<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
+	await init();
 	if (!access && store.get(REFRESH)) await refresh(null);
 	const send = () => {
 		const sent = access;
@@ -197,6 +244,7 @@ export async function signOut(): Promise<unknown> {
 	access = null;
 	store.remove(REFRESH);
 	store.remove(DEVICE);
+	await refreshStore.clear();
 	return undefined;
 }
 
@@ -268,7 +316,9 @@ export const playbackPort: PlaybackPort = {
 };
 
 export const authMethods = (): Promise<AuthMethods> =>
-	fetch(url("/auth/methods")).then((res) => res.json());
+	init()
+		.then(() => fetch(url("/auth/methods")))
+		.then((res) => res.json());
 
 const callbackUrl = () => `${location.origin}${resolve("/")}signin/callback`;
 
@@ -304,7 +354,7 @@ export async function finishSso(query: URLSearchParams): Promise<string> {
 		device_name: browserDeviceName(navigator.userAgent),
 	});
 	if (!res.ok) throw new SignInError("invalid_grant");
-	keep(await res.json());
+	await keep(await res.json());
 	return pending.next;
 }
 
@@ -316,7 +366,7 @@ export async function signInEmail(email: string, password: string) {
 		device_name: browserDeviceName(navigator.userAgent),
 	});
 	if (!res.ok) throw new SignInError("credentials");
-	keep(await res.json());
+	await keep(await res.json());
 }
 
 export const windowControls = {

@@ -1,6 +1,6 @@
 // node dev/auth-check.ts
 import { match, strictEqual as eq } from "node:assert";
-import { browserDeviceName, challengeFor, pkcePair } from "../src/lib/core/auth.ts";
+import { browserDeviceName, challengeFor, pkcePair, safeNext } from "../src/lib/core/auth.ts";
 
 eq(
 	await challengeFor("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
@@ -32,3 +32,9 @@ eq(
 	),
 	"Chrome on Linux",
 );
+
+eq(safeNext("/library/movies?x=1"), "/library/movies?x=1");
+eq(safeNext("//evil.example"), "/");
+eq(safeNext("https://evil.example"), "/");
+eq(safeNext("/\\evil.example"), "/");
+eq(safeNext(null), "/");
