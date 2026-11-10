@@ -1,18 +1,17 @@
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import adapter from "@sveltejs/adapter-static";
 import { sveltekit } from "@sveltejs/kit/vite";
-import { defineConfig } from "vite";
+import { defaultClientConditions, defineConfig } from "vite";
 
 // `cargo tauri android|ios dev` sets this to the host's LAN address: the app on
 // the device loads the dev server over the network, not from localhost.
 const host = process.env.TAURI_DEV_HOST;
 
 // The target is fixed at build time: Tauri sets TAURI_ENV_PLATFORM, a plain Vite build leaves it unset.
-const platform = process.env.TAURI_ENV_PLATFORM
-	? "src/lib/platform/native.ts"
-	: "src/lib/platform/web.ts";
+// package.json's `#platform` import resolves to native.ts under the "native" condition, web.ts otherwise.
+const native = !!process.env.TAURI_ENV_PLATFORM;
 
-const csp: NonNullable<Parameters<typeof sveltekit>[0]>["csp"] = platform.endsWith("web.ts")
+const csp: NonNullable<Parameters<typeof sveltekit>[0]>["csp"] = !native
 	? {
 			mode: "hash",
 			directives: {
@@ -43,11 +42,11 @@ export default defineConfig({
 		sveltekit({
 			// Tauri serves files, not a Node server: an SPA with one fallback page.
 			adapter: adapter({ fallback: "index.html" }),
-			alias: { "#platform": platform },
 			paths: { base: (process.env.BASE_PATH ?? "") as "" | `/${string}` },
 			csp,
 		}),
 	],
+	resolve: { conditions: native ? ["native", ...defaultClientConditions] : undefined },
 	clearScreen: false,
 	server: {
 		port: 1420,

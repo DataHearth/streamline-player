@@ -528,7 +528,7 @@ class Handler(BaseHTTPRequestHandler):
             b = self.body()
             path = MEDIA.get(b.pop("media_id", None))
             if path is None:
-                return self.reply(404, {"code": "media_not_found", "message": "no such media"})
+                return self.reply(404, {"error": {"code": "media_not_found", "message": "no such media"}})
             if path in ANALYSIS:
                 b["analysis"] = ANALYSIS[path]
             st, resp = engine("POST", "/v1/decisions", {"path": path, **b})
