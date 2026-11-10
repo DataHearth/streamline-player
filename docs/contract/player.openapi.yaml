@@ -16,6 +16,17 @@ security:
   - bearer: []
 
 paths:
+  /home:
+    get:
+      operationId: getHome
+      description: The Home screen. The billboard's featured titles with the reason each is shown, and the days of new arrivals below it.
+      responses:
+        "200":
+          description: Both lists are empty for a library with nothing in it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HomeFeed" }
+        default: { $ref: "#/components/responses/Error" }
   /movies:
     get:
       operationId: listMovies
@@ -85,7 +96,7 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [movies, series, people] }
+        schema: { type: string, enum: [movies, series, people, users] }
       - name: id
         in: path
         required: true
@@ -93,16 +104,20 @@ paths:
       - name: file
         in: path
         required: true
-        description: poster.jpg, backdrop.jpg, or photo.jpg for a person.
+        description: poster.jpg, backdrop.jpg, or photo.jpg for a person or for the user (`users/me/photo.jpg`).
         schema: { type: string }
     get:
       operationId: getArtwork
-      description: Posters, backdrops and headshots on every screen that draws a title or a person.
+      description: Posters, backdrops and headshots on every screen that draws a title or a person, and the user's own picture in Settings, Account and the account menu. Needs no credential, as an image element cannot send one.
       responses:
         "200":
           description: The image.
           content:
             image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+            image/webp:
               schema: { type: string, format: binary }
         default: { $ref: "#/components/responses/Error" }
   /watchstate:
@@ -154,6 +169,63 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      operationId: updateMe
+      description: Settings, Account. Saves the name and the email. The field names are those of `updateMe` in Streamline's API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateMe" }
+      responses:
+        "200":
+          description: The user after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "409":
+          description: The email is in use. `error.code` is `email_taken`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: The email is not valid. `error.code` is `invalid_email`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/Error" }
+  /me/picture:
+    put:
+      operationId: setPicture
+      description: Settings, Account. Replaces the profile picture with the request body.
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema: { type: string, format: binary }
+          image/png:
+            schema: { type: string, format: binary }
+          image/webp:
+            schema: { type: string, format: binary }
+      responses:
+        "204": { description: The picture is saved. }
+        "413":
+          description: The picture is over 2 MB. `error.code` is `too_large`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: Not a JPEG, PNG or WebP image. `error.code` is `unsupported_type`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: removePicture
+      description: Settings, Account. Removes the profile picture, back to the initials.
+      responses:
+        "204": { description: The picture is removed. }
         default: { $ref: "#/components/responses/Error" }
   /devices:
     get:
@@ -561,6 +633,9 @@ components:
         hdr: { type: string }
         audio: { type: string }
         channels: { type: string }
+        size:
+          type: integer
+          description: Bytes on disk, the sum of the episode files for a show. Library sorts by it and Detail's technical details show it.
     CastMember:
       type: object
       required: [id, name, character]
@@ -693,6 +768,56 @@ components:
         email: { type: string }
         role: { type: string }
         library_language: { type: string }
+        picture: { type: boolean, description: Whether a profile picture is set. }
+        initials: { type: string, description: One or two capital letters of the name, drawn when there is no picture. }
+    UpdateMe:
+      type: object
+      properties:
+        display_name: { type: string }
+        device_email: { type: string, description: Empty string clears it. }
+    Kind:
+      type: string
+      enum: [movies, series]
+    Featured:
+      type: object
+      required: [kind, id, reason]
+      properties:
+        kind: { $ref: "#/components/schemas/Kind" }
+        id: { type: integer }
+        reason:
+          type: string
+          enum: [continue, new_episodes, added]
+          description: The billboard's eyebrow, Continue watching, New episodes, or Added today.
+        season: { type: integer }
+        episodes: { type: array, items: { type: integer } }
+    Arrival:
+      type: object
+      required: [kind, id, at]
+      properties:
+        kind: { $ref: "#/components/schemas/Kind" }
+        id: { type: integer }
+        at: { type: string, description: ISO 8601 }
+        season: { type: integer, description: Set when episodes arrived, absent when the whole title did. }
+        episodes: { type: array, items: { type: integer } }
+    ArrivalDay:
+      type: object
+      required: [date, items]
+      properties:
+        date: { type: string, description: YYYY-MM-DD }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Arrival" }
+    HomeFeed:
+      type: object
+      required: [featured, arrivals]
+      properties:
+        featured:
+          type: array
+          items: { $ref: "#/components/schemas/Featured" }
+        arrivals:
+          type: array
+          description: Newest day first.
+          items: { $ref: "#/components/schemas/ArrivalDay" }
     Tokens:
       type: object
       required: [access_token, token_type, expires_in, refresh_token, refresh_expires_in, device_id]

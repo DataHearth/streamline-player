@@ -8,6 +8,7 @@ import type {
 	DecisionOption,
 	Device,
 	DeviceInfo,
+	HomeFeed,
 	Kind,
 	Me,
 	Pairing,
@@ -176,6 +177,7 @@ function refresh(stale: string | null): Promise<boolean> {
 	});
 }
 
+/** A `Blob` goes out as it is, with its own type; anything else as JSON. */
 async function call<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
 	await init();
 	if (!access && store.get(REFRESH)) await refresh(null);
@@ -185,9 +187,11 @@ async function call<T = unknown>(method: string, path: string, body?: unknown): 
 			method,
 			headers: {
 				...(sent ? { Authorization: `Bearer ${sent}` } : {}),
-				...(body === undefined ? {} : { "Content-Type": "application/json" }),
+				...(body === undefined
+					? {}
+					: { "Content-Type": body instanceof Blob ? body.type : "application/json" }),
 			},
-			body: body === undefined ? undefined : JSON.stringify(body),
+			body: body === undefined ? undefined : body instanceof Blob ? body : JSON.stringify(body),
 		}).then((res) => ({ res, sent }));
 	};
 	let { res, sent } = await send().catch((e) => fail(String(e)));
@@ -213,6 +217,8 @@ export const setWatched = (mediaId: string, watched: boolean) =>
 
 export const artwork = (kind: Kind, id: number, name: "poster" | "backdrop") =>
 	`${streamline}/api/v1/posters/${kind}/${id}/${name}.jpg`;
+export const myPicture = (version: number) =>
+	`${streamline}/api/v1/posters/users/me/photo.jpg?v=${version}`;
 export const headshot = (person: string) =>
 	`${streamline}/api/v1/posters/people/${person}/photo.jpg`;
 
@@ -235,6 +241,16 @@ export const connect = (_url: string): Promise<unknown> => notOnWeb();
 export const pairStart = (): Promise<Pairing> => notOnWeb();
 export const pairPoll = (): Promise<string> => notOnWeb();
 export const me = () => call<Me>("GET", "/me");
+export const home = () => call<HomeFeed>("GET", "/home");
+export const updateMe = (patch: { name?: string; email?: string }) =>
+	call<Me>("PATCH", "/me", {
+		...(patch.name === undefined ? {} : { display_name: patch.name }),
+		...(patch.email === undefined ? {} : { device_email: patch.email }),
+	});
+export const setPicture = (file: Blob) => call<void>("PUT", "/me/picture", file);
+export const removePicture = () => call<void>("DELETE", "/me/picture");
+export const revokeDevice = (id: string) =>
+	call<void>("DELETE", `/devices/${encodeURIComponent(id)}`);
 export const devices = () => call<{ items: Device[] }>("GET", "/devices").then(listOf);
 export const playbackStatus = () => call<{ network?: string }>("GET", "/playback/status");
 export const serverHost = () => Promise.resolve(streamline.replace(/^[a-z]+:\/\//, ""));

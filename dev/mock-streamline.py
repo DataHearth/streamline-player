@@ -53,11 +53,20 @@ p.add_argument("--cors-origin", action="append", help="origin a browser may call
 p.add_argument("--access-ttl", type=int, default=900, help="seconds a browser's access token lasts")
 p.add_argument("--refresh-ttl", type=int, default=2592000, help="seconds a browser's refresh token lasts")
 p.add_argument("--password", default="streamline", help="password of the email sign-in")
+p.add_argument("--empty", action="store_true", help="serve a library with no titles in it")
 p.add_argument("--sso-deny", action="store_true", help="have the SSO provider refuse every sign-in")
 p.add_argument("--heartbeat-timeout", type=float, default=90, help="seconds without a heartbeat before a session is stopped")
 args = p.parse_args()
 CORS_ORIGINS = args.cors_origin or ["http://localhost:1430", "http://127.0.0.1:1430"]
 USER_EMAIL = "antoine@example.net"
+TAKEN_EMAIL = "taken@example.net"
+PICTURE_MAX = 2 * 1024 * 1024
+PICTURE_TYPES = ("image/jpeg", "image/png", "image/webp")
+ME = {"name": "Antoine Langlois", "email": USER_EMAIL, "role": "Admin", "library_language": "English"}
+PICTURE = {"data": None, "type": ""}
+ART_ON = {"on": True}
+ARRIVAL_DAYS = 7
+BITRATE = {"2160p": 40_000_000, "1080p": 12_000_000}
 
 
 def shown_now():
@@ -95,8 +104,8 @@ WATCHED_AT = 0.9
 
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mock-library.json")) as f:
     LIBRARY = json.load(f)
-MOVIES = LIBRARY["movies"]
-SERIES = LIBRARY["series"]
+MOVIES = [] if args.empty else LIBRARY["movies"]
+SERIES = [] if args.empty else LIBRARY["series"]
 PEOPLE = LIBRARY.get("people", {})
 REFS = {}
 clips = itertools.cycle(args.clip or list(FILES.values()))
@@ -116,6 +125,61 @@ for show in SERIES:
         for episode in season["episodes"]:
             MEDIA.setdefault(episode["media_file_id"], next(clips))
             REFS[episode["media_file_id"]] = {"series_id": show["id"], "season": season["number"], "episode_id": episode["id"]}
+
+
+def file_size(title, runtime):
+    return runtime * 60 * BITRATE.get(title.get("file_summary", {}).get("resolution"), 8_000_000) // 8
+
+
+for movie in MOVIES:
+    if "resolution" in movie.get("file_summary", {}):
+        movie["file_summary"]["size"] = file_size(movie, movie["runtime"])
+for show in SERIES:
+    show["file_summary"]["size"] = file_size(show, sum(e["runtime"] for s in show["seasons"] for e in s["episodes"] if e["has_file"]))
+
+
+def initials(name):
+    words = name.split()
+    return "".join(w[0] for w in (words[:1] + words[-1:] if len(words) > 1 else words)).upper()
+
+
+def profile():
+    return {**ME, "picture": PICTURE["data"] is not None, "initials": initials(ME["name"])}
+
+
+def home():
+    """Featured titles and the last week's arrivals, from the library and the watch state."""
+    window = (datetime.datetime.fromtimestamp(shown_now(), datetime.UTC) - datetime.timedelta(days=ARRIVAL_DAYS)).date()
+    by_key = {("movies", m["id"]): m for m in MOVIES} | {("series", s["id"]): s for s in SERIES}
+    featured, arrivals = [], []
+    for w in sorted(WATCH.values(), key=lambda w: w["updated_at"], reverse=True):
+        key = ("movies", w["movie_id"]) if "movie_id" in w else ("series", w.get("series_id"))
+        if key in by_key and not w["watched"] and w["position_seconds"] > 0 and all(f["kind"] != key[0] or f["id"] != key[1] for f in featured):
+            featured.append({"kind": key[0], "id": key[1], "reason": "continue", **({"season": w["season"]} if "season" in w else {})})
+    for show in sorted(SERIES, key=lambda s: s["added_at"], reverse=True):
+        added = datetime.datetime.fromisoformat(show["added_at"].replace("Z", "+00:00"))
+        if added.date() < window:
+            continue
+        latest = show["seasons"][-1]
+        if len(show["seasons"]) > 1:
+            numbers = [e["number"] for e in latest["episodes"][-2:]]
+            arrivals.append((added, {"kind": "series", "id": show["id"], "at": added.isoformat(), "season": latest["number"], "episodes": numbers}))
+            if all(f["kind"] != "series" or f["id"] != show["id"] for f in featured):
+                featured.append({"kind": "series", "id": show["id"], "reason": "new_episodes", "season": latest["number"], "episodes": numbers})
+        else:
+            arrivals.append((added, {"kind": "series", "id": show["id"], "at": added.isoformat()}))
+    for movie in sorted(MOVIES, key=lambda m: m["added_at"], reverse=True):
+        added = datetime.datetime.fromisoformat(movie["added_at"].replace("Z", "+00:00"))
+        if added.date() >= window:
+            arrivals.append((added, {"kind": "movies", "id": movie["id"], "at": added.isoformat()}))
+    taken = {(f["kind"], f["id"]) for f in featured}
+    for movie in sorted(MOVIES, key=lambda m: m["added_at"], reverse=True):
+        if ("movies", movie["id"]) not in taken:
+            featured.append({"kind": "movies", "id": movie["id"], "reason": "added"})
+    days = {}
+    for added, item in sorted(arrivals, key=lambda a: a[0], reverse=True):
+        days.setdefault(added.date().isoformat(), []).append(item)
+    return {"featured": featured[:3], "arrivals": [{"date": d, "items": items} for d, items in days.items()]}
 
 
 def summary(item):
@@ -152,6 +216,8 @@ def art(kind, item_id, name):
     slug = next((i["slug"] for i in items if str(i["id"]) == item_id), None)
     folder = {"poster": "p", "backdrop": "b"}[name]
     path = os.path.join(args.art, folder, f"{slug}.jpg")
+    if not ART_ON["on"]:
+        return None
     return path if slug and os.path.exists(path) else None
 
 
@@ -310,6 +376,13 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def image(self, data, content_type):
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def body(self):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}")
@@ -398,9 +471,16 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             found = person(m[1])
             return self.reply(200, found) if found else self.reply(404, {"error": {"code": "not_found"}})
+        if self.path == "/api/v1/home":
+            return self.reply(200, home())
+        url = urllib.parse.urlsplit(self.path)
+        if url.path == "/api/v1/posters/users/me/photo.jpg":
+            if PICTURE["data"] is None:
+                return self.reply(404, {"error": {"code": "not_found"}})
+            return self.image(PICTURE["data"], PICTURE["type"])
         m = re.fullmatch(r"/api/v1/posters/(movies|series|people)/([\w-]+)/(poster|backdrop|photo)\.jpg", self.path)
         if m:
-            if (m[1] == "people") != (m[3] == "photo"):
+            if not ART_ON["on"] or (m[1] == "people") != (m[3] == "photo"):
                 path = None
             elif m[1] == "people":
                 path = os.path.join(args.art, "c", f"{m[2]}.jpg")
@@ -410,23 +490,16 @@ class Handler(BaseHTTPRequestHandler):
             if not path:
                 return self.reply(404, {"error": {"code": "not_found"}})
             with open(path, "rb") as image:
-                data = image.read()
-            self.send_response(200)
-            self.send_header("Content-Type", "image/jpeg")
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
-            return None
+                return self.image(image.read(), "image/jpeg")
         if self.path == "/api/v1/playback/status":
             st, _ = engine("GET", "/v1/health")
             return self.reply(200, {"available": st == 200, "media": sorted(MEDIA), "network": args.network})
-        url = urllib.parse.urlsplit(self.path)
         if url.path == "/api/v1/auth/methods":
             return self.reply(200, {"sso": SSO, "email": True, "register_url": None})
         if url.path == "/api/v1/auth/authorize":
             return self.authorize(urllib.parse.parse_qs(url.query))
         if self.path == "/api/v1/me":
-            return self.reply(200, {"name": "Antoine Langlois", "email": USER_EMAIL, "role": "Admin", "library_language": "English"})
+            return self.reply(200, profile())
         if self.path == "/api/v1/devices":
             now = shown_now()
             ago = lambda s: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - s))
@@ -487,6 +560,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(404, {"error": {"code": "no_pending_pairing"}})
             found["status"] = "approved" if m[1] == "approve" else "denied"
             return self.reply(200, {"user_code": found["user_code"], "name": found["name"]})
+        m = re.fullmatch(r"/dev/art/(on|off)", self.path)
+        if m:
+            ART_ON["on"] = m[1] == "on"
+            return self.reply(204)
         if self.path == "/dev/revoke":
             KEYS.clear()
             return self.reply(204)
@@ -560,6 +637,15 @@ class Handler(BaseHTTPRequestHandler):
     def do_PUT(self):
         if self.refused():
             return
+        if self.path == "/api/v1/me/picture":
+            data = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            kind = self.headers.get("Content-Type", "").split(";")[0].strip()
+            if kind not in PICTURE_TYPES:
+                return self.reply(415, {"error": {"code": "unsupported_type"}})
+            if len(data) > PICTURE_MAX:
+                return self.reply(413, {"error": {"code": "too_large", "message": "The picture is over 2 MB."}})
+            PICTURE.update(data=data, type=kind)
+            return self.reply(204)
         m = re.fullmatch(r"/api/v1/watchstate/(.+)", self.path)
         if not m or m[1] not in MEDIA:
             return self.reply(404, {"error": {"code": "not_found"}})
@@ -572,6 +658,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_PATCH(self):
         if self.refused():
             return
+        if self.path == "/api/v1/me":
+            b = self.body()
+            email = b.get("device_email")
+            if email is not None and email != "":
+                if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+                    return self.reply(422, {"error": {"code": "invalid_email", "message": "That is not an email address."}})
+                if email == TAKEN_EMAIL:
+                    return self.reply(409, {"error": {"code": "email_taken", "message": "That email is already in use."}})
+            if b.get("display_name") is not None:
+                ME["name"] = b["display_name"]
+            if email is not None:
+                ME["email"] = email
+            return self.reply(200, profile())
         m = re.fullmatch(r"/api/v1/playback/sessions/([0-9a-f]{32})", self.path)
         if not m:
             return self.reply(404, {"error": {"code": "not_found"}})
@@ -581,6 +680,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         if self.refused():
             return
+        if self.path == "/api/v1/me/picture":
+            PICTURE.update(data=None, type="")
+            return self.reply(204)
         if self.path == "/api/v1/devices/current":
             caller = bearer_device(self.headers)
             if caller:

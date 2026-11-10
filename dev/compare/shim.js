@@ -65,6 +65,11 @@
     watch_state: () => call("GET", "/watchstate"),
     set_watched: ({ mediaId, watched }) => call("PUT", `/watchstate/${mediaId}`, { watched }),
     me: () => call("GET", "/me"),
+    home: () => call("GET", "/home"),
+    update_me: ({ name, email }) => call("PATCH", "/me", { ...(name === undefined ? {} : { display_name: name }), ...(email === undefined ? {} : { device_email: email }) }),
+    set_picture: (bytes, options) => fetch(`${B}/api/v1/me/picture`, { method: "PUT", headers: { "Content-Type": options.headers["x-picture-type"] }, body: bytes }).then(async (r) => { if (!r.ok) throw await r.text(); return null; }),
+    remove_picture: () => call("DELETE", "/me/picture"),
+    revoke_device: ({ id }) => call("DELETE", `/devices/${encodeURIComponent(id)}`),
     devices: () => call("GET", "/devices"),
     playback_status: () => call("GET", "/playback/status"),
     start_session: (a) => window.__holdStart ? new Promise((r) => { window.__releaseStart = r; }).then(() => startSession(a)) : startSession(a),
@@ -83,13 +88,13 @@
     transformCallback(cb, once) { const id = next++; cbs.set(id, (m) => { if (once) cbs.delete(id); cb(m); }); return id; },
     unregisterCallback(id) { cbs.delete(id); },
     convertFileSrc(path, proto) { return `${B}/${proto}/${path}`; },
-    async invoke(cmd, args = {}) {
+    async invoke(cmd, args = {}, options) {
       window.__calls.push(cmd);
       if (cmd.startsWith("plugin:window|")) return null;
       if (cmd.startsWith("plugin:player|")) { const f = plugin[cmd.slice(14)]; if (!f) throw `no ${cmd}`; return f(args); }
       const f = cmds[cmd];
       if (!f) throw `unknown command ${cmd}`;
-      return f(args);
+      return f(args, options);
     },
   };
 })();

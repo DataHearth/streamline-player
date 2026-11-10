@@ -15,7 +15,7 @@ class H(http.server.BaseHTTPRequestHandler):
         elif path.startswith("/artwork/"): path = "/api/v1/posters/" + path[len("/artwork/"):]
         n = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(n) if n else None
-        req = urllib.request.Request(MOCK + path if path.startswith("/") else path, data=body, method=self.command, headers={"Content-Type": "application/json"} if body else {})
+        req = urllib.request.Request(MOCK + path if path.startswith("/") else path, data=body, method=self.command, headers={"Content-Type": self.headers.get("Content-Type", "application/json")} if body else {})
         try:
             r = urllib.request.urlopen(req, timeout=60); code, data, ct = r.status, r.read(), r.headers.get("Content-Type", "")
         except urllib.error.HTTPError as e:

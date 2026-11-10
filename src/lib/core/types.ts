@@ -5,6 +5,8 @@ export type FileSummary = {
 	hdr?: string;
 	audio?: string;
 	channels?: string;
+	/** Bytes on disk; a show's is the sum of its episode files. */
+	size?: number;
 };
 export type Episode = {
 	id: number;
@@ -93,7 +95,25 @@ export type DecisionOption = {
 	max_bitrate?: number | null;
 };
 
-export type Me = { name: string; email: string; role: string; library_language?: string };
+export type Me = {
+	name: string;
+	email: string;
+	role: string;
+	library_language?: string;
+	picture: boolean;
+	initials: string;
+};
+export type Featured = {
+	kind: Kind;
+	id: number;
+	reason: "continue" | "new_episodes" | "added";
+	season?: number;
+	episodes?: number[];
+};
+/** `season` and `episodes` are set when episodes arrived, absent when the whole title did. */
+export type Arrival = { kind: Kind; id: number; at: string; season?: number; episodes?: number[] };
+export type ArrivalDay = { date: string; items: Arrival[] };
+export type HomeFeed = { featured: Featured[]; arrivals: ArrivalDay[] };
 export type Device = {
 	id: string;
 	name: string;

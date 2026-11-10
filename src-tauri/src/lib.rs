@@ -17,6 +17,12 @@ struct Conn {
     loaded: bool,
 }
 
+enum Body {
+    None,
+    Json(Value),
+    Raw(Vec<u8>, String),
+}
+
 pub struct Api {
     http: reqwest::Client,
     app: AppHandle,
@@ -121,6 +127,16 @@ impl Api {
         path: &str,
         body: Option<Value>,
     ) -> Result<Value, String> {
+        self.call_with(method, path, body.map_or(Body::None, Body::Json))
+            .await
+    }
+
+    async fn call_with(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        body: Body,
+    ) -> Result<Value, String> {
         let conn = self.conn().await;
         let Some(server) = conn.server else {
             return Err(json!({ "error": { "code": "no_server" } }).to_string());
@@ -129,9 +145,11 @@ impl Api {
         if let Some(key) = &conn.key {
             req = req.header("X-API-Key", key);
         }
-        if let Some(b) = body {
-            req = req.json(&b);
-        }
+        req = match body {
+            Body::None => req,
+            Body::Json(b) => req.json(&b),
+            Body::Raw(bytes, content_type) => req.header("Content-Type", content_type).body(bytes),
+        };
         let resp = req.send().await.map_err(|e| e.to_string())?;
         let status = resp.status();
         let text = resp.text().await.map_err(|e| e.to_string())?;
@@ -208,6 +226,72 @@ async fn set_watched(
 #[tauri::command]
 async fn me(api: tauri::State<'_, Api>) -> Result<Value, String> {
     api.call(reqwest::Method::GET, "/me", None).await
+}
+
+#[tauri::command]
+async fn home(api: tauri::State<'_, Api>) -> Result<Value, String> {
+    api.call(reqwest::Method::GET, "/home", None).await
+}
+
+#[tauri::command]
+async fn update_me(
+    api: tauri::State<'_, Api>,
+    name: Option<String>,
+    email: Option<String>,
+) -> Result<Value, String> {
+    let mut body = serde_json::Map::new();
+    if let Some(name) = name {
+        body.insert("display_name".into(), name.into());
+    }
+    if let Some(email) = email {
+        body.insert("device_email".into(), email.into());
+    }
+    api.call(reqwest::Method::PATCH, "/me", Some(body.into()))
+        .await
+}
+
+/// The image travels as the raw body of the call, its type in `x-picture-type`.
+#[tauri::command]
+async fn set_picture(
+    api: tauri::State<'_, Api>,
+    request: tauri::ipc::Request<'_>,
+) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(json!({ "error": { "code": "invalid_request" } }).to_string());
+    };
+    let content_type = request
+        .headers()
+        .get("x-picture-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    api.call_with(
+        reqwest::Method::PUT,
+        "/me/picture",
+        Body::Raw(bytes.clone(), content_type),
+    )
+    .await
+    .map(drop)
+}
+
+#[tauri::command]
+async fn remove_picture(api: tauri::State<'_, Api>) -> Result<(), String> {
+    api.call(reqwest::Method::DELETE, "/me/picture", None)
+        .await
+        .map(drop)
+}
+
+#[tauri::command]
+async fn revoke_device(api: tauri::State<'_, Api>, id: String) -> Result<(), String> {
+    if !id
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    {
+        return Err(json!({ "error": { "code": "not_found" } }).to_string());
+    }
+    api.call(reqwest::Method::DELETE, &format!("/devices/{id}"), None)
+        .await
+        .map(drop)
 }
 
 #[tauri::command]
@@ -438,6 +522,11 @@ pub fn run() {
             watch_state,
             set_watched,
             me,
+            home,
+            update_me,
+            set_picture,
+            remove_picture,
+            revoke_device,
             devices,
             playback_status,
             decisions,

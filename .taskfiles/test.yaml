@@ -23,6 +23,7 @@ tasks:
       - node dev/shortcuts-check.ts
       - node dev/contract/proxy-check.ts
       - node dev/contract/auth-flow-check.ts
+      - node dev/contract/browse-check.ts
       - cmd: node dev/web-build-check.ts
         # Only a web build in build/ is checked; `task build:web` makes one.
         if: test -f build/index.html

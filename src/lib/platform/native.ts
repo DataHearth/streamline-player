@@ -7,6 +7,7 @@ import type {
 	DecisionOption,
 	Device,
 	DeviceInfo,
+	HomeFeed,
 	Kind,
 	Me,
 	Pairing,
@@ -73,6 +74,7 @@ export const setWatched = (mediaId: string, watched: boolean) =>
 const ARTWORK = convertFileSrc("", "artwork");
 export const artwork = (kind: Kind, id: number, name: "poster" | "backdrop") =>
 	`${ARTWORK}${kind}/${id}/${name}.jpg`;
+export const myPicture = (version: number) => `${ARTWORK}users/me/photo.jpg?v=${version}`;
 export const headshot = (person: string) => `${ARTWORK}people/${person}/photo.jpg`;
 
 /** Movies and shows together; ids are only unique within a kind. */
@@ -90,6 +92,15 @@ export const pairStart = () => invoke<Pairing>("pair_start");
 export const pairPoll = () => invoke<string>("pair_poll");
 export const signOut = () => invoke("sign_out");
 export const me = () => invoke<Me>("me");
+export const home = () => invoke<HomeFeed>("home");
+export const updateMe = (patch: { name?: string; email?: string }) =>
+	invoke<Me>("update_me", patch);
+export const setPicture = async (file: Blob) =>
+	invoke<void>("set_picture", new Uint8Array(await file.arrayBuffer()), {
+		headers: { "x-picture-type": file.type },
+	});
+export const removePicture = () => invoke<void>("remove_picture");
+export const revokeDevice = (id: string) => invoke<void>("revoke_device", { id });
 export const devices = () => invoke<{ items: Device[] }>("devices").then(listOf);
 export const playbackStatus = () => invoke<{ network?: string }>("playback_status");
 export const serverHost = () => invoke<string>("server_host");

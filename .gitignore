@@ -12,3 +12,4 @@ node_modules
 /engine/corpus/
 /result
 /result-*
+__pycache__/
