@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Runs every scenario against a fresh mock: dev/compare/run.sh <out-dir>.
-# Needs the engine (:8097), bridge.py (:8099) and Vite (:1420) up; starts and stops the mock and the
+# Needs the engine (:8097), bridge.py (:8099) and the TV build on Vite (:1420, task dev:tv-web) up; starts and stops the mock and the
 # contract proxy (:8098) itself, because the mock's watch state carries over between runs.
 # Exits 1 when the proxy reported an exchange off docs/contract/player.openapi.yaml.
 set -u
 cd "$(dirname "$0")/../.."
 out=$1
+if ! curl -s localhost:1420/src/lib/platform/target.ts | grep -q '"TAURI_ENV_PLATFORM": "android"'; then
+  echo "Vite on :1420 is not serving the TV target. Start it with: task dev:tv-web" >&2
+  exit 1
+fi
 rm -rf "$out"
 tmp=${MEDIA_DIR:-/tmp/streamline-player}
 python3 dev/mock-streamline.py --listen 127.0.0.1:8081 --secret dev-secret-0123456789abcdef --now 1794225600 \

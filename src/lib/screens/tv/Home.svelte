@@ -1,7 +1,7 @@
 <script module lang="ts">
 import type { Kind, Title } from "#lib/core/types.ts";
 import { badges, episodesOf, inProgress, left, meta, pct, stillPos } from "#lib/core/format.ts";
-import { artwork, library, title as fetchTitle, watchState } from "#lib/platform/native.ts";
+import { artwork, library, title as fetchTitle, watchState } from "#platform";
 import { hideBroken, orPoster } from "#lib/ui/img.ts";
 
 type Item = {

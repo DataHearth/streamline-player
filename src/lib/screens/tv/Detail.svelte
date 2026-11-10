@@ -27,7 +27,7 @@ import {
 	setWatched,
 	title as fetchTitle,
 	watchState,
-} from "#lib/platform/native.ts";
+} from "#platform";
 import { hideBroken, orPoster } from "#lib/ui/img.ts";
 import { toast } from "#lib/core/toast.svelte.ts";
 import { Check, CheckCheck, Eye, Play, RotateCcw } from "@lucide/svelte";

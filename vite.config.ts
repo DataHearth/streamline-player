@@ -7,7 +7,13 @@ import { defineConfig } from "vite";
 // the device loads the dev server over the network, not from localhost.
 const host = process.env.TAURI_DEV_HOST;
 
+// The target is fixed at build time: Tauri sets TAURI_ENV_PLATFORM, a plain Vite build leaves it unset.
+const platform = process.env.TAURI_ENV_PLATFORM
+	? "src/lib/platform/native.ts"
+	: "src/lib/platform/web.ts";
+
 export default defineConfig({
+	envPrefix: ["VITE_", "TAURI_ENV_"],
 	plugins: [
 		// Same strategy as `pnpm check` and as Streamline: the Settings choice, else the TV's language.
 		paraglideVitePlugin({
@@ -19,6 +25,7 @@ export default defineConfig({
 		sveltekit({
 			// Tauri serves files, not a Node server: an SPA with one fallback page.
 			adapter: adapter({ fallback: "index.html" }),
+			alias: { "#platform": platform },
 		}),
 	],
 	clearScreen: false,

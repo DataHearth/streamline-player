@@ -2,7 +2,7 @@
 import { episodesOf, stillPos } from "#lib/core/format.ts";
 import type { Kind, Title } from "#lib/core/types.ts";
 import { m as i18n } from "#lib/paraglide/messages.js";
-import { artwork, everything, title as fetchTitle, watchState } from "#lib/platform/native.ts";
+import { artwork, everything, title as fetchTitle, watchState } from "#platform";
 import PlayerControls from "#lib/screens/tv/PlayerControls.svelte";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";

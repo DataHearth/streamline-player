@@ -4,7 +4,7 @@ import { goto } from "$app/navigation";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
 import type { Kind, Title } from "#lib/core/types.ts";
-import { artwork, everything } from "#lib/platform/native.ts";
+import { artwork, everything } from "#platform";
 import { hideBroken } from "#lib/ui/img.ts";
 import { search } from "#lib/core/search.svelte.ts";
 import { Delete, Mic, Search } from "@lucide/svelte";

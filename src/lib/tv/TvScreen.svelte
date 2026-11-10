@@ -3,7 +3,7 @@ import { afterNavigate, goto } from "$app/navigation";
 import { m as i18n } from "#lib/paraglide/messages.js";
 import { getLocale } from "#lib/paraglide/runtime.js";
 import { search } from "#lib/core/search.svelte.ts";
-import { onPlayer, voice as hear } from "#lib/platform/native.ts";
+import { onPlayer, voice as hear } from "#platform";
 import { Film, House, Search, Settings, TvMinimal } from "@lucide/svelte";
 import { onMount, type Snippet } from "svelte";
 import { focus, focusDefault, forgetFocus, move } from "./focus";

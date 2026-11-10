@@ -4,7 +4,7 @@ import { goto } from "$app/navigation";
 import { focusDefault } from "#lib/tv/focus.ts";
 import TvScreen from "#lib/tv/TvScreen.svelte";
 import type { Pairing } from "#lib/core/types.ts";
-import { authState, connect, me as whoAmI, pairPoll, pairStart } from "#lib/platform/native.ts";
+import { authState, connect, me as whoAmI, pairPoll, pairStart } from "#platform";
 import { Check, CircleCheck } from "@lucide/svelte";
 import { onMount, tick } from "svelte";
 

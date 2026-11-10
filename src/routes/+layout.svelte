@@ -7,7 +7,7 @@ import "#lib/design/shape.css";
 import "#lib/design/typography.css";
 import { goto } from "$app/navigation";
 import Toast from "#lib/ui/Toast.svelte";
-import { authState, onSignedOut } from "#lib/platform/native.ts";
+import { authState, onSignedOut } from "#platform";
 import { onMount } from "svelte";
 
 const STAGE_WIDTH = 1920;

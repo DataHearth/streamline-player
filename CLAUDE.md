@@ -54,9 +54,10 @@ updates `../streamline`.
 The Taskfile holds every command; `task` lists them. Run them inside the
 devshell (direnv), or `nix develop .#android` for the Android ones.
 
-- `task dev:desktop` / `dev:web` / `dev:engine` / `dev:mock` / `dev:android` —
-  run the app (Vite on :1420), the UI alone, the engine (:8097), the mock
-  Streamline (:8081), the TV emulator
+- `task dev:desktop` / `dev:web` / `dev:tv-web` / `dev:engine` / `dev:mock` /
+  `dev:android` — run the app (Vite on :1420), the web build (Vite on :1430),
+  the TV build in a browser (Vite on :1420, for the compare harness), the
+  engine (:8097), the mock Streamline (:8081), the TV emulator
 - `task build:<target>` — `engine`, `desktop:linux`, `desktop:windows`,
   `android`, `web`, `image`, … (`desktop:appimage` fails on NixOS by design)
 - `task check` — everything CI runs: `fmt:check`, `lint` (clippy `-D warnings`,

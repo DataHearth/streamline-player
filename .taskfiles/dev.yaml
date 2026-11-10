@@ -20,7 +20,14 @@ tasks:
     interactive: true
 
   web:
-    desc: Run the UI alone in a browser (Vite on :1420)
+    desc: Run the web build in a browser (Vite on :1430)
+    cmd: pnpm dev --port 1430
+    interactive: true
+
+  tv-web:
+    desc: Serve the TV build in a browser (Vite on :1420), for the compare harness
+    env:
+      TAURI_ENV_PLATFORM: android
     cmd: pnpm dev
     interactive: true
 

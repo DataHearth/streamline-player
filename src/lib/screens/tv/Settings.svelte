@@ -13,7 +13,7 @@ import {
 	playerCapabilities,
 	serverHost,
 	signOut as signOutNow,
-} from "#lib/platform/native.ts";
+} from "#platform";
 import type { Device, DeviceInfo, Me } from "#lib/core/types.ts";
 import {
 	Captions,

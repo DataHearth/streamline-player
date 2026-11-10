@@ -15,6 +15,7 @@ tasks:
     desc: Run the UI's rule and message checks
     cmds:
       - node dev/auto-check.ts
+      - node dev/auth-check.ts
       - node dev/halt-check.ts
       - node dev/playback-check.ts
       - node --import ./dev/controller-check/register.mjs dev/controller-check/check.mjs

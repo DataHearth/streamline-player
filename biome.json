@@ -50,6 +50,7 @@
 									{
 										"group": [
 											"#lib/platform/**",
+											"#platform",
 											"#lib/ui/**",
 											"#lib/tv/**",
 											"#lib/shells/**",
@@ -106,6 +107,7 @@
 									{
 										"group": [
 											"#lib/platform/**",
+											"#platform",
 											"#lib/tv/**",
 											"#lib/shells/**",
 											"#lib/screens/**",
@@ -131,8 +133,15 @@
 							"options": {
 								"patterns": [
 									{
-										"group": ["#lib/shells/**", "#lib/screens/**", "@tauri-apps/**", "../**"],
-										"message": "tv does not import shells or screens, and only platform touches Tauri."
+										"group": [
+											"#lib/shells/**",
+											"#lib/screens/**",
+											"#lib/platform/native.ts",
+											"#lib/platform/web.ts",
+											"@tauri-apps/**",
+											"../**"
+										],
+										"message": "tv does not import shells or screens, and only platform touches Tauri; import #platform."
 									}
 								]
 							}
@@ -151,8 +160,13 @@
 							"options": {
 								"patterns": [
 									{
-										"group": ["@tauri-apps/**", "../**"],
-										"message": "Only platform imports Tauri."
+										"group": [
+											"#lib/platform/native.ts",
+											"#lib/platform/web.ts",
+											"@tauri-apps/**",
+											"../**"
+										],
+										"message": "Only platform imports Tauri and its two modules; import #platform."
 									}
 								]
 							}
@@ -171,8 +185,8 @@
 							"options": {
 								"patterns": [
 									{
-										"group": ["@tauri-apps/**"],
-										"message": "Routes pick screens; only platform imports Tauri."
+										"group": ["#lib/platform/native.ts", "#lib/platform/web.ts", "@tauri-apps/**"],
+										"message": "Routes pick screens; only platform imports Tauri and its two modules."
 									}
 								]
 							}

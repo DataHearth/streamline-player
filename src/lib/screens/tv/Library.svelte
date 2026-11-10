@@ -5,7 +5,7 @@ import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
 import type { Kind, Title, Watch } from "#lib/core/types.ts";
 import { episodesOf, inProgress, pct } from "#lib/core/format.ts";
-import { artwork, library, title as fetchTitle, watchState } from "#lib/platform/native.ts";
+import { artwork, library, title as fetchTitle, watchState } from "#platform";
 import { hideBroken } from "#lib/ui/img.ts";
 import { Check } from "@lucide/svelte";
 

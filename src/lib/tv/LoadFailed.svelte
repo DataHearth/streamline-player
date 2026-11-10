@@ -2,7 +2,7 @@
 import { m as i18n } from "#lib/paraglide/messages.js";
 import HaltScreen from "#lib/tv/HaltScreen.svelte";
 import { haltFor, type Halt } from "#lib/core/playback/halt.ts";
-import { PLAYER_NAME, serverHost } from "#lib/platform/native.ts";
+import { PLAYER_NAME, serverHost } from "#platform";
 import { onMount } from "svelte";
 import { focusDefault } from "./focus";
 

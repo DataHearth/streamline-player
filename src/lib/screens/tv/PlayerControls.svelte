@@ -20,7 +20,7 @@ import type { Reason, Session, SubKind } from "#lib/core/playback/port.ts";
 import { DEFAULT_SIZE_PX, SIZE_PX } from "#lib/core/playback/rules.ts";
 import { prefs, setPref as savePref } from "#lib/core/prefs.svelte.ts";
 import type { Decision } from "#lib/core/types.ts";
-import { onPlayer, PLAYER_NAME, playbackPort } from "#lib/platform/native.ts";
+import { onPlayer, PLAYER_NAME, playbackPort } from "#platform";
 import { focusDefault as focusStageDefault, move } from "#lib/tv/focus.ts";
 import HaltScreen from "#lib/tv/HaltScreen.svelte";
 import { hideBroken, orPoster } from "#lib/ui/img.ts";

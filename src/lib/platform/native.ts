@@ -1,6 +1,7 @@
 import type { PlaybackPort, Session, Tracks } from "#lib/core/playback/port.ts";
 import { decodeHere } from "#lib/core/prefs.svelte.ts";
 import type {
+	AuthMethods,
 	AuthState,
 	Decision,
 	DecisionOption,
@@ -15,10 +16,25 @@ import type {
 } from "#lib/core/types.ts";
 import { addPluginListener, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+const webOnly = () => Promise.reject(new Error("not on this target"));
+
+export const init = () => Promise.resolve();
+export const authMethods = (): Promise<AuthMethods> => webOnly();
+export const startSso = (_provider: string, _next: string): Promise<void> => webOnly();
+export const finishSso = (_query: URLSearchParams): Promise<string> => webOnly();
+export const signInEmail = (_email: string, _password: string): Promise<void> => webOnly();
+
+export const windowControls = {
+	minimize: () => getCurrentWindow().minimize(),
+	toggleMaximize: () => getCurrentWindow().toggleMaximize(),
+	close: () => getCurrentWindow().close(),
+};
 
 let capabilities: { decode: string; value: Promise<unknown> } | null = null;
 // ponytail: mpv is the only desktop backend so far (Linux); macOS and Windows will need their own name.
-export const PLAYER_NAME = /Android/.test(navigator.userAgent) ? "ExoPlayer" : "mpv";
+export const PLAYER_NAME: string = /Android/.test(navigator.userAgent) ? "ExoPlayer" : "mpv";
 /** What this device plays, as the server needs it; it changes with the pass-through settings. */
 export function playerCapabilities() {
 	const decode = decodeHere();

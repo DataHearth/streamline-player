@@ -5,7 +5,7 @@ import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
 import type { Credit, Person } from "#lib/core/types.ts";
 import { monogram, seasonSpan } from "#lib/core/format.ts";
-import { artwork, headshot, person as fetchPerson } from "#lib/platform/native.ts";
+import { artwork, headshot, person as fetchPerson } from "#platform";
 import { hideBroken } from "#lib/ui/img.ts";
 
 let { id }: { id: string } = $props();

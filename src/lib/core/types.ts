@@ -117,6 +117,11 @@ export type Pairing = {
 	interval: number;
 	qr: string;
 };
+export type AuthMethods = {
+	sso: { id: string; label: string }[];
+	email: boolean;
+	register_url: string | null;
+};
 export type AuthState = {
 	paired: boolean;
 	server: string | null;
