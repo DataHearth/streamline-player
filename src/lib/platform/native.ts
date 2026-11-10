@@ -1,3 +1,4 @@
+import type { PlaybackPort, Session, Tracks } from "#lib/core/playback/port.ts";
 import { decodeHere } from "#lib/core/prefs.svelte.ts";
 import type {
 	AuthState,
@@ -87,3 +88,21 @@ export const voice = (language: string) =>
 
 export const onPlayer = <T = undefined>(event: string, cb: (e: T) => void) =>
 	addPluginListener<T>("player", event, cb).then((h) => () => h.unregister());
+
+export const playbackPort: PlaybackPort = {
+	playerName: PLAYER_NAME,
+	command: (cmd, args) => invoke(`plugin:player|${cmd}`, args),
+	on: onPlayer,
+	capabilities: playerCapabilities,
+	decisions,
+	network,
+	serverHost,
+	startSession: (mediaId, capabilities, position, tracks) =>
+		invoke<Session>("start_session", { mediaId, capabilities, position, tracks }),
+	patchSession: (id, changes) => invoke<Session>("patch_session", { id, changes }),
+	sessionInfo: (id) => invoke<{ speed: number | null }>("session_info", { id }),
+	stopSession: (id) => invoke("stop_session", { id }),
+	heartbeat: (id, position, paused) => invoke("heartbeat", { id, position, paused }),
+	mediaTracks: (mediaId) => invoke<Tracks>("media_tracks", { mediaId }),
+	subtitleText: (url) => invoke<string>("subtitle_text", { url }),
+};
