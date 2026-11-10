@@ -54,6 +54,7 @@ p.add_argument("--access-ttl", type=int, default=900, help="seconds a browser's 
 p.add_argument("--refresh-ttl", type=int, default=2592000, help="seconds a browser's refresh token lasts")
 p.add_argument("--password", default="streamline", help="password of the email sign-in")
 p.add_argument("--empty", action="store_true", help="serve a library with no titles in it")
+p.add_argument("--demo-progress", action="store_true", help="start with Dune: Part Two and Severance S2 E4 partly watched")
 p.add_argument("--sso-deny", action="store_true", help="have the SSO provider refuse every sign-in")
 p.add_argument("--heartbeat-timeout", type=float, default=90, help="seconds without a heartbeat before a session is stopped")
 args = p.parse_args()
@@ -125,6 +126,20 @@ for show in SERIES:
         for episode in season["episodes"]:
             MEDIA.setdefault(episode["media_file_id"], next(clips))
             REFS[episode["media_file_id"]] = {"series_id": show["id"], "season": season["number"], "episode_id": episode["id"]}
+
+
+if args.demo_progress and not args.empty:
+    dune = next(m for m in MOVIES if m["slug"] == "dune2")
+    severance = next(s for s in SERIES if s["slug"] == "severance")
+    episode = severance["seasons"][1]["episodes"][3]
+    for offset, (media_id, runtime, fraction) in enumerate([
+        (episode["media_file_id"], episode["runtime"], 0.3), (dune["media_files"][0]["id"], dune["runtime"], 0.4),
+    ]):
+        duration = runtime * 60
+        WATCH[media_id] = {
+            **REFS[media_id], "media_id": media_id, "position_seconds": int(duration * fraction), "duration_seconds": duration,
+            "watched": False, "updated_at": datetime.datetime.fromtimestamp(shown_now() - offset * 3600, datetime.UTC).isoformat(),
+        }
 
 
 def file_size(title, runtime):

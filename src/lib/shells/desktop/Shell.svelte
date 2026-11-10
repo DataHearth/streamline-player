@@ -14,6 +14,7 @@ import Kbd from "#lib/ui/Kbd.svelte";
 import Menu from "#lib/ui/Menu.svelte";
 import ShortcutList from "#lib/ui/ShortcutList.svelte";
 import { presence } from "#lib/ui/presence.svelte.ts";
+import { provideScroll } from "#lib/ui/scroll.ts";
 import { me, signOut } from "#platform";
 import type { Snippet } from "svelte";
 import { onMount } from "svelte";
@@ -34,6 +35,8 @@ let menuOpen = $state(false);
 let helpOpen = $state(false);
 let fullscreenHint = $state(false);
 let gAt = 0;
+let content = $state<HTMLElement>();
+provideScroll(() => content);
 
 const menu = presence(() => menuOpen, 140);
 const help = presence(() => helpOpen, 240);
@@ -201,7 +204,11 @@ const toastNow = $derived(activeToast());
 	{#if narrow}
 		<p class="narrow">{i18n.shell_narrow()}</p>
 	{:else}
-		<div class="content" onscroll={(e) => (scrolledDown = e.currentTarget.scrollTop > 24)}>
+		<div
+			class="content"
+			bind:this={content}
+			onscroll={(e) => (scrolledDown = e.currentTarget.scrollTop > 24)}
+		>
 			{@render children()}
 		</div>
 

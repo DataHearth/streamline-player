@@ -3,6 +3,7 @@ const ORIGIN = "http://localhost:1450";
 const BASE = `${ORIGIN}/watch`;
 
 export const target = "web";
+export const ownServer = true;
 export const mockArgs = ["--cors-origin", ORIGIN];
 
 export default async ({ app, wait }) => {
