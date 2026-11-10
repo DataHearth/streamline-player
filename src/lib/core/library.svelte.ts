@@ -50,7 +50,8 @@ async function fetchAll(port: LibraryPort) {
 		).filter((e) => e !== null),
 	);
 	lib.movies = movies;
-	lib.shows = shows.map((s) => details.get(s.id) ?? s);
+	const seen = new Map(lib.shows.filter((s) => s.seasons).map((s) => [s.id, s]));
+	lib.shows = shows.map((s) => details.get(s.id) ?? seen.get(s.id) ?? s);
 	lib.watch = watch;
 	lib.feed = feed;
 	lib.loaded = true;
@@ -88,5 +89,34 @@ export function applyWatch(
 			watched,
 			...ref,
 		});
+	}
+}
+
+const DETAIL_BATCH = 6;
+
+/** List entries carry no seasons, which a series needs to know whether it is watched and which episode Play starts. */
+export function loadSeasons(port: Pick<LibraryPort, "title">): Promise<void> {
+	seasonsInflight ??= fetchSeasons(port).finally(() => {
+		seasonsInflight = null;
+	});
+	return seasonsInflight;
+}
+
+let seasonsInflight: Promise<void> | null = null;
+
+async function fetchSeasons(port: Pick<LibraryPort, "title">) {
+	const missing = lib.shows.filter((s) => !s.seasons).map((s) => s.id);
+	for (let i = 0; i < missing.length; i += DETAIL_BATCH) {
+		await Promise.all(
+			missing.slice(i, i + DETAIL_BATCH).map((id) =>
+				port.title("series", id).then(
+					(d) => {
+						const at = lib.shows.findIndex((s) => s.id === id);
+						if (at >= 0) lib.shows[at] = d;
+					},
+					() => {},
+				),
+			),
+		);
 	}
 }

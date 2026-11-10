@@ -128,3 +128,18 @@ export function arrivalDay(date: string, now: Date): "today" | "yesterday" | nul
 	if (date === day(new Date(now.getTime() - DAY_MS))) return "yesterday";
 	return null;
 }
+
+/** The episode Play starts: the first one with a file that is not watched yet, else the first. Needs the seasons loaded. */
+export function nextEpisode(t: Title, watch: Watch[]) {
+	const files = (t.seasons ?? []).flatMap((s) =>
+		s.episodes.filter((e) => e.has_file).map((e) => ({ ...e, season: s.number })),
+	);
+	return (
+		files.find((e) => !watch.some((w) => w.media_id === e.media_file_id && w.watched)) ?? files[0]
+	);
+}
+
+export const playUrl = (kind: Kind, id: number, episodeId?: number, resuming = false) => {
+	const query = [episodeId ? `ep=${episodeId}` : "", resuming ? "resume=1" : ""].filter(Boolean);
+	return `/player/${kind}/${id}${query.length ? `?${query.join("&")}` : ""}`;
+};

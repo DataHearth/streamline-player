@@ -4,12 +4,14 @@ import {
 	continueWatching,
 	isNew,
 	metaLine,
+	nextEpisode,
+	playUrl,
 	recentCount,
 	recentlyAdded,
 	topGenre,
 	watchedTitle,
 } from "#lib/core/browse.ts";
-import { badges, episodesOf, left, runtime, stillPos } from "#lib/core/format.ts";
+import { badges, left, runtime, stillPos } from "#lib/core/format.ts";
 import { lib, loadLibrary } from "#lib/core/library.svelte.ts";
 import type { Kind, Title } from "#lib/core/types.ts";
 import { getLocale } from "#lib/paraglide/runtime.js";
@@ -50,19 +52,9 @@ const fmt = {
 const resLabel = (t: Title) => badges(t.file_summary)[0];
 const years = (t: Title) => t.first_aired ?? String(t.year);
 
-const playUrl = (kind: Kind, id: number, episodeId?: number, resuming = false) =>
-	`/player/${kind}/${id}${episodeId ? `?ep=${episodeId}${resuming ? "&resume=1" : ""}` : resuming ? "?resume=1" : ""}`;
 const playResume = (r: (typeof resume)[number]) => goto(playUrl(r.kind, r.id, r.episodeId, true));
 const open = (kind: Kind, id: number, season?: number) =>
 	goto(`/detail/${kind}/${id}${season ? `?s=${season}` : ""}`);
-
-const firstEpisode = (t: Title) => {
-	const eps = episodesOf(t).filter((e) => e.has_file);
-	const unseen = eps.find(
-		(e) => !lib.watch.some((w) => w.media_id === e.media_file_id && w.watched),
-	);
-	return unseen ?? eps[0];
-};
 
 function eyebrow(f: NonNullable<typeof lib.feed>["featured"][number], t: Title) {
 	if (f.reason === "continue") return i18n.home_continue_watching();
@@ -115,7 +107,7 @@ const slides = $derived.by(() => {
 			});
 			continue;
 		}
-		const ep = f.kind === "series" ? firstEpisode(t) : undefined;
+		const ep = f.kind === "series" ? nextEpisode(t, lib.watch) : undefined;
 		out.push({
 			...base,
 			primary: i18n.common_play(),
@@ -223,6 +215,7 @@ onMount(() => {
 				>
 					{#each recentMovies as t (t.id)}
 						<PosterCard
+							width={164}
 							title={t.title}
 							sub={movieSub(t)}
 							src={artwork("movies", t.id, "poster")}
@@ -243,6 +236,7 @@ onMount(() => {
 				>
 					{#each recentShows as t (t.id)}
 						<PosterCard
+							width={164}
 							title={t.title}
 							sub={showSub(t)}
 							src={artwork("series", t.id, "poster")}
@@ -262,6 +256,7 @@ onMount(() => {
 				>
 					{#each genreTitles as { kind, t } (`${kind}:${t.id}`)}
 						<PosterCard
+							width={164}
 							title={t.title}
 							sub={kind === "movies" ? movieSub(t) : showSub(t)}
 							src={artwork(kind, t.id, "poster")}
