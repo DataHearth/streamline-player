@@ -1,0 +1,816 @@
+# yaml-language-server: $schema=https://spec.openapis.org/oas/3.0/schema/2024-10-18
+openapi: "3.0.4"
+info:
+  title: Streamline Player API
+  version: 0.1.0
+  description: |
+    What the player's clients send and read, as the mock (dev/mock-streamline.py) serves it today.
+    Paths and shapes are provisional until Streamline's extension system decides where they live.
+    dev/contract/proxy.ts checks the mock and every client against this file.
+
+servers:
+  - url: /api/v1
+
+security:
+  - deviceKey: []
+
+paths:
+  /movies:
+    get:
+      operationId: listMovies
+      description: The Movies library grid (Library screen) and Home's rows.
+      responses:
+        "200":
+          description: Every movie, without media files or cast.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TitleList" }
+        default: { $ref: "#/components/responses/Error" }
+  /series:
+    get:
+      operationId: listSeries
+      description: The Series library grid (Library screen) and Home's rows.
+      responses:
+        "200":
+          description: Every series, without seasons or cast.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TitleList" }
+        default: { $ref: "#/components/responses/Error" }
+  /movies/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: getMovie
+      description: The movie Detail screen, and the player's source of media ids.
+      responses:
+        "200":
+          description: One movie with its media files and cast.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Title" }
+        default: { $ref: "#/components/responses/Error" }
+  /series/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: getSeries
+      description: The series Detail screen with its seasons and episodes.
+      responses:
+        "200":
+          description: One series with seasons, episodes and cast.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Title" }
+        default: { $ref: "#/components/responses/Error" }
+  /people/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getPerson
+      description: The Person screen, reached from a title's cast.
+      responses:
+        "200":
+          description: A person's credits on this server and what they are known for.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Person" }
+        default: { $ref: "#/components/responses/Error" }
+  /posters/{kind}/{id}/{file}:
+    parameters:
+      - name: kind
+        in: path
+        required: true
+        schema: { type: string, enum: [movies, series, people] }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: file
+        in: path
+        required: true
+        description: poster.jpg, backdrop.jpg, or photo.jpg for a person.
+        schema: { type: string }
+    get:
+      operationId: getArtwork
+      description: Posters, backdrops and headshots on every screen that draws a title or a person.
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        default: { $ref: "#/components/responses/Error" }
+  /watchstate:
+    get:
+      operationId: listWatchState
+      description: Home's Continue Watching row, and every watched or progress mark in the library.
+      responses:
+        "200":
+          description: Watch state, most recently updated first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Watch" }
+        default: { $ref: "#/components/responses/Error" }
+  /watchstate/{mediaId}:
+    parameters:
+      - $ref: "#/components/parameters/MediaId"
+    put:
+      operationId: setWatched
+      description: The Mark watched and Mark unwatched actions on Detail.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [watched]
+              properties:
+                watched: { type: boolean }
+      responses:
+        "200":
+          description: The state after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Watch" }
+        default: { $ref: "#/components/responses/Error" }
+  /me:
+    get:
+      operationId: getMe
+      description: Settings, Account, and the library language the screens read.
+      responses:
+        "200":
+          description: The signed-in user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        default: { $ref: "#/components/responses/Error" }
+  /devices:
+    get:
+      operationId: listDevices
+      description: Settings, Devices.
+      responses:
+        "200":
+          description: The user's paired devices.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Device" }
+        default: { $ref: "#/components/responses/Error" }
+  /devices/current:
+    delete:
+      operationId: signOutDevice
+      description: Settings, Sign out. Revokes the calling device's key.
+      responses:
+        "204": { description: The key is revoked. }
+        default: { $ref: "#/components/responses/Error" }
+  /auth/device/code:
+    post:
+      operationId: startPairing
+      description: Welcome, Pair. Starts a device pairing and returns the code the screen shows.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, name, platform]
+              properties:
+                client_id: { type: string }
+                name: { type: string }
+                platform: { type: string }
+      responses:
+        "200":
+          description: The pairing.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval]
+                properties:
+                  device_code: { type: string }
+                  user_code: { type: string }
+                  verification_uri: { type: string }
+                  verification_uri_complete: { type: string }
+                  expires_in: { type: integer }
+                  interval: { type: integer }
+        default: { $ref: "#/components/responses/Error" }
+  /auth/device/token:
+    post:
+      operationId: pollPairing
+      description: Welcome, Pair. One poll of a pairing; the 400 codes are authorization_pending, slow_down, access_denied and expired_token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_code]
+              properties:
+                device_code: { type: string }
+      responses:
+        "200":
+          description: The pairing was approved; the key is shown to the app once.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [api_key, key_id]
+                properties:
+                  api_key: { type: string }
+                  key_id: { type: integer }
+        default: { $ref: "#/components/responses/Error" }
+  /playback/status:
+    get:
+      operationId: playbackStatus
+      description: The player's start-up check and where Streamline places this device (home or away).
+      responses:
+        "200":
+          description: Whether playback is available.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available, network]
+                properties:
+                  available: { type: boolean }
+                  media:
+                    type: array
+                    items: { type: string }
+                  network: { type: string, enum: [home, away] }
+        default: { $ref: "#/components/responses/Error" }
+  /playback/decisions:
+    post:
+      operationId: decide
+      description: The Player's quality menu, one decision per option, before any session exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [media_id, capabilities, options]
+              properties:
+                media_id: { type: string }
+                capabilities: { $ref: "#/components/schemas/Capabilities" }
+                options:
+                  type: array
+                  items: { $ref: "#/components/schemas/SessionOptions" }
+      responses:
+        "200":
+          description: One decision per option, in order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bit_rate, decisions]
+                properties:
+                  bit_rate: { type: integer }
+                  decisions:
+                    type: array
+                    items:
+                      anyOf:
+                        - $ref: "#/components/schemas/Plan"
+                        - type: object
+                          required: [error]
+                          properties:
+                            error: { $ref: "#/components/schemas/ErrorBody" }
+        default: { $ref: "#/components/responses/Error" }
+  /playback/sessions:
+    post:
+      operationId: startSession
+      description: The Player, on opening a title or resuming after a halt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - type: object
+                  required: [media_id, capabilities, position]
+                  properties:
+                    media_id: { type: string }
+                    capabilities: { $ref: "#/components/schemas/Capabilities" }
+                    position: { type: number }
+                - $ref: "#/components/schemas/SessionOptions"
+      responses:
+        "200":
+          description: The session and the HLS url the webview plays.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        default: { $ref: "#/components/responses/Error" }
+  /playback/sessions/{sessionId}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      operationId: getSession
+      description: The Player's stats overlay.
+      responses:
+        "200":
+          description: What the engine reports for the session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionInfo" }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      operationId: patchSession
+      description: The Player's audio, subtitle-burn-in and quality menus, and seeking past what the engine has built.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SessionOptions"
+                - type: object
+                  properties:
+                    position: { type: number }
+      responses:
+        "200":
+          description: The session as changed, with a fresh url.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: stopSession
+      description: The Player, on leaving.
+      responses:
+        "200":
+          description: Stopped; the engine's reply is passed through.
+          content:
+            application/json:
+              schema: { nullable: true }
+        "204": { description: Stopped. }
+        default: { $ref: "#/components/responses/Error" }
+  /playback/sessions/{sessionId}/progress:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      operationId: heartbeat
+      description: The Player's heartbeat, which also writes the watch position. A 410 means an admin stopped the session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [position, paused]
+              properties:
+                position: { type: number }
+                paused: { type: boolean }
+      responses:
+        "204": { description: Recorded. }
+        default: { $ref: "#/components/responses/Error" }
+  /playback/media/{mediaId}/tracks:
+    parameters:
+      - $ref: "#/components/parameters/MediaId"
+    get:
+      operationId: getTracks
+      description: The Player's audio and subtitle menus, chapters, and the intro and credits cards.
+      responses:
+        "200":
+          description: What the file holds, and where its subtitles are served.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tracks" }
+        default: { $ref: "#/components/responses/Error" }
+  /playback/media/{mediaId}/subtitles/{name}:
+    parameters:
+      - $ref: "#/components/parameters/MediaId"
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getSubtitle
+      description: A subtitle or font file of a media file; the Player draws text subtitles from it.
+      responses:
+        "200":
+          description: The file, as extracted.
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+        default: { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    deviceKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema: { type: string }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[0-9a-f]{32}$" }
+
+  responses:
+    Error:
+      description: Any failure. `code` is what the client branches on.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    ErrorBody:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string }
+        message: { type: string }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { $ref: "#/components/schemas/ErrorBody" }
+
+    FileSummary:
+      type: object
+      properties:
+        file_count: { type: integer }
+        resolution: { type: string }
+        codec: { type: string }
+        hdr: { type: string }
+        audio: { type: string }
+        channels: { type: string }
+    CastMember:
+      type: object
+      required: [id, name, character]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        character: { type: string }
+        seasons:
+          type: array
+          items: { type: integer }
+    Episode:
+      type: object
+      required: [id, number, title, overview, runtime, has_file, media_file_id]
+      properties:
+        id: { type: integer }
+        number: { type: integer }
+        title: { type: string }
+        overview: { type: string }
+        runtime: { type: integer }
+        has_file: { type: boolean }
+        media_file_id: { type: string }
+        air_date: { type: string }
+        status: { type: string }
+    Season:
+      type: object
+      required: [number, name, episodes]
+      properties:
+        number: { type: integer }
+        name: { type: string }
+        total: { type: integer }
+        episodes:
+          type: array
+          items: { $ref: "#/components/schemas/Episode" }
+    Title:
+      type: object
+      required: [id, title, year, overview, genres, rating, added_at]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        title: { type: string }
+        original_title: { type: string }
+        year: { type: integer }
+        overview: { type: string }
+        genres:
+          type: array
+          items: { type: string }
+        rating: { type: number }
+        added_at: { type: string }
+        status: { type: string }
+        monitored: { type: boolean }
+        tmdb_id: { type: integer }
+        file_summary: { $ref: "#/components/schemas/FileSummary" }
+        runtime: { type: integer }
+        certification: { type: string }
+        media_files:
+          type: array
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: { type: string }
+        network: { type: string }
+        total_seasons: { type: integer }
+        first_aired: { type: string }
+        seasons:
+          type: array
+          items: { $ref: "#/components/schemas/Season" }
+        cast:
+          type: array
+          items: { $ref: "#/components/schemas/CastMember" }
+    TitleList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Title" }
+        total: { type: integer }
+    Credit:
+      type: object
+      required: [kind, id, title, year, character]
+      properties:
+        kind: { type: string, enum: [movies, series] }
+        id: { type: integer }
+        title: { type: string }
+        year: { type: integer }
+        character: { type: string }
+        seasons:
+          type: array
+          items: { type: integer }
+        total_seasons: { type: integer, nullable: true }
+    Person:
+      type: object
+      required: [id, name, department, credits, known_for]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        department: { type: string }
+        credits:
+          type: array
+          items: { $ref: "#/components/schemas/Credit" }
+        known_for:
+          type: array
+          items:
+            type: object
+            required: [title, year]
+            properties:
+              title: { type: string }
+              year: { type: integer }
+              kind: { type: string, enum: [movies, series] }
+              id: { type: integer }
+    Watch:
+      type: object
+      required: [media_id, position_seconds, duration_seconds, watched]
+      properties:
+        media_id: { type: string }
+        movie_id: { type: integer }
+        series_id: { type: integer }
+        season: { type: integer }
+        episode_id: { type: integer }
+        position_seconds: { type: number }
+        duration_seconds: { type: number }
+        watched: { type: boolean }
+        updated_at: { type: string }
+    Me:
+      type: object
+      required: [name, email, role]
+      properties:
+        name: { type: string }
+        email: { type: string }
+        role: { type: string }
+        library_language: { type: string }
+    Device:
+      type: object
+      required: [id, name, platform, last_seen, streaming, current]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        platform: { type: string }
+        last_seen: { type: string }
+        streaming: { type: boolean }
+        current: { type: boolean }
+
+    Capabilities:
+      type: object
+      additionalProperties: false
+      required: [video, hdr, audio, containers, subtitles, hls_keyframe_exact]
+      properties:
+        video:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [codec, profiles, max_level, max_width, max_height, max_fps]
+            properties:
+              codec: { type: string }
+              profiles:
+                type: array
+                items: { type: string }
+              max_level: { type: integer, nullable: true }
+              max_width: { type: integer }
+              max_height: { type: integer }
+              max_fps: { type: number }
+        hdr:
+          type: object
+          additionalProperties: false
+          required: [formats, dv_profiles]
+          properties:
+            formats:
+              type: array
+              items: { type: string }
+            dv_profiles:
+              type: array
+              items: { type: integer }
+        audio:
+          type: object
+          additionalProperties: false
+          required: [codecs, max_channels, passthrough]
+          properties:
+            codecs:
+              type: array
+              items: { type: string }
+            max_channels: { type: integer }
+            passthrough:
+              type: array
+              items: { type: string }
+        containers:
+          type: array
+          items: { type: string }
+        subtitles:
+          type: array
+          items: { type: string }
+        hls_keyframe_exact: { type: boolean }
+    SessionOptions:
+      type: object
+      description: Absent keeps the session's value, null clears it (default audio, no burn-in, original quality).
+      properties:
+        audio_index: { type: integer, nullable: true }
+        burn_in_subtitle: { type: integer, nullable: true }
+        max_bitrate: { type: integer, nullable: true }
+
+    Reason:
+      type: object
+      required: [code, text]
+      properties:
+        code: { type: string }
+        text: { type: string }
+    VideoOut:
+      type: object
+      required: [action, codec, width, height, hdr]
+      properties:
+        action: { type: string }
+        codec: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        hdr: { type: string }
+        dv_profile: { type: integer }
+    AudioOut:
+      type: object
+      required: [action, codec, channels]
+      properties:
+        action: { type: string }
+        codec: { type: string }
+        channels: { type: integer }
+    Mode:
+      type: string
+      enum: [direct, remux, audio_transcode, transcode]
+    Plan:
+      type: object
+      required: [mode, video, audio, video_reasons, audio_reasons, hw, needs_slot, bandwidth]
+      properties:
+        mode: { $ref: "#/components/schemas/Mode" }
+        video: { $ref: "#/components/schemas/VideoOut" }
+        audio: { $ref: "#/components/schemas/AudioOut" }
+        video_reasons:
+          type: array
+          items: { $ref: "#/components/schemas/Reason" }
+        audio_reasons:
+          type: array
+          items: { $ref: "#/components/schemas/Reason" }
+        hw: { type: string }
+        needs_slot: { type: boolean }
+        bandwidth: { type: integer }
+    Session:
+      type: object
+      required: [session_id, mode, url, url_path, bandwidth, duration, video, audio, video_reasons, audio_reasons, hw]
+      properties:
+        session_id: { type: string }
+        mode: { $ref: "#/components/schemas/Mode" }
+        url: { type: string }
+        url_path: { type: string }
+        bandwidth: { type: integer }
+        duration: { type: number }
+        video: { $ref: "#/components/schemas/VideoOut" }
+        audio: { $ref: "#/components/schemas/AudioOut" }
+        video_reasons:
+          type: array
+          items: { $ref: "#/components/schemas/Reason" }
+        audio_reasons:
+          type: array
+          items: { $ref: "#/components/schemas/Reason" }
+        hw: { type: string }
+    SessionInfo:
+      type: object
+      required: [session_id, mode, hw, video, audio, speed, bitrate, last_fetch, bytes_served]
+      properties:
+        session_id: { type: string }
+        mode: { $ref: "#/components/schemas/Mode" }
+        hw: { type: string }
+        video: { $ref: "#/components/schemas/VideoOut" }
+        audio: { $ref: "#/components/schemas/AudioOut" }
+        speed: { type: number, nullable: true }
+        bitrate: { type: integer, nullable: true }
+        last_fetch: { type: integer, nullable: true }
+        bytes_served: { type: integer }
+
+    AudioTrack:
+      type: object
+      required: [index, codec, channels, language, default]
+      properties:
+        index: { type: integer }
+        codec: { type: string }
+        profile: { type: string }
+        channels: { type: integer }
+        layout: { type: string }
+        language: { type: string }
+        title: { type: string }
+        default: { type: boolean }
+        forced: { type: boolean }
+    SubtitleTrack:
+      type: object
+      required: [index, codec, language, forced, sdh, files]
+      properties:
+        index: { type: integer }
+        codec: { type: string }
+        language: { type: string }
+        title: { type: string }
+        default: { type: boolean }
+        forced: { type: boolean }
+        sdh: { type: boolean }
+        files:
+          type: object
+          description: Subtitle format to url.
+          additionalProperties: { type: string }
+    Span:
+      type: array
+      minItems: 2
+      maxItems: 2
+      items: { type: number }
+      nullable: true
+    Tracks:
+      type: object
+      required: [preparing, container, video, chapters, markers, audio, subtitles, fonts]
+      properties:
+        preparing: { type: boolean }
+        container: { type: string }
+        video:
+          type: object
+          nullable: true
+          required: [codec, width, height]
+          properties:
+            codec: { type: string }
+            width: { type: integer }
+            height: { type: integer }
+            profile: { type: string }
+            hdr: { type: string }
+            dv: { type: object, nullable: true }
+        chapters:
+          type: array
+          items:
+            type: object
+            required: [start, end, title]
+            properties:
+              start: { type: number }
+              end: { type: number }
+              title: { type: string }
+        markers:
+          type: object
+          required: [intro, credits]
+          properties:
+            intro: { $ref: "#/components/schemas/Span" }
+            credits: { $ref: "#/components/schemas/Span" }
+        audio:
+          type: array
+          items: { $ref: "#/components/schemas/AudioTrack" }
+        subtitles:
+          type: array
+          items: { $ref: "#/components/schemas/SubtitleTrack" }
+        fonts:
+          type: array
+          items: { type: string }

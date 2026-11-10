@@ -1,6 +1,7 @@
-# Stands in for the Rust side when the UI runs in a plain browser: forwards /api/v1 to the mock with CORS.
+# Stands in for the Rust side when the UI runs in a plain browser: forwards /api/v1 to the mock with CORS,
+# through the contract proxy (dev/contract/proxy.ts) that run.sh starts.
 import http.server, urllib.request, sys
-MOCK = "http://127.0.0.1:8081"
+MOCK = "http://127.0.0.1:8098"
 class H(http.server.BaseHTTPRequestHandler):
     def cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
