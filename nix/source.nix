@@ -23,6 +23,7 @@ let
     ../static
     ../dev/auto-check.ts
     ../dev/messages-check.ts
+    ../dev/web-build-check.ts
   ];
   toSource =
     fileset:

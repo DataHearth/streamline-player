@@ -12,6 +12,24 @@ const platform = process.env.TAURI_ENV_PLATFORM
 	? "src/lib/platform/native.ts"
 	: "src/lib/platform/web.ts";
 
+const csp: NonNullable<Parameters<typeof sveltekit>[0]>["csp"] = platform.endsWith("web.ts")
+	? {
+			mode: "hash",
+			directives: {
+				"default-src": ["self"],
+				"script-src": ["self"],
+				"style-src": ["self", "unsafe-inline"],
+				"img-src": ["self", "https:", "http:", "data:", "blob:"],
+				"media-src": ["self", "https:", "http:", "blob:"],
+				"connect-src": ["self", "https:", "http:"],
+				"font-src": ["self", "data:"],
+				"object-src": ["none"],
+				"base-uri": ["self"],
+				"form-action": ["self"],
+			},
+		}
+	: undefined;
+
 export default defineConfig({
 	envPrefix: ["VITE_", "TAURI_ENV_"],
 	plugins: [
@@ -26,6 +44,8 @@ export default defineConfig({
 			// Tauri serves files, not a Node server: an SPA with one fallback page.
 			adapter: adapter({ fallback: "index.html" }),
 			alias: { "#platform": platform },
+			paths: { base: (process.env.BASE_PATH ?? "") as "" | `/${string}` },
+			csp,
 		}),
 	],
 	clearScreen: false,

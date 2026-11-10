@@ -1,6 +1,6 @@
 <script lang="ts">
 import { m as i18n } from "#lib/paraglide/messages.js";
-import { goto } from "$app/navigation";
+import { goto } from "#lib/ui/nav.ts";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
 import type { Credit, Person } from "#lib/core/types.ts";

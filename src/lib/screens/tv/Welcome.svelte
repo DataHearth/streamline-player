@@ -1,6 +1,6 @@
 <script lang="ts">
 import { m as i18n } from "#lib/paraglide/messages.js";
-import { goto } from "$app/navigation";
+import { goto, staticUrl } from "#lib/ui/nav.ts";
 import { focusDefault } from "#lib/tv/focus.ts";
 import TvScreen from "#lib/tv/TvScreen.svelte";
 import type { Pairing } from "#lib/core/types.ts";
@@ -202,7 +202,7 @@ onMount(() => {
 		<div class="page" bind:this={stage}>
 			<div class="side">
 				<div class="brand">
-					<img class="mark" src="/streamline-mark.png" alt="">
+					<img class="mark" src={staticUrl("streamline-mark.png")} alt="">
 					<span class="eyebrow">{STEPS[step]}</span>
 				</div>
 				<h1>{TITLES[step]}</h1>

@@ -7,6 +7,8 @@
   sqlite,
   nodejs,
   pnpm,
+  basePath ? "",
+  streamlineUrl ? null,
 }:
 let
   source = callPackage ./source.nix { };
@@ -34,7 +36,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     inherit (finalAttrs) version src;
     inherit pnpm;
     fetcherVersion = 4;
-    hash = "sha256-RCSBEzjNVMXpTaFLxXXXZ+gqWDqmanTfV2+J/6Mkv4E=";
+    hash = "sha256-qhm9evabvgCGpZjAGIEba0nFj6KmkZJ5RggWhlVJVmM=";
   };
 
   # nixpkgs' pnpmConfigHook restores the store index without WAL mode, and
@@ -46,7 +48,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   buildPhase = ''
     runHook preBuild
-    pnpm build
+    BASE_PATH=${lib.escapeShellArg basePath} pnpm build
     runHook postBuild
   '';
 
@@ -57,12 +59,16 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     pnpm check
     node dev/auto-check.ts
     node dev/messages-check.ts
+    node dev/web-build-check.ts
     runHook postCheck
   '';
 
   installPhase = ''
     runHook preInstall
     cp -r build $out
+    ${lib.optionalString (streamlineUrl != null) ''
+      echo ${lib.escapeShellArg (builtins.toJSON { streamline = streamlineUrl; })} > $out/config.json
+    ''}
     runHook postInstall
   '';
 })

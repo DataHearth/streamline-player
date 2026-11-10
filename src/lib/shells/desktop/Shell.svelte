@@ -1,5 +1,5 @@
 <script lang="ts">
-import { goto } from "$app/navigation";
+import { goto } from "#lib/ui/nav.ts";
 import { page } from "$app/state";
 import { activeToast, toast } from "#lib/core/toast.svelte.ts";
 import type { Me } from "#lib/core/types.ts";

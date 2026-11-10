@@ -1,6 +1,6 @@
 <script lang="ts">
 import { m as i18n } from "#lib/paraglide/messages.js";
-import { goto } from "$app/navigation";
+import { goto } from "#lib/ui/nav.ts";
 import { page } from "$app/state";
 import { autoCap, PRESETS, presetOf, rememberedThroughput } from "#lib/core/playback/auto.ts";
 import { prefs } from "#lib/core/prefs.svelte.ts";

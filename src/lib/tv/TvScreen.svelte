@@ -1,5 +1,6 @@
 <script lang="ts">
-import { afterNavigate, goto } from "$app/navigation";
+import { afterNavigate } from "$app/navigation";
+import { appPath, goto, staticUrl } from "#lib/ui/nav.ts";
 import { m as i18n } from "#lib/paraglide/messages.js";
 import { getLocale } from "#lib/paraglide/runtime.js";
 import { search } from "#lib/core/search.svelte.ts";
@@ -76,7 +77,7 @@ afterNavigate(({ type }) => {
 });
 
 async function listen() {
-	if (location.pathname.startsWith("/player")) return;
+	if (appPath().startsWith("/player")) return;
 	// Recognized in the app's language, in the TV's own variant of it when the TV has one.
 	const language =
 		navigator.languages.find((l) => l.startsWith(getLocale())) ??
@@ -84,7 +85,7 @@ async function listen() {
 	const { text } = await hear(language).catch(() => ({ text: "" }));
 	if (!text.trim()) return;
 	search.q = text.trim();
-	if (location.pathname !== "/search") goto("/search");
+	if (appPath() !== "/search") goto("/search");
 }
 
 onMount(() => {
@@ -111,7 +112,7 @@ onMount(() => {
 	{#if tab}
 		<div class="nav" data-tv-nav="1">
 			<div class="brand">
-				<img src="/streamline-mark.png" alt="" width="44" height="44">
+				<img src={staticUrl("streamline-mark.png")} alt="" width="44" height="44">
 				<span class="name"><span>streamline</span><span class="player">player</span></span>
 			</div>
 			<div class="tabs" data-tv-row="1">

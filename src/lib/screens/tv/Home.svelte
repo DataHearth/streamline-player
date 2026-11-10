@@ -24,7 +24,7 @@ let cached: Row[] | null = null;
 
 <script lang="ts">
 import { m as i18n } from "#lib/paraglide/messages.js";
-import { goto } from "$app/navigation";
+import { goto, staticUrl } from "#lib/ui/nav.ts";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
 import { focusDefault } from "#lib/tv/focus.ts";
@@ -203,7 +203,9 @@ const onFocus = (it: Item, ri: number) => {
 	{#if failed !== null}
 		<LoadFailed error={failed} retry={load} onloaded={onLoaded} />
 	{:else if !loaded}
-		<div class="boot"><img src="/streamline-mark.png" alt="" width="56" height="56"></div>
+		<div class="boot">
+			<img src={staticUrl("streamline-mark.png")} alt="" width="56" height="56">
+		</div>
 	{/if}
 	{#each slots as slot, i}
 		{#if slot}

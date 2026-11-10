@@ -1,5 +1,7 @@
 <script lang="ts">
-let { size = 36, src = "/streamline-mark.png" }: { size?: number; src?: string } = $props();
+import { staticUrl } from "#lib/ui/nav.ts";
+let { size = 36, src = staticUrl("streamline-mark.png") }: { size?: number; src?: string } =
+	$props();
 const radius = $derived(size >= 48 ? "12px" : size >= 36 ? "var(--radius-md)" : "8px");
 </script>
 

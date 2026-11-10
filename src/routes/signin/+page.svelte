@@ -1,5 +1,5 @@
 <script lang="ts">
-import { goto } from "$app/navigation";
+import { goto } from "#lib/ui/nav.ts";
 import { page } from "$app/state";
 import { safeNext } from "#lib/core/auth.ts";
 import SignIn from "#lib/screens/SignIn.svelte";

@@ -28,8 +28,10 @@ tasks:
     cmd: cargo tauri build
 
   web:
-    desc: Build the static UI into build/
-    cmd: pnpm build
+    desc: Build the static UI into build/ and check its CSP
+    cmds:
+      - pnpm build
+      - node dev/web-build-check.ts
 
   android:
     desc: Build the Android APK and AAB (phones and Android TV)

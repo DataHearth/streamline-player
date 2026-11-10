@@ -5,7 +5,7 @@ import "#lib/design/elevation.css";
 import "#lib/design/motion.css";
 import "#lib/design/shape.css";
 import "#lib/design/typography.css";
-import { goto } from "$app/navigation";
+import { appPath, goto } from "#lib/ui/nav.ts";
 import { toast } from "#lib/core/toast.svelte.ts";
 import { m as i18n } from "#lib/paraglide/messages.js";
 import { FORM_FACTOR, IS_WEB } from "#lib/platform/target.ts";
@@ -17,10 +17,10 @@ import { onMount } from "svelte";
 let { children } = $props();
 let ready = $state(false);
 
-const onSignIn = () => location.pathname.startsWith("/signin");
+const onSignIn = () => appPath().startsWith("/signin");
 
 const toSignIn = () => {
-	const next = `${location.pathname}${location.search}`;
+	const next = `${appPath()}${location.search}`;
 	return goto(`/signin?next=${encodeURIComponent(next)}`, { replace: true });
 };
 
@@ -37,7 +37,7 @@ onMount(() => {
 			if (s.paired) return;
 			if (IS_WEB) {
 				if (!onSignIn()) await toSignIn();
-			} else if (location.pathname !== "/welcome") await goto("/welcome", { replace: true });
+			} else if (appPath() !== "/welcome") await goto("/welcome", { replace: true });
 		})
 		.finally(() => (ready = true));
 	return () => {

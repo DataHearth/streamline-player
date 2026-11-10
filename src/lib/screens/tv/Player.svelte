@@ -6,7 +6,8 @@ import { artwork, everything, title as fetchTitle, watchState } from "#platform"
 import PlayerControls from "#lib/screens/tv/PlayerControls.svelte";
 import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
-import { afterNavigate, goto } from "$app/navigation";
+import { afterNavigate } from "$app/navigation";
+import { goto } from "#lib/ui/nav.ts";
 
 type Play = {
 	key: string;
