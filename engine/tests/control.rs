@@ -229,28 +229,19 @@ async fn jobs_require_bearer() {
 async fn boots_and_answers_health() {
     let dir = std::env::temp_dir().join(format!("engine-boot-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let port = {
-        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        l.local_addr().unwrap().port()
-    };
     let cfg = dir.join("engine.yaml");
     std::fs::write(
         &cfg,
         format!(
-            "listen: 127.0.0.1:{port}\nsecret: boot-secret-boot-secret\ntmp_dir: {0}/live\njobs_dir: {0}/jobs\nhw_accel: none\n",
+            "listen: 127.0.0.1:0\nsecret: boot-secret-boot-secret\ntmp_dir: {0}/live\njobs_dir: {0}/jobs\nhw_accel: none\n",
             dir.display()
         ),
     )
     .unwrap();
-    let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_engine"))
-        .arg("--config")
-        .arg(&cfg)
-        .kill_on_drop(true)
-        .spawn()
-        .unwrap();
+    let (mut child, addr) = common::spawn_engine(&cfg);
     let mut status = None;
     for _ in 0..50 {
-        if let Ok(mut s) = tokio::net::TcpStream::connect(("127.0.0.1", port)).await {
+        if let Ok(mut s) = tokio::net::TcpStream::connect(addr).await {
             use tokio::io::{AsyncReadExt, AsyncWriteExt};
             s.write_all(
                 b"GET /v1/health HTTP/1.1\r\nhost: x\r\nauthorization: Bearer boot-secret-boot-secret\r\nconnection: close\r\n\r\n",
@@ -264,7 +255,8 @@ async fn boots_and_answers_health() {
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
-    let _ = child.kill().await;
+    let _ = child.kill();
+    let _ = child.wait();
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(status.as_deref(), Some("HTTP/1.1 200 OK"));
 }

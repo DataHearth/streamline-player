@@ -128,7 +128,7 @@ async fn serve(cfg: Config, secret: Vec<u8>) -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(cfg.listen)
         .await
         .with_context(|| format!("binding {}", cfg.listen))?;
-    tracing::info!(listen = %cfg.listen, "serving");
+    tracing::info!(listen = %listener.local_addr()?, "serving");
     let mut signals = Signals::new()?;
     let drain = Arc::new(Notify::new());
     let server = axum::serve(listener, app(state))

@@ -242,3 +242,34 @@ pub fn start_body(sid: &str, path: &std::path::Path, codec: &str, container: &st
         "position": 0.0,
     })
 }
+
+/// Spawns the engine binary on `config` (whose `listen` should use port 0) and returns it with
+/// the address it bound, read from its "serving" log line. Picking a free port in the test and
+/// handing it over races with parallel tests that get the same freed port.
+pub fn spawn_engine(config: &std::path::Path) -> (std::process::Child, std::net::SocketAddr) {
+    use std::io::BufRead;
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_engine"))
+        .arg("--config")
+        .arg(config)
+        .env("NO_COLOR", "1")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let out = std::io::BufReader::new(child.stdout.take().unwrap());
+    let (tx, rx) = std::sync::mpsc::channel();
+    // Keeps reading after the address so the engine never blocks on a full pipe.
+    std::thread::spawn(move || {
+        for line in out.lines().map_while(Result::ok) {
+            if let Some(addr) = line.split("listen=").nth(1) {
+                let _ = tx.send(addr.split_whitespace().next().unwrap_or("").to_owned());
+            }
+        }
+    });
+    let addr = rx
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("engine never logged its listen address")
+        .parse()
+        .unwrap();
+    (child, addr)
+}

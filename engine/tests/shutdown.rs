@@ -86,33 +86,19 @@ fn start_engine(name: &str) -> (Engine, std::path::PathBuf) {
     .unwrap();
     std::fs::set_permissions(&ffmpeg, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-    let addr = std::net::TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap();
     let conf = root.join("engine.yaml");
     std::fs::write(
         &conf,
         format!(
-            "listen: {addr}\nsecret: {SECRET}\ntmp_dir: {}\njobs_dir: {}\nffmpeg_dir: {}\n",
+            "listen: 127.0.0.1:0\nsecret: {SECRET}\ntmp_dir: {}\njobs_dir: {}\nffmpeg_dir: {}\n",
             root.join("live").display(),
             root.join("jobs").display(),
             bin.display()
         ),
     )
     .unwrap();
-    let child = Command::new(env!("CARGO_BIN_EXE_engine"))
-        .arg("--config")
-        .arg(&conf)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .unwrap();
+    let (child, addr) = common::spawn_engine(&conf);
     let engine = Engine { child, root, addr };
-    assert!(
-        until(Duration::from_secs(10), || TcpStream::connect(addr).is_ok()),
-        "engine never listened"
-    );
     (engine, pidfile)
 }
 
