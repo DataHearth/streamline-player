@@ -6,7 +6,7 @@ import "#lib/design/motion.css";
 import "#lib/design/shape.css";
 import "#lib/design/typography.css";
 import { goto } from "$app/navigation";
-import Toast from "#lib/tv/Toast.svelte";
+import Toast from "#lib/ui/Toast.svelte";
 import { authState, onSignedOut } from "#lib/platform/native.ts";
 import { onMount } from "svelte";
 

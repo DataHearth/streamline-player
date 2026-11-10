@@ -1,6 +1,6 @@
 <script lang="ts">
 import { m as i18n } from "#lib/paraglide/messages.js";
-import HaltScreen from "#lib/player/HaltScreen.svelte";
+import HaltScreen from "#lib/tv/HaltScreen.svelte";
 import { haltFor, type Halt } from "#lib/core/playback/halt.ts";
 import { PLAYER_NAME, serverHost } from "#lib/platform/native.ts";
 import { onMount } from "svelte";

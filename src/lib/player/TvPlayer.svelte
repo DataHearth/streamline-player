@@ -8,7 +8,7 @@ import {
 } from "#lib/platform/native.ts";
 import { hideBroken, orPoster } from "#lib/ui/img.ts";
 import { focusDefault as focusStageDefault, move } from "#lib/tv/focus.ts";
-import HaltScreen from "./HaltScreen.svelte";
+import HaltScreen from "#lib/tv/HaltScreen.svelte";
 import {
 	autoCap,
 	PRESETS,
@@ -19,7 +19,7 @@ import {
 	type Quality,
 } from "#lib/core/playback/auto.ts";
 import { haltFor, type Halt } from "#lib/core/playback/halt.ts";
-import "./screen.css";
+import "#lib/tv/screen.css";
 import { toast } from "#lib/core/toast.svelte.ts";
 import {
 	decodeHere,
