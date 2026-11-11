@@ -43,13 +43,17 @@ export function language(code: string) {
 	}
 }
 
+export const isAnime = (genres: string[]) => genres.some((g) => /^(anime|animation)$/i.test(g));
+
 const animeAudio = (list: AudioTrack[], anime: boolean, animeRule: boolean) =>
 	anime && animeRule ? list.find((t) => language(t.language) === "Japanese") : undefined;
 
 export function initialAudio(
 	list: AudioTrack[],
-	o: { anime: boolean; animeRule: boolean; audioLang: string },
+	o: { anime: boolean; animeRule: boolean; audioLang: string; chosen?: string },
 ) {
+	const chosen = o.chosen ? list.find((t) => language(t.language) === o.chosen) : undefined;
+	if (chosen) return chosen;
 	const wanted =
 		o.audioLang === "Original language"
 			? undefined
@@ -68,16 +72,19 @@ export function autoForcedSub(o: {
 	animeRule: boolean;
 	subsMode: string;
 	myLanguage: string;
+	/** A language the viewer asked subtitles in for this title: always on, in place of the app's language. */
+	subLanguage?: string;
 	burnOnly: (t: SubTrack) => boolean;
 }): SubTrack | null {
 	const audio = o.audio && language(o.audio.language);
 	const usable = o.subs.filter((t) => !o.burnOnly(t));
 	const full = usable
-		.filter((t) => !t.forced && language(t.language) === o.myLanguage)
+		.filter((t) => !t.forced && language(t.language) === (o.subLanguage ?? o.myLanguage))
 		.sort((a, b) => Number(a.sdh) - Number(b.sdh))[0];
 	const forced = usable.find((t) => t.forced && language(t.language) === audio);
 	// The selected audio is one of the tracks, so an anime-rule Japanese pick means the list has one.
-	const always = o.subsMode === "Always" || (o.anime && o.animeRule && audio === "Japanese");
+	const always =
+		!!o.subLanguage || o.subsMode === "Always" || (o.anime && o.animeRule && audio === "Japanese");
 	const want = always ? (full ?? forced) : o.subsMode === "Off" ? undefined : forced;
 	return want ?? null;
 }

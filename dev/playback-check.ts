@@ -19,6 +19,24 @@ eq(
 	undefined,
 );
 eq(initialAudio([eng, jpn], { anime: false, animeRule: false, audioLang: "English" }), eng);
+eq(
+	initialAudio([jpn, eng], {
+		anime: true,
+		animeRule: true,
+		audioLang: "English",
+		chosen: "English",
+	}),
+	eng,
+);
+eq(
+	initialAudio([jpn, eng], {
+		anime: true,
+		animeRule: true,
+		audioLang: "English",
+		chosen: "German",
+	}),
+	jpn,
+);
 
 const sub = (index: number, language: string, forced = false, sdh = false) => ({
 	index,
@@ -67,4 +85,16 @@ eq(
 		burnOnly: () => true,
 	}),
 	null,
+);
+
+// A language chosen on the title page is always on, whatever the device's mode says.
+eq(
+	autoForcedSub({
+		...base,
+		subs: [sub(0, "eng"), sub(1, "fre")],
+		audio: eng,
+		subsMode: "Off",
+		subLanguage: "French",
+	})?.index,
+	1,
 );

@@ -1,4 +1,5 @@
 <script lang="ts">
+import { choiceFor, type Choice } from "#lib/core/playback/choice.ts";
 import { episodesOf, stillPos } from "#lib/core/format.ts";
 import type { Kind, Title } from "#lib/core/types.ts";
 import { m as i18n } from "#lib/paraglide/messages.js";
@@ -12,6 +13,7 @@ import { goto } from "#lib/ui/nav.ts";
 type Play = {
 	key: string;
 	anime: boolean;
+	choice: Choice | null;
 	mediaId: string;
 	titleName: string;
 	heading: string;
@@ -59,6 +61,7 @@ async function load(k: Kind, i: number, ep: number | null, wantsResume: boolean)
 		mediaId: e.media_file_id,
 		titleName: t.title,
 		anime: isAnime(t),
+		choice: choiceFor({ kind: "series", id: i, season: e.season, episode: e.number }),
 		heading: e.title,
 		eyebrow: `${t.title} · S${e.season} E${e.number}`,
 		frame: still,
@@ -107,6 +110,7 @@ async function movie(t: Title, start: number): Promise<Play> {
 		mediaId,
 		titleName: t.title,
 		anime: isAnime(t),
+		choice: choiceFor({ kind: "movies", id: t.id }),
 		heading: t.title,
 		eyebrow: `${t.year} · ${g}`,
 		frame: artwork("movies", t.id, "backdrop"),

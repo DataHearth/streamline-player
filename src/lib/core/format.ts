@@ -84,3 +84,26 @@ export const episodesOf = (t: Title) =>
 const STILL_POS = ["50% 45%", "22% 40%", "78% 55%", "35% 30%", "64% 70%", "12% 60%", "88% 35%"];
 export const stillPos = (episode: number, season: number) =>
 	STILL_POS[(episode + season) % STILL_POS.length] ?? "50% 50%";
+
+const DATE_LOCALE: Record<string, string> = { en: "en-GB" };
+
+export const sizeText = (bytes?: number) => {
+	if (!bytes) return "";
+	const gb = bytes / 1e9;
+	const fmt = (n: number) => n.toLocaleString(getLocale(), { maximumFractionDigits: 1 });
+	return gb >= 1
+		? i18n.library_size_gb({ n: fmt(gb) })
+		: i18n.library_size_mb({ n: fmt(bytes / 1e6) });
+};
+
+export const addedText = (iso: string, now: Date) => {
+	const at = new Date(iso);
+	if (at.toISOString().slice(0, 10) === now.toISOString().slice(0, 10))
+		return i18n.library_added_today();
+	return at.toLocaleDateString(
+		DATE_LOCALE[getLocale()] ?? getLocale(),
+		at.getFullYear() === now.getFullYear()
+			? { day: "numeric", month: "short" }
+			: { month: "short", year: "numeric" },
+	);
+};

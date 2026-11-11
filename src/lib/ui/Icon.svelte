@@ -1,5 +1,6 @@
 <script lang="ts" module>
 import {
+	ArrowLeft,
 	ArrowUpDown,
 	Bell,
 	Check,
@@ -16,6 +17,7 @@ import {
 	Info,
 	Keyboard,
 	KeyRound,
+	Languages,
 	LayoutGrid,
 	List,
 	ListFilter,
@@ -23,14 +25,17 @@ import {
 	Mail,
 	Minus,
 	Play,
+	RotateCcw,
 	Search,
 	Settings,
+	SlidersHorizontal,
 	Square,
 	Wifi,
 	X,
 } from "@lucide/svelte";
 
 const ICONS = {
+	"arrow-left": ArrowLeft,
 	"arrow-up-down": ArrowUpDown,
 	bell: Bell,
 	check: CircleCheck,
@@ -46,6 +51,7 @@ const ICONS = {
 	info: Info,
 	keyboard: Keyboard,
 	"key-round": KeyRound,
+	languages: Languages,
 	"layout-grid": LayoutGrid,
 	list: List,
 	"list-filter": ListFilter,
@@ -53,8 +59,10 @@ const ICONS = {
 	mail: Mail,
 	minus: Minus,
 	play: Play,
+	"rotate-ccw": RotateCcw,
 	search: Search,
 	settings: Settings,
+	sliders: SlidersHorizontal,
 	square: Square,
 	tick: Check,
 	wifi: Wifi,

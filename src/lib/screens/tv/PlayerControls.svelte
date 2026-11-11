@@ -1,5 +1,6 @@
 <script lang="ts">
 import { PRESETS, rememberedThroughput } from "#lib/core/playback/auto.ts";
+import type { Choice } from "#lib/core/playback/choice.ts";
 import {
 	audioName,
 	audioOutName,
@@ -72,6 +73,7 @@ let {
 	next,
 	more,
 	anime,
+	choice,
 	onexit,
 	onnext,
 	onopen,
@@ -87,6 +89,7 @@ let {
 	next: Next | null;
 	more: More[];
 	anime: boolean;
+	choice: Choice | null;
 	onexit: () => void;
 	onnext: () => void;
 	onopen: (href: string) => void;
@@ -150,7 +153,7 @@ const playNext = () => pb.leave().then(onnext);
 // svelte-ignore state_referenced_locally
 const pb = new Playback(
 	playbackPort,
-	{ mediaId, titleName, anime, start: startAt, onEnd: next ? playNext : undefined },
+	{ mediaId, titleName, anime, choice, start: startAt, onEnd: next ? playNext : undefined },
 	{
 		halted: () => {
 			if (menu) closeMenu();

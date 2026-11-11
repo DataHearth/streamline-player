@@ -166,3 +166,157 @@ export async function library(ctx, side) {
   });
   return out;
 }
+
+const text = async (loc) => (await loc.innerText()).replace(/\s+/g, " ").trim();
+const rect = (loc) => loc.evaluate((el) => { const r = el.getBoundingClientRect(); return [r.width, r.height].map(Math.round); });
+
+export async function detail(ctx, side) {
+  const { app, shot, wait } = ctx;
+  await app.setViewportSize({ width: 1440, height: 900 });
+  await side.open(ctx);
+  await app.goto(`${side.url}/detail/movies/1`);
+  await wait(2500);
+  await shot(`${side.target}-detail-movie`);
+  const out = { movie: {} };
+  out.movie.title = await app.locator(".detail h1").textContent();
+  out.movie.primary = (await app.locator(".detail .cta").textContent())?.trim();
+  out.movie.meta = await text(app.locator(".detail .meta"));
+  out.movie.restart = await app.locator(".detail .restart").count();
+  out.movie.cast = await app.locator(".detail .castc").count();
+  out.movie.similar = await app.locator(".detail .similar > button").count();
+  await app.locator(".detail .tech-toggle").click();
+  await wait(700);
+  await shot(`${side.target}-detail-movie-tech`);
+  out.movie.techRows = await app.locator(".detail .tech .k").allTextContents();
+  out.movie.audioTracks = await app.locator(".detail .tech .tracks div").count();
+  await app.locator(".detail .castc").first().click();
+  await wait(1500);
+  out.castUrl = await pathOf(app);
+  await app.goBack();
+  await wait(2500);
+  await app.locator(".detail .similar > button").first().click();
+  await wait(1500);
+  out.similarUrl = await pathOf(app);
+  await app.goto(`${side.url}/detail/movies/2`);
+  await wait(3500);
+  await app.locator('.detail [data-lang-trigger="hero"]').click();
+  await wait(700);
+  await shot(`${side.target}-detail-movie-lang`);
+  out.lang = {
+    title: await app.locator('.detail [role="dialog"]').getAttribute("aria-label"),
+    audio: await app.locator('.detail [role="dialog"] .audio button').allTextContents(),
+    subs: await app.locator('.detail [role="dialog"] .sub').allTextContents(),
+    hint: await text(app.locator('.detail [role="dialog"] .hint')),
+  };
+  await app.locator('.detail [role="dialog"] .sub').filter({ hasText: "Off" }).click();
+  await app.locator('.detail [role="dialog"] .apply').click();
+  await wait(600);
+  out.lang.closed = await app.locator('.detail [role="dialog"]').count();
+  out.lang.label = await app.locator('.detail [data-lang-trigger="hero"]').getAttribute("aria-label");
+  await app.reload();
+  await wait(2500);
+  out.lang.afterReload = await app.locator('.detail [data-lang-trigger="hero"]').getAttribute("aria-label");
+
+  await app.goto(`${side.url}/detail/series/1`);
+  await wait(2500);
+  await shot(`${side.target}-detail-show`);
+  out.show = {};
+  await app.evaluate(() => { const el = document.querySelector(".detail .season-note"); el.scrollIntoView({ block: "start" }); el.closest(".content").scrollBy(0, -96); });
+  await wait(500);
+  await shot(`${side.target}-detail-show-eps`);
+  await app.evaluate(() => document.querySelector(".detail").closest(".content").scrollTo(0, 0));
+  await wait(300);
+  out.show.title = await app.locator(".detail h1").textContent();
+  out.show.primary = (await app.locator(".detail .cta").textContent())?.trim();
+  out.show.seasons = await app.locator(".detail .seasons button").allTextContents();
+  out.show.selected = await app.locator('.detail .seasons button[aria-pressed="true"]').textContent();
+  out.show.note = (await app.locator(".detail .season-note").textContent())?.trim();
+  out.show.episodes = await app.locator(".detail .ep").count();
+  out.show.states = await app.locator(".detail .ep").evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute("data-state")))].sort());
+  out.show.firstEpisode = await text(app.locator(".detail .ep").first());
+  out.show.newBadges = await app.locator(".detail .ep .new").count();
+  out.show.cast = await app.locator(".detail .castc").count();
+  out.show.castTitle = await text(app.locator(".detail .cast-head"));
+  await app.locator(".detail .seasons button").first().click();
+  await wait(700);
+  await shot(`${side.target}-detail-show-s1`);
+  out.show.s1 = { query: await app.evaluate(() => location.search), episodes: await app.locator(".detail .ep").count(), castTitle: await text(app.locator(".detail .cast-head")) };
+  await app.locator(".detail .ep .mark").first().click();
+  await wait(700);
+  out.show.epToast = await text(app.locator('[role="status"]'));
+  await app.locator(".detail .season-mark").click();
+  await wait(700);
+  out.show.seasonToast = await text(app.locator('[role="status"]'));
+  await app.locator(".detail .season-mark").click();
+  await wait(300);
+  await app.locator('.detail [data-lang-trigger="season"]').click();
+  await wait(700);
+  await shot(`${side.target}-detail-show-lang`);
+  out.show.lang = { title: await app.locator('.detail [role="dialog"]').getAttribute("aria-label"), hint: await text(app.locator('.detail [role="dialog"] .hint')) };
+  await app.keyboard.press("Escape");
+  await wait(500);
+  out.show.langClosed = await app.locator('.detail [role="dialog"]').count();
+  await app.goto(`${side.url}/detail/series/4?s=2`);
+  await wait(2500);
+  await shot(`${side.target}-detail-wanted`);
+  out.wanted = { states: await app.locator(".detail .ep").evaluateAll((els) => els.map((e) => e.getAttribute("data-state"))), text: await text(app.locator('.detail .ep[data-state="wanted"]')), playable: await app.locator('.detail .ep[data-state="wanted"] .play-ep').count() };
+  await app.locator(".detail .play-ep").first().click();
+  await wait(1500);
+  out.show.playUrl = await pathOf(app);
+  return out;
+}
+
+export async function watched(ctx, side) {
+  const { app, shot, wait } = ctx;
+  await app.setViewportSize({ width: 1440, height: 900 });
+  await side.open(ctx);
+  await wait(2500);
+  const out = {};
+  const continuing = () => app.locator(".rows section").first().locator(".resume .title").evaluateAll((els) => els.map((e) => e.firstChild.textContent.trim()));
+  out.before = await continuing();
+  const movie = out.before.find((t) => t === "Dune: Part Two") ?? out.before[0];
+  let loads = 0;
+  app.on("load", () => loads++);
+  await app.locator(".rows section").first().locator(".resume").filter({ hasText: movie }).click();
+  await wait(1200);
+  await app.keyboard.press("Escape");
+  out.opened = await pathOf(app);
+  await app.evaluate(() => history.back());
+  await wait(1500);
+  await app.locator(".rows .poster", { hasText: movie }).first().click();
+  await wait(2000);
+  out.detailPath = await pathOf(app);
+  await app.locator(".detail .mark-title").click();
+  await wait(700);
+  out.toast = await text(app.locator('[role="status"]'));
+  await shot(`${side.target}-detail-watched`);
+  await app.keyboard.press("g");
+  await app.keyboard.press("h");
+  await wait(1500);
+  out.after = await continuing();
+  out.goneFromContinue = !out.after.includes(movie);
+  out.reloads = loads;
+  return out;
+}
+
+export async function missing(ctx, side) {
+  const { app, shot, wait } = ctx;
+  await app.setViewportSize({ width: 1440, height: 900 });
+  await side.open(ctx);
+  const out = {};
+  for (const [name, path] of [["direct", "/detail/movies/999999"], ["series", "/detail/series/999999"]]) {
+    await app.goto(`${side.url}${path}`);
+    await wait(2500);
+    if (name === "direct") await shot(`${side.target}-detail-missing`);
+    out[name] = { text: await text(app.locator(".detail .empty")), button: await app.locator(".detail .empty button").textContent() };
+    if (name === "direct") {
+      await app.reload();
+      await wait(2500);
+      out.reloaded = await text(app.locator(".detail .empty"));
+      await app.locator(".detail .empty button").click();
+      await wait(1500);
+      out.backTo = await pathOf(app);
+    }
+  }
+  return out;
+}

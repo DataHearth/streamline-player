@@ -30,6 +30,7 @@ import type {
 	SubTrack,
 	Tracks,
 } from "#lib/core/playback/port.ts";
+import { type Choice, subsRule } from "#lib/core/playback/choice.ts";
 import {
 	autoForcedSub,
 	cueAt,
@@ -67,6 +68,8 @@ export type PlayItem = {
 	mediaId: string;
 	titleName: string;
 	anime: boolean;
+	/** What the viewer chose for this title on its page, over the device's settings. */
+	choice?: Choice | null;
 	start: number;
 	onEnd?: () => void;
 };
@@ -442,7 +445,7 @@ export class Playback {
 			audio: this.selectedAudio,
 			anime: this.#item.anime,
 			animeRule: prefs.animeRule,
-			subsMode: prefs.subsMode,
+			...subsRule(this.#item.choice, prefs.subsMode),
 			myLanguage: myLanguage(),
 			burnOnly: (t) => !!subInfo(t).burnOnly,
 		});
@@ -504,6 +507,7 @@ export class Playback {
 					anime: this.#item.anime,
 					animeRule: prefs.animeRule,
 					audioLang: prefs.audioLang,
+					chosen: this.#item.choice?.audio,
 				})?.index ?? null;
 		}
 		this.#autoForced();

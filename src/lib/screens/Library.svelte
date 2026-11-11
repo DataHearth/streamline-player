@@ -1,6 +1,6 @@
 <script lang="ts">
 import { isNew, nextEpisode, playUrl, watchedTitle } from "#lib/core/browse.ts";
-import { badges } from "#lib/core/format.ts";
+import { addedText, badges, sizeText } from "#lib/core/format.ts";
 import { lib, loadLibrary, loadSeasons, applyWatch } from "#lib/core/library.svelte.ts";
 import {
 	FLAGS,
@@ -20,7 +20,6 @@ import { prefs } from "#lib/core/prefs.svelte.ts";
 import { toast } from "#lib/core/toast.svelte.ts";
 import type { Kind, Title } from "#lib/core/types.ts";
 import { m as i18n } from "#lib/paraglide/messages.js";
-import { getLocale } from "#lib/paraglide/runtime.js";
 import Button from "#lib/ui/Button.svelte";
 import Chip from "#lib/ui/Chip.svelte";
 import { dismiss } from "#lib/ui/dismiss.ts";
@@ -41,7 +40,6 @@ const PAD_X = 56;
 const TOP = 92;
 const MIN_COL = 196;
 const ALL = "__all";
-const DATE_LOCALE: Record<string, string> = { en: "en-GB" };
 const LIST_COLS = "32px minmax(0,2.2fr) 74px 58px 104px minmax(0,1.4fr) 76px 84px";
 const port = { library, watchState, home, title };
 
@@ -89,27 +87,6 @@ const sub = (t: Title) => {
 		? [q?.resolution, q?.hdr].filter(Boolean).join(" ")
 		: badges(q).slice(0, 2).join(" ");
 	return [t.year, tech].filter(Boolean).join(" · ");
-};
-
-const sizeText = (bytes?: number) => {
-	if (!bytes) return "";
-	const gb = bytes / 1e9;
-	const fmt = (n: number) => n.toLocaleString(getLocale(), { maximumFractionDigits: 1 });
-	return gb >= 1
-		? i18n.library_size_gb({ n: fmt(gb) })
-		: i18n.library_size_mb({ n: fmt(bytes / 1e6) });
-};
-
-const addedText = (t: Title) => {
-	const at = new Date(t.added_at);
-	if (at.toISOString().slice(0, 10) === now.toISOString().slice(0, 10))
-		return i18n.library_added_today();
-	return at.toLocaleDateString(
-		DATE_LOCALE[getLocale()] ?? getLocale(),
-		at.getFullYear() === now.getFullYear()
-			? { day: "numeric", month: "short" }
-			: { month: "short", year: "numeric" },
-	);
 };
 
 function episodeFor(t: Title) {
@@ -342,7 +319,7 @@ const heads: { label: () => string; sort?: Sort; end?: boolean }[] = [
 							hdrOn={!!q?.hdr}
 							audio={[q?.audio, q?.channels].filter(Boolean).join(" ")}
 							size={sizeText(q?.size)}
-							added={addedText(t)}
+							added={addedText(t.added_at, now)}
 							onclick={() => open(t)}
 						/>
 					{/each}
