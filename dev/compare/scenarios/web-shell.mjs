@@ -27,8 +27,11 @@ export default async ({ app, shot, wait, key }) => {
   await wait(500);
   out.afterCtrlK = await app.evaluate(() => {
     const a = document.activeElement;
-    return { url: location.pathname, tag: a?.tagName, label: a?.getAttribute("aria-label") ?? a?.textContent?.trim().slice(0, 40) };
+    return { url: location.pathname, tag: a?.tagName, placeholder: a?.getAttribute("placeholder"), label: a?.getAttribute("aria-label") ?? a?.textContent?.trim().slice(0, 40) };
   });
+  await key("Escape");
+  await wait(700);
+  out.afterEscape = await app.evaluate(() => location.pathname);
   await key("g");
   await key("h");
   await wait(500);

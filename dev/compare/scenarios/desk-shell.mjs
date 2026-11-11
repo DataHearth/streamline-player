@@ -1,5 +1,5 @@
 // The desktop shell inside the app (Tauri shim, Linux window chrome). Expected: menu ["Settings", "Keyboard shortcuts",
-// "Sign out"], the sheet open and then closed, focus after Ctrl K recorded, and the URL back at "/" after g then h.
+// "Sign out"], the sheet open and then closed, the search field focused after Ctrl K, Escape back on "/", and the URL back at "/" after g then h.
 export const target = "desktop";
 
 export default async ({ app, shot, wait, key }) => {
@@ -30,8 +30,11 @@ export default async ({ app, shot, wait, key }) => {
   await wait(500);
   out.afterCtrlK = await app.evaluate(() => {
     const a = document.activeElement;
-    return { url: location.pathname, tag: a?.tagName, label: a?.getAttribute("aria-label") ?? a?.textContent?.trim().slice(0, 40) };
+    return { url: location.pathname, tag: a?.tagName, placeholder: a?.getAttribute("placeholder"), label: a?.getAttribute("aria-label") ?? a?.textContent?.trim().slice(0, 40) };
   });
+  await key("Escape");
+  await wait(700);
+  out.afterEscape = await app.evaluate(() => location.pathname);
   await key("g");
   await key("h");
   await wait(500);

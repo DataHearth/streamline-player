@@ -7,6 +7,8 @@ type Mark = { on: boolean; label: string; onclick: () => void };
 let {
 	title,
 	sub,
+	character,
+	accent = false,
 	src,
 	badge,
 	watched = false,
@@ -19,6 +21,9 @@ let {
 }: {
 	title: string;
 	sub: string;
+	/** A role, between the title and the sub line; the sub line then reads as the credit's own detail. */
+	character?: string;
+	accent?: boolean;
 	src?: string;
 	badge?: string;
 	watched?: boolean;
@@ -64,7 +69,10 @@ let {
 	<span class="text">
 		<span class="lines">
 			<span class="title">{title}</span>
-			<span class="sub">{sub}</span>
+			{#if character}
+				<span class="character">{character}</span>
+			{/if}
+			<span class="sub" class:credit={!!character} class:accent>{sub}</span>
 		</span>
 		{#if mark}
 			<button
@@ -238,6 +246,22 @@ let {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+.character {
+	font-size: 12.5px;
+	color: var(--fg-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.sub.credit {
+	font-size: 11px;
+}
+
+.sub.accent {
+	color: var(--accent-text);
 }
 
 .mark {

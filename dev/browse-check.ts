@@ -10,6 +10,7 @@ import {
 	topGenre,
 	watchedTitle,
 } from "../src/lib/core/browse.ts";
+import { genreTiles, rememberSearch, searchTitles, tagged } from "../src/lib/core/search-view.ts";
 import type { Title, Watch } from "../src/lib/core/types.ts";
 
 const title = (
@@ -112,4 +113,43 @@ const fmt = {
 };
 eq(metaLine(old, "movies", fmt), ["2024", "100m", "PG-13", "★ 8.2"]);
 eq(metaLine(show, "series", fmt), ["2022–", "2 seasons", "Net", "★ 8.2"]);
+
+const all = tagged(
+	[
+		title(1, "Dune", "2026-10-01T00:00:00.000Z", ["Science Fiction"], { rating: 8 }),
+		title(2, "Dune: Part Two", "2026-10-02T00:00:00.000Z", ["Science Fiction"], { rating: 9 }),
+		title(3, "Léon", "2026-10-03T00:00:00.000Z", ["Crime", "Drama"], { rating: 8.5 }),
+		title(4, "The Dunes", "2026-10-04T00:00:00.000Z", ["Drama"], { rating: 9.5 }),
+	],
+	[
+		title(5, "Severance", "2026-10-05T00:00:00.000Z", ["Drama", "Science Fiction"], {
+			rating: 8.7,
+		}),
+	],
+);
+eq(
+	searchTitles(all, " dune ").map((t) => t.id),
+	[2, 1, 4],
+);
+eq(
+	searchTitles(all, "leon").map((t) => t.id),
+	[3],
+);
+eq(
+	searchTitles(all, "science").map((t) => t.id),
+	[2, 5, 1],
+);
+eq(searchTitles(all, "zzzz"), []);
+eq(searchTitles(all, "  "), []);
+eq(
+	genreTiles(all).map((g) => [g.name, g.count, g.cover.id]),
+	[
+		["Drama", 3, 3],
+		["Science Fiction", 3, 1],
+		["Crime", 1, 3],
+	],
+);
+eq(rememberSearch(["a", "b"], " B "), ["B", "a"]);
+eq(rememberSearch(["a", "b", "c", "d"], "e"), ["e", "a", "b", "c"]);
+eq(rememberSearch(["a"], "  "), ["a"]);
 console.log("browse-check ok");

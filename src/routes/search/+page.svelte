@@ -1,5 +1,11 @@
 <script lang="ts">
-import Search from "#lib/screens/tv/Search.svelte";
+import { FORM_FACTOR } from "#lib/platform/target.ts";
+import Search from "#lib/screens/Search.svelte";
+import TvSearch from "#lib/screens/tv/Search.svelte";
 </script>
 
-<Search />
+{#if FORM_FACTOR === "tv"}
+	<TvSearch />
+{:else}
+	<Search />
+{/if}

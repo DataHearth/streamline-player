@@ -112,6 +112,13 @@ const groups = $derived([
 
 const go = (id: string) => goto(PATHS[id] ?? "/");
 
+function search() {
+	const field = document.querySelector<HTMLInputElement>("[data-search-field]");
+	if (!field) return go("search");
+	field.focus();
+	field.select();
+}
+
 async function leave() {
 	menuOpen = false;
 	await signOut();
@@ -165,7 +172,8 @@ function onKey(e: KeyboardEvent) {
 	if (act === "help") {
 		menuOpen = false;
 		helpOpen = true;
-	} else go(act);
+	} else if (act === "search") search();
+	else go(act);
 }
 
 onMount(() => {
@@ -228,7 +236,7 @@ const toastNow = $derived(activeToast());
 				{menuOpen}
 				onhome={() => go("home")}
 				ontab={go}
-				onsearch={() => go("search")}
+				onsearch={search}
 				onactivity={() => {}}
 				ondownloads={() => {}}
 				onmenu={() => (menuOpen = !menuOpen)}

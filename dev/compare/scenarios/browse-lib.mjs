@@ -68,6 +68,10 @@ export async function empty(ctx, side) {
     if (kind === "movies") await shot(`${side.target}-empty-library`);
     out[`library_${kind}`] = (await app.locator(".library").innerText()).replace(/\s+/g, " ").trim();
   }
+  await app.goto(`${side.url}/search`);
+  await wait(2500);
+  await shot(`${side.target}-empty-search`);
+  out.search = (await app.locator(".search").innerText()).replace(/\s+/g, " ").trim();
   return out;
 }
 
@@ -318,5 +322,120 @@ export async function missing(ctx, side) {
       out.backTo = await pathOf(app);
     }
   }
+  await app.goto(`${side.url}/person/nobody`);
+  await wait(2500);
+  await shot(`${side.target}-person-missing`);
+  out.person = { text: await text(app.locator(".person .empty")), button: await app.locator(".person .empty button").textContent() };
+  await app.reload();
+  await wait(2500);
+  out.personReloaded = await text(app.locator(".person .empty"));
+  await app.locator(".person .empty button").click();
+  await wait(1500);
+  out.personBackTo = await pathOf(app);
+  return out;
+}
+
+const activeField = (app) => app.evaluate(() => {
+  const a = document.activeElement;
+  return { tag: a?.tagName, placeholder: a?.getAttribute("placeholder"), value: a?.value };
+});
+const resultTitles = (app) => app.locator(".search .results .poster .title").allTextContents();
+
+export async function search(ctx, side) {
+  const { app, shot, wait, key } = ctx;
+  await app.setViewportSize({ width: 1440, height: 900 });
+  await side.open(ctx);
+  await wait(2000);
+  await key("Control+k");
+  await wait(900);
+  const out = { opened: { url: await pathOf(app), focus: await activeField(app) } };
+  await shot(`${side.target}-search`);
+  out.recent = await app.locator(".search .recent button").allTextContents();
+  out.genres = (await app.locator(".search .genre-tile").allTextContents()).map((t) => t.replace(/\s+/g, " ").trim());
+  await app.keyboard.type("dun", { delay: 40 });
+  await wait(900);
+  await shot(`${side.target}-search-results`);
+  out.typed = { url: await pathOf(app), titles: await resultTitles(app), count: await text(app.locator(".search .found")) };
+  out.top = await text(app.locator(".search .top"));
+  out.groups = await app.locator(".search .results h2").allTextContents();
+  await app.reload();
+  await wait(2500);
+  out.reloaded = { url: await pathOf(app), field: (await activeField(app)).value ?? null, value: await app.locator("[data-search-field]").inputValue(), titles: await resultTitles(app) };
+  await app.locator(".search .found").click();
+  out.blurred = (await activeField(app)).tag;
+  await key("Control+k");
+  await wait(300);
+  out.refocused = await activeField(app);
+  await app.locator("[data-search-field]").fill("zzzz");
+  await wait(900);
+  await shot(`${side.target}-search-none`);
+  out.none = { url: await pathOf(app), text: await text(app.locator(".search .empty")) };
+  await app.locator("[data-search-field]").fill("");
+  await wait(600);
+  out.cleared = await pathOf(app);
+  await app.locator("[data-search-field]").focus();
+  await key("Escape");
+  await wait(1500);
+  out.escape = await pathOf(app);
+  await key("Control+k");
+  await wait(700);
+  await app.keyboard.type("severance", { delay: 30 });
+  await wait(900);
+  await app.locator(".search .results .poster .hit").first().click();
+  await wait(1500);
+  out.opened_result = await pathOf(app);
+  await app.goBack();
+  await wait(1500);
+  out.back = { url: await pathOf(app), value: await app.locator("[data-search-field]").inputValue() };
+  await app.locator("[data-search-field]").fill("");
+  await wait(500);
+  out.recentAfter = await app.locator(".search .recent button").allTextContents();
+  await app.locator(".search .genre-tile").first().click();
+  await wait(900);
+  out.genreClick = { url: await pathOf(app), titles: (await resultTitles(app)).length };
+  return out;
+}
+
+export async function person(ctx, side) {
+  const { app, shot, wait } = ctx;
+  await app.setViewportSize({ width: 1440, height: 900 });
+  await side.open(ctx);
+  await app.goto(`${side.url}/detail/movies/1`);
+  await wait(3000);
+  await app.locator(".detail .castc").first().click();
+  await wait(2000);
+  await shot(`${side.target}-person`);
+  const out = { url: await pathOf(app) };
+  out.name = await app.locator(".person h1").textContent();
+  out.department = (await app.locator(".person .eyebrow").textContent())?.trim();
+  out.summary = (await app.locator(".person .sum").textContent())?.trim();
+  out.known = await app.locator(".person .known-item").evaluateAll((els) => els.map((e) => e.className.includes("out") ? "out" : "on"));
+  out.sections = await text(app.locator(".person .credits").first());
+  out.credits = await app.locator(".person .credits .poster").count();
+  out.titles = await app.locator(".person .credits .poster .title").allTextContents();
+  await app.locator(".person .credits .poster .hit").first().click();
+  await wait(1500);
+  out.creditUrl = await pathOf(app);
+  await app.goBack();
+  await wait(1500);
+  await app.locator(".person .back").click();
+  await wait(1200);
+  out.backTo = await pathOf(app);
+  await app.goto(`${side.url}/person/zendaya`);
+  await wait(2500);
+  await app.locator(".person .known-item:not(.out)").first().click();
+  await wait(1500);
+  out.knownUrl = await pathOf(app);
+  await app.goto(`${side.url}/person/britt-lower`);
+  await wait(2500);
+  await shot(`${side.target}-person-series`);
+  out.series = {
+    summary: (await app.locator(".person .sum").textContent())?.trim(),
+    sections: await app.locator(".person .credits h2").allTextContents(),
+    subs: await app.locator(".person .credits .poster .sub").allTextContents(),
+  };
+  await app.locator(".person .credits .poster .hit").first().click();
+  await wait(1500);
+  out.series.url = await pathOf(app);
   return out;
 }
