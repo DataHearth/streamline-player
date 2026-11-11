@@ -15,7 +15,7 @@ let {
 	onclick,
 	children,
 }: {
-	variant?: "primary" | "secondary" | "ghost" | "icon";
+	variant?: "primary" | "secondary" | "ghost" | "icon" | "danger-outline";
 	size?: "sm" | "md";
 	icon?: IconName;
 	label?: string;

@@ -37,7 +37,7 @@ let {
 	activityLabel: string;
 	downloadsLabel: string;
 	showDownloads: boolean;
-	account: { name: string; email: string; initials: string; color: string };
+	account: { name: string; email: string; initials: string; color: string; picture?: string };
 	accountLabel: string;
 	menuOpen: boolean;
 	onhome: () => void;

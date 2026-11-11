@@ -10,7 +10,7 @@ set -u
 cd "$(dirname "$0")/../.."
 out=$1
 shift
-scenarios=${*:-web-shell web-signin web-sso-bad web-tabs web-idle web-revoked web-home web-empty web-noart web-library web-detail web-watched web-missing desk-home desk-empty desk-noart desk-library desk-detail desk-watched desk-missing web-search web-person desk-search desk-person}
+scenarios=${*:-web-shell web-signin web-sso-bad web-tabs web-idle web-revoked web-home web-empty web-noart web-library web-detail web-watched web-missing desk-home desk-empty desk-noart desk-library desk-detail desk-watched desk-missing web-search web-person desk-search desk-person web-settings web-account-refused desk-settings desk-account-refused}
 tmp=${MEDIA_DIR:-/tmp/streamline-player}
 rm -rf "$out"
 status=0

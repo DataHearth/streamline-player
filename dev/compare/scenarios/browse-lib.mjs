@@ -439,3 +439,171 @@ export async function person(ctx, side) {
   out.series.url = await pathOf(app);
   return out;
 }
+
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+const text1 = async (loc) => (await loc.count()) ? (await loc.first().innerText()).replace(/\s+/g, " ").trim() : null;
+const barImg = (app) => app.locator('button[aria-label="Account menu"] img').count();
+const sectionTitles = (app) => app.locator("[data-sec] > h3").allTextContents();
+const deviceRows = (app) => app.locator('[data-sec="devices"] .card > .row').count();
+const profileLine = (app) => text1(app.locator("header .mono"));
+
+export async function settings(ctx, side) {
+  const { app, shot, wait, key } = ctx;
+  await app.setViewportSize({ width: 1440, height: 900 });
+  await side.open(ctx);
+  await wait(2000);
+  await key("g");
+  await key(",");
+  await wait(1500);
+  const out = { url: await pathOf(app) };
+  out.sections = await sectionTitles(app);
+  out.nav = await app.locator("nav .group-name").allTextContents();
+  for (const sec of ["profile", "playback", "subs", "display", "language", "devices", "device", "account"]) {
+    await app.locator(`nav button`).nth(["profile", "playback", "subs", "display", "language", "devices", "device", "account"].indexOf(sec)).click();
+    await wait(1200);
+    await shot(`${side.target}-settings-${sec}`);
+  }
+  await app.locator("nav button").first().click();
+  await wait(1200);
+  await app.locator('select[aria-label="Quality at home"]').selectOption("Original");
+  await wait(300);
+  await app.locator('fieldset[aria-label="Subtitles"] button:text-is("Always")').click();
+  await wait(500);
+  await shot(`${side.target}-settings-choice`);
+  const sw = app.locator('input[aria-label="Play the next episode automatically"]');
+  out.autoplay = { before: await sw.isChecked() };
+  await sw.evaluate((el) => el.click());
+  await wait(300);
+  out.autoplay.after = await sw.isChecked();
+  await app.reload();
+  await wait(2500);
+  out.autoplay.reloaded = await app.locator('input[aria-label="Play the next episode automatically"]').isChecked();
+  out.held = {
+    quality: await app.locator('select[aria-label="Quality at home"]').inputValue(),
+    subtitles: await app.locator('fieldset[aria-label="Subtitles"] button[aria-pressed="true"]').textContent(),
+  };
+  await app.locator('[data-sec="language"] fieldset button:text-is("Français")').click();
+  await wait(3000);
+  out.french = { profile: (await sectionTitles(app))[0], url: await pathOf(app) };
+  await shot(`${side.target}-settings-french`);
+  await app.locator('[data-sec="language"] fieldset button:text-is("English")').click();
+  await wait(3000);
+  out.english = (await sectionTitles(app))[0];
+
+  const name = app.locator('input[aria-label="Name"]');
+  out.saveHiddenAtRest = (await app.locator('button:text-is("Save")').count()) === 0;
+  await name.fill("A. Langlois");
+  await wait(300);
+  await shot(`${side.target}-settings-editing`);
+  await app.locator('button:text-is("Save")').click();
+  await wait(800);
+  out.saved = {
+    toast: await text1(app.locator(".sl-toast__title")),
+    saveGone: (await app.locator('button:text-is("Save")').count()) === 0,
+  };
+  await app.locator('button[aria-label="Account menu"]').click();
+  await wait(500);
+  out.menuName = await text1(app.locator(".sl-acct__name"));
+  await key("Escape");
+  await wait(300);
+  await app.reload();
+  await wait(2500);
+  out.afterReload = await profileLine(app);
+  await app.locator('input[aria-label="Name"]').fill("Antoine Langlois");
+  await app.locator('button:text-is("Cancel")').click();
+  out.cancelled = await app.locator('input[aria-label="Name"]').inputValue();
+  await app.locator('input[aria-label="Name"]').fill("Antoine Langlois");
+  await app.locator('button:text-is("Save")').click();
+  await wait(800);
+
+  out.picture = { before: await barImg(app) };
+  await app.locator('[data-sec="profile"] input[type="file"]').setInputFiles({ name: "me.png", mimeType: "image/png", buffer: Buffer.concat([PNG, Buffer.alloc(1024 - PNG.length)]) });
+  await wait(1500);
+  out.picture.uploaded = await barImg(app);
+  await shot(`${side.target}-settings-picture`);
+  await app.locator('button:text-is("Remove")').click();
+  await wait(1200);
+  out.picture.removed = await barImg(app);
+
+  await app.locator("nav button").nth(5).click();
+  await wait(1000);
+  out.devices = { before: await deviceRows(app), first: await text1(app.locator('[data-sec="devices"] .card > .row').first()) };
+  await app.locator('[data-sec="devices"] .row:has-text("Pixel 9") button:text-is("Sign out")').click();
+  await wait(700);
+  await shot(`${side.target}-settings-confirm`);
+  out.confirm = await text1(app.locator('[role="dialog"]'));
+  await app.locator('[role="dialog"] button:text-is("Sign out")').click();
+  await wait(1200);
+  out.devices.after = await deviceRows(app);
+  out.devices.toast = await text1(app.locator(".sl-toast__title"));
+
+  const body = await text1(app.locator(".settings"));
+  out.where = {
+    sectionTitle: (await sectionTitles(app))[6],
+    thisBrowser: body.includes("This browser"),
+    thisDevice: body.includes("This device"),
+    keyRow: body.includes("Device key"),
+    signOutText: await text1(app.locator('[data-sec="account"] .card > .row').last()),
+    sessionRow: await text1(app.locator('[data-sec="device"] .card > .row:has-text("Session")')),
+    roleRow: await text1(app.locator('[data-sec="profile"] .card > .row:has-text("Role")')),
+    playerRow: await text1(app.locator('[data-sec="device"] .card > .row:has-text("Video player")')),
+    footer: await text1(app.locator(".settings footer")),
+  };
+  if (side.target === "desktop") await app.evaluate(() => { window.__auth = { paired: false }; });
+  if (side.target === "web") await app.evaluate(async () => (await import("/src/lib/platform/web.ts")).updateMe({ name: "Beatrice Martin" }));
+  await app.locator('[data-sec="account"] button:text-is("Sign out")').click();
+  await wait(2500);
+  out.signedOut = await pathOf(app);
+  if (side.target === "web") {
+    await app.getByRole("button", { name: "Continue with Authentik" }).click();
+    await app.waitForURL(`${side.url}/`);
+    await wait(1500);
+    await key("g");
+    await key(",");
+    await wait(2000);
+    out.nextAccount = { header: await text1(app.locator("header .mono")), field: await app.locator('input[aria-label="Name"]').inputValue() };
+  }
+  return out;
+}
+
+export async function accountRefused(ctx, side) {
+  const { app, shot, wait } = ctx;
+  await app.setViewportSize({ width: 1440, height: 900 });
+  await side.open(ctx);
+  await app.goto(`${side.url}/settings`);
+  await wait(2500);
+  const puts = [];
+  app.on("request", (r) => r.method() === "PUT" && /\/me\/picture/.test(r.url()) && puts.push(r.url()));
+  const email = app.locator('input[aria-label="Email"]');
+  const before = await email.inputValue();
+  await email.fill("taken@example.net");
+  await app.locator('button:text-is("Save")').click();
+  await wait(1000);
+  await shot(`${side.target}-account-refused`);
+  const out = {
+    emailError: await text1(app.locator('input[aria-label="Email"] ~ .error')),
+    fieldKept: await email.inputValue(),
+    saveStillShown: (await app.locator('button:text-is("Save")').count()) > 0,
+  };
+  await app.reload();
+  await wait(2500);
+  out.oldEmail = (await profileLine(app)).includes(before);
+  await app.locator('[data-sec="profile"] input[type="file"]').setInputFiles({ name: "big.png", mimeType: "image/png", buffer: Buffer.alloc(3 * 1024 * 1024) });
+  await wait(800);
+  await shot(`${side.target}-account-refused-picture`);
+  out.pictureError = await text1(app.locator('[data-sec="profile"] [role="alert"]'));
+  out.pictureRequests = puts.length;
+  await app.locator('[data-sec="profile"] input[type="file"]').setInputFiles({ name: "x.gif", mimeType: "image/gif", buffer: Buffer.alloc(100) });
+  await wait(500);
+  out.typeError = await text1(app.locator('[data-sec="profile"] [role="alert"]'));
+  out.pictureRequests2 = puts.length;
+  await app.locator('input[aria-label="Email"]').fill("nope");
+  await app.locator('button:text-is("Save")').click();
+  await wait(500);
+  out.invalid = await text1(app.locator('input[aria-label="Email"] ~ .error'));
+  await app.locator('input[aria-label="Name"]').fill("");
+  await app.locator('button:text-is("Save")').click();
+  await wait(500);
+  out.noName = await text1(app.locator('input[aria-label="Name"] ~ .error'));
+  return out;
+}

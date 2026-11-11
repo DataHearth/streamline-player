@@ -15,6 +15,7 @@ let {
 	size = 40,
 	color,
 	ring = false,
+	picture,
 }: {
 	name?: string;
 	email?: string;
@@ -22,7 +23,14 @@ let {
 	size?: 32 | 40 | 48;
 	color?: string;
 	ring?: boolean;
+	picture?: string;
 } = $props();
+
+let broken = $state(false);
+$effect(() => {
+	picture;
+	broken = false;
+});
 
 const hash = (s: string) => {
 	let h = 0;
@@ -51,10 +59,21 @@ const fill = $derived(color || PALETTE[hash(email || name || text) % PALETTE.len
 	role="img"
 	aria-label={name || email || text}
 	style:--av={fill}
-	>{text}</span
+	>{#if picture && !broken}
+		<img src={picture} alt="" onerror={() => (broken = true)}>
+	{:else}
+		{text}
+	{/if}</span
 >
 
 <style>
+img {
+	width: 100%;
+	height: 100%;
+	border-radius: inherit;
+	object-fit: cover;
+}
+
 .ring {
 	box-shadow: 0 0 0 2px var(--accent);
 }

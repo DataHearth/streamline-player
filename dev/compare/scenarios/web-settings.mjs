@@ -1,0 +1,5 @@
+import { settings, targets } from "./browse-lib.mjs";
+
+export const target = targets.web.target;
+export const mockArgs = [];
+export default (ctx) => settings(ctx, targets.web);

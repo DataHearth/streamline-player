@@ -1,8 +1,8 @@
 <script lang="ts">
 import { goto } from "#lib/ui/nav.ts";
 import { page } from "$app/state";
+import { account, clearMe, initialsOf, setMe } from "#lib/core/me.svelte.ts";
 import { activeToast, toast } from "#lib/core/toast.svelte.ts";
-import type { Me } from "#lib/core/types.ts";
 import { m as i18n } from "#lib/paraglide/messages.js";
 import { IS_WEB, TARGET } from "#lib/platform/target.ts";
 import { keyAction } from "#lib/shells/desktop/shortcuts.ts";
@@ -15,7 +15,7 @@ import Menu from "#lib/ui/Menu.svelte";
 import ShortcutList from "#lib/ui/ShortcutList.svelte";
 import { presence } from "#lib/ui/presence.svelte.ts";
 import { provideScroll } from "#lib/ui/scroll.ts";
-import { me, signOut } from "#platform";
+import { me, myPicture, signOut } from "#platform";
 import type { Snippet } from "svelte";
 import { onMount } from "svelte";
 
@@ -29,7 +29,6 @@ let { web, children }: { web: boolean; children: Snippet } = $props();
 
 const mac = TARGET === "darwin" || (IS_WEB && /Mac/.test(navigator.platform));
 let width = $state(window.innerWidth);
-let account = $state<Me | null>(null);
 let scrolledDown = $state(false);
 let menuOpen = $state(false);
 let helpOpen = $state(false);
@@ -54,17 +53,9 @@ const padRight = $derived(
 );
 const toastTop = $derived((showBar ? 64 : 0) + 16);
 
-const name = $derived(account?.name ?? "");
-const initials = $derived(
-	name
-		.trim()
-		.split(/\s+/)
-		.filter(Boolean)
-		.slice(0, 2)
-		.map((w) => w[0])
-		.join("")
-		.toUpperCase(),
-);
+const name = $derived(account.me?.name ?? "");
+const initials = $derived(initialsOf(name));
+const picture = $derived(account.me?.picture ? myPicture(account.version) : undefined);
 const modifier = mac ? "⌘" : "Ctrl";
 
 const tabs = $derived([
@@ -176,10 +167,18 @@ function onKey(e: KeyboardEvent) {
 	else go(act);
 }
 
-onMount(() => {
+$effect(() => {
+	if (onboarding) clearMe();
+});
+
+$effect(() => {
+	if (onboarding || account.me) return;
 	me()
-		.then((v) => (account = v))
+		.then((v) => setMe(v))
 		.catch(() => {});
+});
+
+onMount(() => {
 	const zoom = () =>
 		document.documentElement.style.setProperty(
 			"--tv-zoom",
@@ -231,7 +230,7 @@ const toastNow = $derived(activeToast());
 				activityLabel={i18n.shell_activity()}
 				downloadsLabel={i18n.shell_downloads()}
 				showDownloads={!web}
-				account={{ name, email: account?.email ?? "", initials, color: AVATAR_COLOR }}
+				account={{ name, email: account.me?.email ?? "", initials, color: AVATAR_COLOR, picture }}
 				accountLabel={i18n.shell_account_menu()}
 				{menuOpen}
 				onhome={() => go("home")}
@@ -261,9 +260,10 @@ const toastNow = $derived(activeToast());
 			>
 				<Menu
 					{name}
-					email={account?.email}
+					email={account.me?.email}
 					{initials}
 					color={AVATAR_COLOR}
+					{picture}
 					{items}
 					label={i18n.shell_account_menu()}
 				/>

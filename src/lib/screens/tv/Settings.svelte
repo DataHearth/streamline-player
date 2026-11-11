@@ -5,6 +5,8 @@ import LoadFailed from "#lib/tv/LoadFailed.svelte";
 import TvScreen from "#lib/tv/TvScreen.svelte";
 import { focus, focusDefault } from "#lib/tv/focus.ts";
 import { prefs, setPref, type ChoiceKey, type ToggleKey } from "#lib/core/prefs.svelte.ts";
+import { QUALITIES, shown } from "#lib/core/prefs-labels.ts";
+import { seen } from "#lib/core/devices.ts";
 import {
 	authState,
 	deviceInfo,
@@ -43,9 +45,7 @@ type Row = {
 };
 type Section = { key: string; title: string; icon: Component; rows: Row[] };
 
-const QUALITIES = ["Auto", "Original", "20 Mbit/s", "8 Mbit/s", "4 Mbit/s", "2 Mbit/s", "1 Mbit/s"];
 const PLAYABLE = 12;
-const ACTIVE_SECS = 300;
 
 let me = $state.raw<Me | null>(null);
 let devices = $state.raw<Device[]>([]);
@@ -98,51 +98,6 @@ function playable(c: Caps) {
 		...["aac", "ac3", "eac3", "truehd", "dts", "flac"].map((x) => a.has(x)),
 	].filter(Boolean).length;
 }
-
-function seen(d: Device, short = false) {
-	if (d.streaming)
-		return short ? i18n.settings_streaming_now_short() : i18n.settings_streaming_now();
-	const s = (Date.now() - Date.parse(d.last_seen)) / 1000;
-	if (s < ACTIVE_SECS) return short ? i18n.settings_active_now_short() : i18n.settings_active_now();
-	if (s < 3600)
-		return (short ? i18n.settings_seen_min_short : i18n.settings_seen_min)({
-			count: Math.round(s / 60),
-		});
-	if (s < 86400)
-		return (short ? i18n.settings_seen_h_short : i18n.settings_seen_h)({
-			count: Math.round(s / 3600),
-		});
-	const count = Math.round(s / 86400);
-	if (short)
-		return (count === 1 ? i18n.settings_seen_days_one_short : i18n.settings_seen_days_other_short)({
-			count,
-		});
-	return (count === 1 ? i18n.settings_seen_days_one : i18n.settings_seen_days_other)({ count });
-}
-
-// Stored values stay English (the player's rules read them); only what is shown is translated.
-const VALUES: Record<string, () => string> = {
-	Auto: i18n.value_auto,
-	Original: i18n.value_original,
-	"Original language": i18n.value_original_language,
-	English: i18n.value_english,
-	French: i18n.value_french,
-	Always: i18n.value_always,
-	None: i18n.value_none,
-	Shadow: i18n.value_shadow,
-	Box: i18n.value_box,
-	White: i18n.value_white,
-	Yellow: i18n.value_yellow,
-	"On start": i18n.value_on_start,
-	"Pass through": i18n.value_pass_through,
-	"Decode here": i18n.value_decode_here,
-};
-const shown = (key: ChoiceKey, v: string) => {
-	// Each app language is named in itself, so it can be found from any other.
-	if (key === "language") return v;
-	if (v === "Off") return key === "subsMode" ? i18n.value_off() : i18n.value_frame_off();
-	return VALUES[v]?.() ?? v;
-};
 
 const choice = (label: string, key: ChoiceKey, vals: string[], desc?: string): Row => ({
 	label,

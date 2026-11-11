@@ -17,6 +17,7 @@ let {
 	email,
 	initials,
 	color,
+	picture,
 	items,
 	label,
 }: {
@@ -24,6 +25,7 @@ let {
 	email?: string;
 	initials?: string;
 	color?: string;
+	picture?: string;
 	items: MenuItem[];
 	label: string;
 } = $props();
@@ -31,7 +33,7 @@ let {
 
 <div class="sl-acct" role="menu" aria-label={label}>
 	<div class="sl-acct__head">
-		<Avatar {name} {email} {initials} {color} size={40} />
+		<Avatar {name} {email} {initials} {color} {picture} size={40} />
 		<span class="sl-acct__who">
 			<span class="sl-acct__name">{name}</span>
 			{#if email}

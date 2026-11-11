@@ -14,6 +14,7 @@ tasks:
   js:
     desc: Run the UI's rule and message checks
     cmds:
+      - node dev/account-check.ts
       - node dev/auto-check.ts
       - node dev/auth-check.ts
       - node dev/browse-check.ts

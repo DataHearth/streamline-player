@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import adapter from "@sveltejs/adapter-static";
 import { sveltekit } from "@sveltejs/kit/vite";
@@ -29,7 +30,10 @@ const csp: NonNullable<Parameters<typeof sveltekit>[0]>["csp"] = !native
 		}
 	: undefined;
 
+const { version } = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
+
 export default defineConfig({
+	define: { "import.meta.env.VITE_APP_VERSION": JSON.stringify(version) },
 	envPrefix: ["VITE_", "TAURI_ENV_"],
 	plugins: [
 		// Same strategy as `pnpm check` and as Streamline: the Settings choice, else the TV's language.
