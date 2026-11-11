@@ -12,6 +12,7 @@ out=$1
 shift
 scenarios=${*:-web-shell web-signin web-sso-bad web-tabs web-idle web-revoked web-home web-empty web-noart web-library web-detail web-watched web-missing desk-home desk-empty desk-noart desk-library desk-detail desk-watched desk-missing web-search web-person desk-search desk-person web-settings web-account-refused desk-settings desk-account-refused}
 tmp=${MEDIA_DIR:-/tmp/streamline-player}
+[ -f "$tmp/multi.mkv" ] || dev/compare/make-multi.sh "$tmp" || exit 1
 rm -rf "$out"
 status=0
 for s in $scenarios; do

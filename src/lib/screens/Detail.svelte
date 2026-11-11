@@ -107,7 +107,9 @@ let device = $state("");
 let tracks = $state.raw<Tracks | null>(null);
 let choices = $state<Choices>(loadChoices());
 
-afterNavigate(({ from }) => {
+afterNavigate(({ from, to }) => {
+	// A replace on the same page (the season in the query) is not an arrival: after a deep link Back must still go Home.
+	if (from && from.url.pathname === to?.url.pathname) return;
 	fromApp = from !== null;
 });
 

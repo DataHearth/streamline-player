@@ -29,10 +29,11 @@ const TYPE_DELAY_MS = 150;
 const port = { library, watchState, home, title };
 
 const urlQ = $derived(page.url.searchParams.get("q") ?? "");
-let text = $state(page.url.searchParams.get("q") ?? "");
+const initialQ = page.url.searchParams.get("q") ?? "";
+let text = $state(initialQ);
 let input = $state<HTMLInputElement>();
 let recent = $state(loadRecent());
-let pushed = text;
+let pushed = initialQ;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let fromApp = false;
 
