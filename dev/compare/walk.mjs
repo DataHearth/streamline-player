@@ -28,9 +28,10 @@ mkdirSync(dir, { recursive: true });
 const shot = (name) => app.screenshot({ path: `${dir}/${engine}-${name}.png`, animations: "disabled", mask: [app.locator(".count, .upnext-timer, .thumb, .times")] });
 const STEP = 100;
 let inflight = 0;
-app.on("request", () => inflight++);
-app.on("requestfinished", () => inflight--);
-app.on("requestfailed", () => inflight--);
+const pending = new Set();
+app.on("request", (r) => (inflight++, pending.add(r.url())));
+app.on("requestfinished", (r) => (inflight--, pending.delete(r.url())));
+app.on("requestfailed", (r) => (inflight--, pending.delete(r.url())));
 const idle = async () => {
   for (let i = 0; i < 50 && inflight > 0; i++) await app.waitForTimeout(10);
 };
@@ -59,6 +60,9 @@ try {
   const out = JSON.stringify(await steps({ app, ctx, engine, shot, wait, key, focused, log }), null, 1).replace(/\b(in|dans) \d+ s\b/g, "$1 N s");
   writeFileSync(`${dir}/${engine}-${scenario}.json`, `${out}\n`);
   console.log(out);
+} catch (e) {
+  console.log("url at failure:", app.url(), "pending requests:", [...pending].slice(0, 20));
+  throw e;
 } finally {
   if (log.length) console.log("console errors:", [...new Set(log)].slice(0, 15));
   await browser.close();

@@ -30,24 +30,36 @@ for s in $scenarios; do
   fi
   mapfile -t flags < <(node -e "import('./dev/compare/scenarios/$s.mjs').then((m) => process.stdout.write((m.mockArgs ?? []).join('\n')))")
   for engine in webkit firefox chromium; do
-    python3 dev/mock-streamline.py --listen 127.0.0.1:8081 --secret dev-secret-0123456789abcdef --now 1794225600 \
-      --art "$tmp/art" --clip "$tmp/h.mkv" "${flags[@]}" >"$tmp/mock-web-$s-$engine.log" 2>&1 &
-    mock=$!
-    report=$tmp/contract-web-$s-$engine.jsonl
-    rm -f "$report"
-    node dev/contract/proxy.ts --listen 127.0.0.1:8098 --upstream http://127.0.0.1:8081 \
-      --spec docs/contract/player.openapi.yaml --report "$report" >"$tmp/proxy-web-$s-$engine.log" 2>&1 &
-    proxy=$!
-    bridge=
-    if [ "$scenario_target" = desktop ]; then
-      python3 dev/compare/bridge.py >"$tmp/bridge-web-$s-$engine.log" 2>&1 &
-      bridge=$!
-    fi
-    sleep 2
-    echo "== $s ($engine)"
-    SHOTS=$out timeout 150 node dev/compare/walk.mjs "$engine" "$s" || { echo "FAILED: $s on $engine"; status=1; }
-    kill $mock $proxy $bridge
-    wait $mock $proxy $bridge 2>/dev/null
+    # One retry on a fresh mock, said out loud: this machine's disk stalls for minutes at a time (the kernel logs
+    # "waiting for writeback completion") and a browser launched during one times out. A real fault fails both times.
+    for attempt in 1 2; do
+      python3 dev/mock-streamline.py --listen 127.0.0.1:8081 --secret dev-secret-0123456789abcdef --now 1794225600 \
+        --art "$tmp/art" --clip "$tmp/h.mkv" "${flags[@]}" >"$tmp/mock-web-$s-$engine.log" 2>&1 &
+      mock=$!
+      report=$tmp/contract-web-$s-$engine.jsonl
+      rm -f "$report"
+      node dev/contract/proxy.ts --listen 127.0.0.1:8098 --upstream http://127.0.0.1:8081 \
+        --spec docs/contract/player.openapi.yaml --report "$report" >"$tmp/proxy-web-$s-$engine.log" 2>&1 &
+      proxy=$!
+      bridge=
+      if [ "$scenario_target" = desktop ]; then
+        python3 dev/compare/bridge.py >"$tmp/bridge-web-$s-$engine.log" 2>&1 &
+        bridge=$!
+      fi
+      sleep 2
+      echo "== $s ($engine)"
+      SHOTS=$out timeout 150 node dev/compare/walk.mjs "$engine" "$s"
+      walked=$?
+      kill $mock $proxy $bridge
+      wait $mock $proxy $bridge 2>/dev/null
+      [ $walked = 0 ] && break
+      if [ $attempt = 1 ]; then
+        echo "RETRY: $s on $engine failed once; $(grep -E '^(Dirty|Writeback):' /proc/meminfo | tr -s ' \n' ' ')"
+      else
+        echo "FAILED: $s on $engine"
+        status=1
+      fi
+    done
     if [ -s "$report" ]; then
       echo "== contract violations ($s, $engine)"
       cat "$report"
