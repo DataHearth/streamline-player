@@ -29,5 +29,11 @@ eq(keyAction(k("h", { target: input }), false, true), null);
 eq(keyAction(k("Escape"), false, false), "close");
 eq(keyAction(k("Escape", { target: input }), false, false), "close");
 
+eq(keyAction(k("k", { ctrlKey: true }), false, false, true), null);
+eq(keyAction(k("g"), false, false, true), null);
+eq(keyAction(k("h"), false, true, true), null);
+eq(keyAction(k("?"), false, false, true), "help");
+eq(keyAction(k("Escape"), false, false, true), "close");
+
 console.log(bad ? `${bad} failed` : "shortcuts ok");
 process.exit(bad ? 1 : 0);

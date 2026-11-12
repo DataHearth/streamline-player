@@ -401,3 +401,11 @@ export const windowControls = {
 	toggleMaximize: () => Promise.resolve(),
 	close: () => Promise.resolve(),
 };
+
+export const setFullscreen = (on: boolean): Promise<unknown> =>
+	on
+		? document.documentElement.requestFullscreen()
+		: document.fullscreenElement
+			? document.exitFullscreen()
+			: Promise.resolve();
+export const isFullscreen = (): Promise<boolean> => Promise.resolve(!!document.fullscreenElement);

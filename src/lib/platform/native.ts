@@ -34,6 +34,10 @@ export const windowControls = {
 	close: () => getCurrentWindow().close(),
 };
 
+export const setFullscreen = (on: boolean): Promise<unknown> =>
+	getCurrentWindow().setFullscreen(on);
+export const isFullscreen = (): Promise<boolean> => getCurrentWindow().isFullscreen();
+
 let capabilities: { decode: string; value: Promise<unknown> } | null = null;
 // ponytail: mpv is the only desktop backend so far (Linux); macOS and Windows will need their own name.
 export const PLAYER_NAME: string = /Android/.test(navigator.userAgent) ? "ExoPlayer" : "mpv";

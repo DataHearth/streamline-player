@@ -148,6 +148,7 @@ function onKey(e: KeyboardEvent) {
 		{ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, target: e.target as Element | null },
 		mac,
 		pendingG,
+		inPlayer,
 	);
 	if (act === "g") {
 		gAt = Date.now();
@@ -216,7 +217,7 @@ const toastNow = $derived(activeToast());
 
 <svelte:window bind:innerWidth={width} />
 
-<div class="shell">
+<div class="shell" class:player={inPlayer}>
 	{#if narrow}
 		<p class="narrow">{i18n.shell_narrow()}</p>
 	{:else}
@@ -328,6 +329,11 @@ const toastNow = $derived(activeToast());
 	overflow: hidden;
 	background: var(--bg-deep);
 	color: var(--fg);
+}
+
+/* The picture is drawn under the page, so the player route is a hole in it. */
+.shell.player {
+	background: transparent;
 }
 
 .content {

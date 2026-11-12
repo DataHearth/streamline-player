@@ -11,6 +11,11 @@ export type PlayView = {
 	eyebrow: string;
 	still: string;
 	synopsis: string;
+	/** The line under the title in the player's top bar. */
+	sub?: string;
+	poster?: string;
+	framePos?: string;
+	prev?: { href: string };
 	next?: {
 		code: string;
 		title: string;

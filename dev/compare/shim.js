@@ -25,25 +25,37 @@
     }, 500);
   };
   window.__fake = { p, send, tickOn };
+  // window.__picture = true: a stand-in for the video the real player draws under the page.
+  const picture = (rect) => {
+    if (!window.__picture) return;
+    let el = document.getElementById("__fake-picture");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "__fake-picture";
+      document.documentElement.appendChild(el);
+    }
+    const box = !rect || rect.full ? "inset:0" : `left:${rect.x}px;top:${rect.y}px;width:${rect.width}px;height:${rect.height}px`;
+    el.style.cssText = `position:fixed;${box};z-index:-1;background:radial-gradient(circle at 30% 35%,#3a4766,#12151f 70%)`;
+  };
   const plugin = {
     capabilities: () => caps,
     register_listener: ({ event, handler }) => { (listeners[event] ||= []).push({ id: typeof handler === "object" ? handler.id : Number(String(handler).split(":")[1]), i: 0 }); },
     remove_listener: ({ event, channelId }) => { listeners[event] = (listeners[event] || []).filter((l) => l.id !== channelId); },
-    load: async ({ url }) => { p.pos = 0; p.dur = window.__fakeDuration || 5400; send("state", { state: "buffering" }); await new Promise((r) => setTimeout(r, 300)); send("state", { state: "paused" }); send("position", { position: 0, buffered: 30, duration: p.dur }); },
+    load: async ({ url }) => { picture(window.__fake.viewport); p.pos = 0; p.dur = window.__fakeDuration || 5400; send("state", { state: "buffering" }); await new Promise((r) => setTimeout(r, 300)); send("state", { state: "paused" }); send("position", { position: 0, buffered: 30, duration: p.dur }); },
     play: () => { p.playing = true; send("state", { state: "playing" }); tickOn(); },
     pause: () => { p.playing = false; send("state", { state: "paused" }); },
     seek: ({ seconds }) => { p.pos = seconds; send("position", { position: p.pos, buffered: p.pos + 30, duration: p.dur }); },
     speed: ({ speed }) => { p.speed = speed; },
-    stop: () => { p.playing = false; clearInterval(p.timer); send("state", { state: "idle" }); },
+    stop: () => { p.playing = false; clearInterval(p.timer); send("state", { state: "idle" }); document.getElementById("__fake-picture")?.remove(); },
     stats: () => ({ player: "fake · browser", version: "fake", buffer: 30, videoBitrate: 8e6, audioBitrate: 6.4e5, rendered: Math.round(p.pos * 24), dropped: 0, displayHz: 60, width: 3840, height: 2160 }),
     subtitle: () => null,
     timing: () => null,
     voice: () => ({ text: "" }),
     frameRate: () => null,
     restoreDisplay: () => null,
-    volume: ({ volume, muted }) => { send("volume", { volume, muted }); },
-    subtitleLift: ({ px }) => { window.__fake.lift = px; },
-    viewport: (rect) => { window.__fake.viewport = rect; },
+    volume: ({ volume, muted }) => { window.__fake.volume = { volume, muted }; send("volume", { volume, muted }); },
+    subtitleLift: (args) => { window.__fake.lift = args; },
+    viewport: (rect) => { window.__fake.viewport = rect; if (document.getElementById("__fake-picture")) picture(rect); },
     deviceInfo: () => ({ name: "Living room", model: "Ugoos AM9 Pro", platform: "Android TV", player: "ExoPlayer 1.8.0", display: { name: "HDMI", width: 3840, height: 2160, refresh_hz: 60, hdr: ["HDR10", "HLG", "Dolby Vision"] }, ...(window.__deviceInfo || {}) }),
   };
   const kp = (k) => (k === "movies" ? "/movies" : "/series");
@@ -103,8 +115,8 @@
     playback_status: () => call("GET", "/playback/status"),
     start_session: (a) => window.__holdStart ? new Promise((r) => { window.__releaseStart = r; }).then(() => startSession(a)) : startSession(a),
     decisions: ({ mediaId, capabilities, options }) => call("POST", "/playback/decisions", { media_id: mediaId, capabilities, options }),
-    media_tracks: ({ mediaId }) => call("GET", `/playback/media/${mediaId}/tracks`).then((t) => { if (t?.duration) window.__fakeDuration = t.duration; return t; }),
-    subtitle_text: ({ url }) => fetch(`${B}/raw/${url}`).then((r) => r.text()),
+    media_tracks: ({ mediaId }) => call("GET", `/playback/media/${mediaId}/tracks`).then((t) => { if (t?.duration) window.__fakeDuration = t.duration; return { ...t, ...(window.__tracks || {}) }; }),
+    subtitle_text: ({ url }) => /^fake:/.test(url) ? "WEBVTT\n\n00:00:01.000 --> 01:00:00.000\nHello there\n" : fetch(`${B}/raw/${url}`).then((r) => r.text()),
     patch_session: ({ id, changes }) => call("PATCH", `/playback/sessions/${id}`, changes),
     session_info: ({ id }) => call("GET", `/playback/sessions/${id}`),
     stop_session: ({ id }) => call("DELETE", `/playback/sessions/${id}`).then(() => null),
@@ -119,6 +131,8 @@
     convertFileSrc(path, proto) { return `${B}/${proto}/${path}`; },
     async invoke(cmd, args = {}, options) {
       window.__calls.push(cmd);
+      if (cmd === "plugin:window|set_fullscreen") { window.__fake.fullscreen = !!args.value; return null; }
+      if (cmd === "plugin:window|is_fullscreen") return !!window.__fake.fullscreen;
       if (cmd.startsWith("plugin:window|")) return null;
       if (cmd.startsWith("plugin:player|")) { const f = plugin[cmd.slice(14)]; if (!f) throw `no ${cmd}`; return f(args); }
       const f = cmds[cmd];
