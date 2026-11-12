@@ -12,6 +12,7 @@ import type {
 	Kind,
 	Me,
 	Pairing,
+	PairRequest,
 	Person,
 	Title,
 	Watch,
@@ -240,6 +241,14 @@ export const authState = (): Promise<AuthState> =>
 export const connect = (_url: string): Promise<unknown> => notOnWeb();
 export const pairStart = (): Promise<Pairing> => notOnWeb();
 export const pairPoll = (): Promise<string> => notOnWeb();
+const pairPath = (code: string) => `/auth/device/${encodeURIComponent(code)}`;
+export const pairRequest = (code: string) => call<PairRequest>("GET", pairPath(code));
+export const approvePairing = (code: string) => call("POST", `${pairPath(code)}/approve`);
+export const denyPairing = (code: string) => call("POST", `${pairPath(code)}/deny`);
+export const openExternal = (url: string): Promise<unknown> => {
+	window.open(url, "_blank", "noopener");
+	return Promise.resolve();
+};
 export const me = () => call<Me>("GET", "/me");
 export const home = () => call<HomeFeed>("GET", "/home");
 export const updateMe = (patch: { name?: string; email?: string }) =>

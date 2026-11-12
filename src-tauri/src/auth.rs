@@ -215,10 +215,24 @@ pub async fn pair_start(app: AppHandle, api: tauri::State<'_, Api>) -> Result<Va
         "code": started["user_code"],
         "name": name,
         "uri": started["verification_uri"],
+        "uri_complete": complete,
         "expires_in": started["expires_in"],
         "interval": started["interval"],
         "qr": qr_svg(complete)?,
     }))
+}
+
+/// Opens a web page in the system browser; anything but http(s) is refused.
+#[tauri::command]
+pub async fn open_external(url: String) -> Result<(), String> {
+    let parsed = reqwest::Url::parse(&url).map_err(|e| e.to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(format!("not a web address: {url}"));
+    }
+    blocking(move || {
+        tauri_plugin_opener::open_url(parsed.as_str(), None::<&str>).map_err(|e| e.to_string())
+    })
+    .await
 }
 
 /// One poll: "pending", "slow_down", "denied", "expired" or "paired".

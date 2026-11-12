@@ -56,6 +56,8 @@ p.add_argument("--password", default="streamline", help="password of the email s
 p.add_argument("--empty", action="store_true", help="serve a library with no titles in it")
 p.add_argument("--demo-progress", action="store_true", help="start with Dune: Part Two and Severance S2 E4 partly watched")
 p.add_argument("--sso-deny", action="store_true", help="have the SSO provider refuse every sign-in")
+p.add_argument("--player-url", help="the player web app's URL; pairing links then point at its /pair page")
+p.add_argument("--pair-ttl", type=int, default=600, help="seconds a pairing lasts")
 p.add_argument("--heartbeat-timeout", type=float, default=90, help="seconds without a heartbeat before a session is stopped")
 args = p.parse_args()
 CORS_ORIGINS = args.cors_origin or ["http://localhost:1430", "http://127.0.0.1:1430"]
@@ -90,7 +92,7 @@ RESTART = {"until": 0.0, "by": "", "message": ""}
 ADMIN = "Antoine Langlois"
 PAIRINGS = {}
 KEYS = {}
-PAIR_TTL = 600
+PAIR_TTL = args.pair_ttl
 PAIR_INTERVAL = 5
 # The design's codes: 6 characters shown as XXX-XXX, no vowels, no 0/O or 1/I.
 CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ23456789"
@@ -109,7 +111,7 @@ MOVIES = [] if args.empty else LIBRARY["movies"]
 SERIES = [] if args.empty else LIBRARY["series"]
 PEOPLE = LIBRARY.get("people", {})
 REFS = {}
-clips = itertools.cycle(args.clip or list(FILES.values()))
+clips = itertools.cycle(args.clip or list(FILES.values())) if args.clip or FILES else None
 for number, media_id in enumerate(FILES):
     MOVIES.insert(number, {
         "id": 1000 + number, "slug": media_id, "title": media_id, "original_title": media_id, "year": 2026,
@@ -119,12 +121,14 @@ for number, media_id in enumerate(FILES):
     })
 for movie in MOVIES:
     media_id = movie["media_files"][0]["id"]
-    MEDIA.setdefault(media_id, next(clips))
+    if clips:
+        MEDIA.setdefault(media_id, next(clips))
     REFS[media_id] = {"movie_id": movie["id"]}
 for show in SERIES:
     for season in show["seasons"]:
         for episode in season["episodes"]:
-            MEDIA.setdefault(episode["media_file_id"], next(clips))
+            if clips:
+                MEDIA.setdefault(episode["media_file_id"], next(clips))
             REFS[episode["media_file_id"]] = {"series_id": show["id"], "season": season["number"], "episode_id": episode["id"]}
 
 
@@ -467,9 +471,32 @@ class Handler(BaseHTTPRequestHandler):
         waiting = [p for p in PAIRINGS.values() if p["status"] == "pending" and (code is None or p["user_code"] == code)]
         return max(waiting, key=lambda p: p["expires"], default=None)
 
+    def approver_pairing(self, code):
+        """The pending pairing a browser's approval call names, or None once the reply (401, 403 or 404) is sent."""
+        if bearer_device(self.headers) is None:
+            if self.headers.get("X-API-Key") in KEYS:
+                self.reply(403, {"error": {"code": "session_required"}})
+            else:
+                self.reply(401, {"error": {"code": "unauthorized"}})
+            return None
+        wanted = code.replace("-", "").upper()
+        now = time.monotonic()
+        for p in PAIRINGS.values():
+            if p["status"] == "pending" and now <= p["expires"] and p["user_code"].replace("-", "") == wanted:
+                return p
+        self.reply(404, {"error": {"code": "no_pending_pairing"}})
+        return None
+
     def do_GET(self):
         if self.refused():
             return
+        m = re.fullmatch(r"/api/v1/auth/device/([A-Za-z0-9-]+)", self.path)
+        if m and m[1] not in ("code", "token"):
+            found = self.approver_pairing(m[1])
+            if found is None:
+                return None
+            return self.reply(200, {"user_code": found["user_code"], "name": found["name"], "platform": found["platform"],
+                                    "requested_at": found["requested_at"], "ip": found["ip"]})
         if self.path == "/health":
             return self.reply(200, {"status": "ok"})
         if self.path == "/api/v1/movies":
@@ -568,6 +595,13 @@ class Handler(BaseHTTPRequestHandler):
                 LAST_BEAT.pop(sid, None)
                 engine("DELETE", f"/v1/sessions/{sid}")
             return self.reply(204)
+        m = re.fullmatch(r"/api/v1/auth/device/([A-Za-z0-9-]+)/(approve|deny)", self.path)
+        if m:
+            found = self.approver_pairing(m[1])
+            if found is None:
+                return None
+            found["status"] = "approved" if m[2] == "approve" else "denied"
+            return self.reply(204)
         m = re.fullmatch(r"/dev/(approve|deny)(?:/([A-Z0-9-]+))?", self.path)
         if m:
             found = self.pairing(m[2])
@@ -590,8 +624,10 @@ class Handler(BaseHTTPRequestHandler):
             code = f"{code[:3]}-{code[3:]}"
             device_code = secrets.token_urlsafe(32)
             PAIRINGS[device_code] = {"user_code": code, "expires": time.monotonic() + PAIR_TTL, "status": "pending",
-                                     "client_id": b.get("client_id"), "name": b.get("name", "")[:64], "platform": b.get("platform", "")}
-            base = f"http://{self.headers['Host']}"
+                                     "client_id": b.get("client_id"), "name": b.get("name", "")[:64], "platform": b.get("platform", ""),
+                                     "requested_at": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                     "ip": self.client_address[0]}
+            base = args.player_url.rstrip("/") if args.player_url else f"http://{self.headers['Host']}"
             return self.reply(200, {"device_code": device_code, "user_code": code, "verification_uri": f"{base}/pair",
                                     "verification_uri_complete": f"{base}/pair?code={code}", "expires_in": PAIR_TTL, "interval": PAIR_INTERVAL})
         if self.path == "/api/v1/auth/device/token":
@@ -740,7 +776,9 @@ for media_path in set(MEDIA.values()):
 
 for show in SERIES:
     for season in show["seasons"]:
-        season_paths = sorted({MEDIA[e["media_file_id"]] for e in season["episodes"]})
+        season_paths = sorted({MEDIA[e["media_file_id"]] for e in season["episodes"] if e["media_file_id"] in MEDIA})
+        if not season_paths:
+            break
         threading.Thread(target=prepare_season, args=(season_paths,), daemon=True).start()
         break
     break

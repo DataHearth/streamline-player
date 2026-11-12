@@ -53,8 +53,9 @@
     pair_start: () => {
       const code = "K7F-Q2M", uri = "https://streamline.home.arpa/pair";
       const q = window.qrcode(0, "M"); q.addData(`${uri}?code=${code}`); q.make();
-      return { code, name: "Living room · SHIELD", uri, expires_in: 600, interval: 1, qr: q.createSvgTag({ cellSize: 8, margin: 0 }) };
+      return { code, name: "Living room · SHIELD", uri, uri_complete: `${uri}?code=${code}`, expires_in: 600, interval: 1, qr: q.createSvgTag({ cellSize: 8, margin: 0 }) };
     },
+    open_external: ({ url }) => { (window.__opened ||= []).push(url); return null; },
     pair_poll: () => window.__pairAnswer || "pending",
     sign_out: () => null,
     "plugin:event|listen": () => 1,

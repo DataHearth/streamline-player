@@ -368,7 +368,7 @@ paths:
                   device_code: { type: string }
                   user_code: { type: string }
                   verification_uri: { type: string }
-                  verification_uri_complete: { type: string }
+                  verification_uri_complete: { type: string, description: "The approval page with the code filled in; the QR code and the pairing link carry it." }
                   expires_in: { type: integer }
                   interval: { type: integer }
         default: { $ref: "#/components/responses/Error" }
@@ -397,6 +397,43 @@ paths:
                 properties:
                   api_key: { type: string }
                   key_id: { type: integer }
+        default: { $ref: "#/components/responses/Error" }
+  /auth/device/{userCode}:
+    get:
+      operationId: getPairRequest
+      description: Approval page. What a pairing asks for, so the page shows what it approves. Ours, not in Streamline's pairing spec. A browser's bearer token only.
+      security:
+        - bearer: []
+      parameters:
+        - { $ref: "#/components/parameters/UserCode" }
+      responses:
+        "200":
+          description: The pending pairing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PairRequest" }
+        default: { $ref: "#/components/responses/Error" }
+  /auth/device/{userCode}/approve:
+    post:
+      operationId: approvePairing
+      description: Approval page. Approves a pairing; the device's next poll gets its key. 404 no_pending_pairing for an unknown, used or expired code, 403 session_required for a device key. A browser's bearer token only.
+      security:
+        - bearer: []
+      parameters:
+        - { $ref: "#/components/parameters/UserCode" }
+      responses:
+        "204": { description: Approved. }
+        default: { $ref: "#/components/responses/Error" }
+  /auth/device/{userCode}/deny:
+    post:
+      operationId: denyPairing
+      description: Approval page. Denies a pairing; the device's next poll gets access_denied. Same errors as approve. A browser's bearer token only.
+      security:
+        - bearer: []
+      parameters:
+        - { $ref: "#/components/parameters/UserCode" }
+      responses:
+        "204": { description: Denied. }
         default: { $ref: "#/components/responses/Error" }
   /playback/status:
     get:
@@ -598,6 +635,12 @@ components:
       in: path
       required: true
       schema: { type: string }
+    UserCode:
+      name: userCode
+      in: path
+      required: true
+      description: The pairing code, with or without its dash, in either case.
+      schema: { type: string }
     SessionId:
       name: sessionId
       in: path
@@ -623,6 +666,16 @@ components:
       required: [error]
       properties:
         error: { $ref: "#/components/schemas/ErrorBody" }
+
+    PairRequest:
+      type: object
+      required: [user_code, name, platform, requested_at, ip]
+      properties:
+        user_code: { type: string }
+        name: { type: string }
+        platform: { type: string }
+        requested_at: { type: string, description: ISO 8601 }
+        ip: { type: string }
 
     FileSummary:
       type: object

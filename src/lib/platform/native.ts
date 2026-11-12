@@ -11,6 +11,7 @@ import type {
 	Kind,
 	Me,
 	Pairing,
+	PairRequest,
 	Person,
 	Title,
 	Watch,
@@ -91,6 +92,11 @@ export const connect = (url: string) => invoke("connect", { url });
 export const pairStart = () => invoke<Pairing>("pair_start");
 export const pairPoll = () => invoke<string>("pair_poll");
 export const signOut = () => invoke("sign_out");
+const notOnNative = () => Promise.reject(new Error("not_on_native"));
+export const pairRequest = (_code: string): Promise<PairRequest> => notOnNative();
+export const approvePairing = (_code: string): Promise<unknown> => notOnNative();
+export const denyPairing = (_code: string): Promise<unknown> => notOnNative();
+export const openExternal = (url: string) => invoke("open_external", { url });
 export const me = () => invoke<Me>("me");
 export const home = () => invoke<HomeFeed>("home");
 export const updateMe = (patch: { name?: string; email?: string }) =>

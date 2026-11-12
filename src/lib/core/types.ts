@@ -133,9 +133,17 @@ export type Pairing = {
 	code: string;
 	name: string;
 	uri: string;
+	uri_complete: string;
 	expires_in: number;
 	interval: number;
 	qr: string;
+};
+export type PairRequest = {
+	user_code: string;
+	name: string;
+	platform: string;
+	requested_at: string;
+	ip: string;
 };
 export type AuthMethods = {
 	sso: { id: string; label: string }[];
