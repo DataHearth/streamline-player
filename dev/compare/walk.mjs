@@ -19,7 +19,8 @@ if (target !== "web") {
   await app.addInitScript({ path: fileURLToPath(new URL("./qrcode-init.js", import.meta.url)) });
   await app.addInitScript({ path: fileURLToPath(new URL("./shim.js", import.meta.url)) });
 }
-await app.clock.install({ time: new Date("2026-11-09T12:00:00Z") });
+// A scenario that exports realClock = true runs on the page's own timers, to catch code that only works on a fake one.
+if (!scenarioModule.realClock) await app.clock.install({ time: new Date("2026-11-09T12:00:00Z") });
 const log = [];
 app.on("console", (m) => m.type() === "error" && log.push(m.text()));
 app.on("pageerror", (e) => log.push("PAGEERR " + e.message));

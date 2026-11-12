@@ -22,6 +22,7 @@ tasks:
       - node dev/halt-check.ts
       - node dev/library-check.ts
       - node dev/playback-check.ts
+      - node --import ./dev/controller-check/register.mjs dev/pairing-check.ts
       - node --import ./dev/controller-check/register.mjs dev/controller-check/check.mjs
       - node dev/messages-check.ts
       - node dev/shortcuts-check.ts

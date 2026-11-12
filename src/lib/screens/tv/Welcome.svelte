@@ -3,15 +3,14 @@ import { m as i18n } from "#lib/paraglide/messages.js";
 import { goto, staticUrl } from "#lib/ui/nav.ts";
 import { focusDefault } from "#lib/tv/focus.ts";
 import TvScreen from "#lib/tv/TvScreen.svelte";
-import type { Pairing } from "#lib/core/types.ts";
+import { checkAddress, createPairing } from "#lib/core/pairing.svelte.ts";
 import { authState, connect, me as whoAmI, pairPoll, pairStart } from "#platform";
 import { Check, CircleCheck } from "@lucide/svelte";
-import { onMount, tick } from "svelte";
+import { onMount, tick, untrack } from "svelte";
 
 type Step = "server" | "pair" | "paired";
 const FOUND_PAUSE_MS = 750;
 const APPROVED_PAUSE_MS = 700;
-const SLOW_DOWN_SECS = 5;
 
 const row = (s: string) => s.split(" ").map((k) => ({ label: k, aria: k, type: k, wide: 0 }));
 const KEY_ROWS = [
@@ -32,18 +31,25 @@ let checking = $state(false);
 let found = $state(false);
 let error = $state("");
 
-let pairing = $state<Pairing | null>(null);
-let left = $state(0);
-let status = $state<"waiting" | "approved" | "denied" | "failed">("waiting");
-let failure = $state("");
+const flow = createPairing({ connect, pairStart, pairPoll });
 let account = $state({ name: "", short: "" });
 let keystore = $state("");
 
 let stage = $state<HTMLElement>();
-let pollTimer: ReturnType<typeof setTimeout> | undefined;
-let generation = 0;
 
 const host = $derived(url.replace(/^[a-z]+:\/\//, "").replace(/\/.*$/, ""));
+const pairing = $derived(flow.pairing);
+const left = $derived(flow.left);
+const status = $derived(
+	flow.status === "unreachable" || flow.status === "refused"
+		? "failed"
+		: flow.status === "browser"
+			? "waiting"
+			: flow.status,
+);
+const failure = $derived(
+	flow.status === "refused" ? i18n.welcome_pairing_refused() : i18n.welcome_unreachable({ host }),
+);
 const pairPage = $derived(pairing?.uri.replace(/^[a-z]+:\/\//, "") ?? `${host}/pair`);
 const chars = $derived(pairing ? [...pairing.code.toUpperCase()] : []);
 const expires = $derived(`${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`);
@@ -102,12 +108,9 @@ function type(k: { aria: string; type: string }) {
 async function submit() {
 	if (checking || found) return;
 	const typed = url.trim();
-	if (!typed) {
-		error = i18n.welcome_enter_address();
-		return;
-	}
-	if (!/^([a-z]+:\/\/)?[a-z0-9.-]+(:\d+)?(\/.*)?$/i.test(typed)) {
-		error = i18n.welcome_bad_address();
+	const bad = checkAddress(typed);
+	if (bad) {
+		error = bad === "empty" ? i18n.welcome_enter_address() : i18n.welcome_bad_address();
 		return;
 	}
 	checking = true;
@@ -126,41 +129,9 @@ async function submit() {
 	}
 }
 
-async function newCode() {
-	const id = ++generation;
-	clearTimeout(pollTimer);
-	status = "waiting";
-	try {
-		const p = await pairStart();
-		if (id !== generation) return;
-		pairing = p;
-		left = p.expires_in;
-		poll(id, p.interval);
-	} catch (e) {
-		if (id !== generation) return;
-		failure = /"code"/.test(String(e))
-			? i18n.welcome_pairing_refused()
-			: i18n.welcome_unreachable({ host });
-		status = "failed";
-	}
-}
-
-function poll(id: number, interval: number) {
-	pollTimer = setTimeout(async () => {
-		const answer = await pairPoll().catch(() => "pending");
-		if (id !== generation) return;
-		if (answer === "paired") return approved();
-		if (answer === "expired") return newCode();
-		if (answer === "denied") {
-			status = "denied";
-			return;
-		}
-		poll(id, answer === "slow_down" ? interval + SLOW_DOWN_SECS : interval);
-	}, interval * 1000);
-}
+const newCode = () => flow.start();
 
 async function approved() {
-	status = "approved";
 	const [me, state] = await Promise.all([whoAmI().catch(() => ({ name: "" })), authState()]);
 	account = { name: me.name, short: me.name.split(" ")[0] ?? "" };
 	keystore = state.store_error
@@ -170,11 +141,14 @@ async function approved() {
 }
 
 function changeServer() {
-	generation++;
-	clearTimeout(pollTimer);
+	flow.reset();
 	found = false;
 	go("server");
 }
+
+$effect(() => {
+	if (flow.status === "approved") untrack(approved);
+});
 
 onMount(() => {
 	authState().then((s) => {
@@ -183,16 +157,7 @@ onMount(() => {
 		else if (s.server) go("pair").then(newCode);
 		else go("server");
 	});
-	const clock = setInterval(() => {
-		if (step !== "pair" || status !== "waiting" || !pairing) return;
-		if (left <= 1) newCode();
-		else left--;
-	}, 1000);
-	return () => {
-		generation++;
-		clearTimeout(pollTimer);
-		clearInterval(clock);
-	};
+	return () => flow.stop();
 });
 </script>
 

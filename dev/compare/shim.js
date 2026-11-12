@@ -41,23 +41,48 @@
     voice: () => ({ text: "" }),
     frameRate: () => null,
     restoreDisplay: () => null,
-    deviceInfo: () => ({ name: "Living room", model: "Ugoos AM9 Pro", platform: "Android TV", player: "ExoPlayer 1.8.0", display: { name: "HDMI", width: 3840, height: 2160, refresh_hz: 60, hdr: ["HDR10", "HLG", "Dolby Vision"] } }),
+    deviceInfo: () => ({ name: "Living room", model: "Ugoos AM9 Pro", platform: "Android TV", player: "ExoPlayer 1.8.0", display: { name: "HDMI", width: 3840, height: 2160, refresh_hz: 60, hdr: ["HDR10", "HLG", "Dolby Vision"] }, ...(window.__deviceInfo || {}) }),
   };
   const kp = (k) => (k === "movies" ? "/movies" : "/series");
   // __holdStart parks start_session until __releaseStart(), to press Back while it is in flight.
   const startSession = ({ mediaId, capabilities, position, tracks }) => window.__failStart ? Promise.reject(window.__failStart) : call("POST", "/playback/sessions", { media_id: mediaId, capabilities, position, ...(tracks || {}) });
+  const fakePairStart = () => {
+    const code = "K7F-Q2M", uri = "https://streamline.home.arpa/pair";
+    const q = window.qrcode(0, "M"); q.addData(`${uri}?code=${code}`); q.make();
+    return { code, name: "Living room · SHIELD", uri, uri_complete: `${uri}?code=${code}`, expires_in: 600, interval: 1, qr: q.createSvgTag({ cellSize: 8, margin: 0 }) };
+  };
+  // window.__realPair: pairing goes to the mock as the Rust side does it; __pairDown makes it fail as a dead network does.
+  let deviceCode = null;
+  const realPairStart = async () => {
+    if (window.__pairDown) throw "error sending request for url (http://127.0.0.1:8081/api/v1/auth/device/code)";
+    const name = "framework-13";
+    const r = await call("POST", "/auth/device/code", { client_id: "shim-desktop", name, platform: "Linux" });
+    deviceCode = r.device_code;
+    const q = window.qrcode(0, "M"); q.addData(r.verification_uri_complete); q.make();
+    return { code: r.user_code, name, uri: r.verification_uri, uri_complete: r.verification_uri_complete, expires_in: r.expires_in, interval: r.interval, qr: q.createSvgTag({ cellSize: 8, margin: 0 }) };
+  };
+  const realPairPoll = async () => {
+    if (!deviceCode) return "expired";
+    try {
+      await call("POST", "/auth/device/token", { device_code: deviceCode });
+    } catch (e) {
+      const code = JSON.parse(e)?.error?.code;
+      const answer = { authorization_pending: "pending", slow_down: "slow_down", access_denied: "denied", expired_token: "expired" }[code];
+      if (answer) return answer;
+      throw e;
+    }
+    deviceCode = null;
+    window.__auth = { ...(window.__auth || {}), paired: true };
+    return "paired";
+  };
   const cmds = {
     server_host: () => "127.0.0.1:8081",
     auth_state: () => ({ server: null, paired: true, keystore: "Android Keystore", ...(window.__auth || {}) }),
     connect: ({ url }) => (/bad/.test(url) ? Promise.reject(`Can’t reach ${url}`) : new Promise((r) => setTimeout(() => r(38), 600))),
-    pair_start: () => {
-      const code = "K7F-Q2M", uri = "https://streamline.home.arpa/pair";
-      const q = window.qrcode(0, "M"); q.addData(`${uri}?code=${code}`); q.make();
-      return { code, name: "Living room · SHIELD", uri, uri_complete: `${uri}?code=${code}`, expires_in: 600, interval: 1, qr: q.createSvgTag({ cellSize: 8, margin: 0 }) };
-    },
+    pair_start: () => window.__realPair ? realPairStart() : fakePairStart(),
     open_external: ({ url }) => { (window.__opened ||= []).push(url); return null; },
-    pair_poll: () => window.__pairAnswer || "pending",
-    sign_out: () => null,
+    pair_poll: () => window.__realPair ? realPairPoll() : (window.__pairAnswer || "pending"),
+    sign_out: () => { if (window.__realPair) window.__auth = { ...(window.__auth || {}), paired: false }; return null; },
     "plugin:event|listen": () => 1,
     "plugin:event|unlisten": () => null,
     library: ({ kind }) => call("GET", kp(kind)),

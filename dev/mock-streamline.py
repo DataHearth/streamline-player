@@ -93,7 +93,7 @@ ADMIN = "Antoine Langlois"
 PAIRINGS = {}
 KEYS = {}
 PAIR_TTL = args.pair_ttl
-PAIR_INTERVAL = 5
+PAIR_INTERVAL = max(1, min(5, PAIR_TTL // 2))
 # The design's codes: 6 characters shown as XXX-XXX, no vowels, no 0/O or 1/I.
 CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ23456789"
 # Browser sign-in: one-time codes, access tokens, and a device per browser holding its refresh token chain.
