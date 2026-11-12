@@ -41,6 +41,9 @@
     voice: () => ({ text: "" }),
     frameRate: () => null,
     restoreDisplay: () => null,
+    volume: ({ volume, muted }) => { send("volume", { volume, muted }); },
+    subtitleLift: ({ px }) => { window.__fake.lift = px; },
+    viewport: (rect) => { window.__fake.viewport = rect; },
     deviceInfo: () => ({ name: "Living room", model: "Ugoos AM9 Pro", platform: "Android TV", player: "ExoPlayer 1.8.0", display: { name: "HDMI", width: 3840, height: 2160, refresh_hz: 60, hdr: ["HDR10", "HLG", "Dolby Vision"] }, ...(window.__deviceInfo || {}) }),
   };
   const kp = (k) => (k === "movies" ? "/movies" : "/series");

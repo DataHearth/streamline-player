@@ -11,7 +11,10 @@ export type PlayerCommand =
 	| "stats"
 	| "stop"
 	| "subtitle"
-	| "timing";
+	| "timing"
+	| "viewport"
+	| "volume"
+	| "subtitleLift";
 export type PlayerEvent =
 	| "position"
 	| "state"
@@ -19,7 +22,8 @@ export type PlayerEvent =
 	| "bandwidth"
 	| "back"
 	| "subtitleFailed"
-	| "voiceKey";
+	| "voiceKey"
+	| "volume";
 
 export type Reason = { code: string; text: string };
 export type Session = {

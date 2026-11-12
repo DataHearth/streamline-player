@@ -25,6 +25,7 @@ tasks:
       - node dev/playback-check.ts
       - node --import ./dev/controller-check/register.mjs dev/pairing-check.ts
       - node --import ./dev/controller-check/register.mjs dev/controller-check/check.mjs
+      - node --import ./dev/controller-check/register.mjs dev/now-playing-check.ts
       - node dev/messages-check.ts
       - node dev/shortcuts-check.ts
       - node dev/contract/proxy-check.ts
