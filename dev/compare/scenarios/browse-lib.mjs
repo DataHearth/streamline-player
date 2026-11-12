@@ -168,6 +168,36 @@ export async function library(ctx, side) {
     const b = el.querySelector("button").getBoundingClientRect();
     return [r.width, r.height, b.width, b.height].map(Math.round);
   });
+
+  await app.goto(`${side.url}/library/movies`);
+  await wait(2500);
+  const card = app.locator(".library .grid .poster").filter({ hasText: "Furiosa" });
+  const trigger = card.locator("[data-lang-trigger]");
+  out.lang = { before: await trigger.getAttribute("aria-label"), showsHaveNone: 0 };
+  await trigger.click();
+  await wait(1500);
+  await shot(`${side.target}-library-lang`);
+  const pop = app.locator('.library [role="dialog"]');
+  out.lang.heading = await pop.locator(".heading").textContent();
+  out.lang.audio = (await pop.locator('.sub:has(input[name="audio"])').allTextContents()).map((s) => s.trim());
+  out.lang.subs = (await pop.locator('.sub:has(input[name="subs"])').allTextContents()).map((s) => s.trim());
+  out.lang.inView = await pop.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+  });
+  await pop.locator('.sub:has(input[name="audio"])').nth(1).click();
+  await pop.locator('.sub:has(input[name="subs"])').filter({ hasText: "Off" }).click();
+  await pop.locator(".apply").click();
+  await wait(600);
+  out.lang.closed = await app.locator('.library [role="dialog"].shown').count();
+  out.lang.label = await trigger.getAttribute("aria-label");
+  out.lang.own = await trigger.evaluate((el) => el.classList.contains("own"));
+  await app.reload();
+  await wait(2500);
+  out.lang.afterReload = await trigger.getAttribute("aria-label");
+  await app.goto(`${side.url}/library/series`);
+  await wait(2500);
+  out.lang.showsHaveNone = await app.locator(".library [data-lang-trigger]").count();
   return out;
 }
 

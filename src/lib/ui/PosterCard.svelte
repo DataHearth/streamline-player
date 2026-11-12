@@ -3,6 +3,7 @@ import Art from "#lib/ui/Art.svelte";
 import Icon from "#lib/ui/Icon.svelte";
 
 type Mark = { on: boolean; label: string; onclick: () => void };
+type Lang = { own: boolean; label: string; onclick: (trigger: HTMLElement) => void };
 
 let {
 	title,
@@ -16,6 +17,7 @@ let {
 	width,
 	playLabel,
 	mark,
+	lang,
 	onplay,
 	onclick,
 }: {
@@ -34,6 +36,7 @@ let {
 	/** With `onplay`, the poster shows a play button on hover. */
 	playLabel?: string;
 	mark?: Mark;
+	lang?: Lang;
 	onplay?: () => void;
 	onclick: () => void;
 } = $props();
@@ -84,6 +87,19 @@ let {
 				onclick={mark.onclick}
 			>
 				<Icon name={mark.on ? "check-check" : "eye"} size={16} stroke={1.75} />
+			</button>
+		{/if}
+		{#if lang}
+			<button
+				type="button"
+				class="mark lang"
+				class:own={lang.own}
+				data-lang-trigger="lib"
+				aria-label={lang.label}
+				title={lang.label}
+				onclick={(e) => lang.onclick(e.currentTarget)}
+			>
+				<Icon name="languages" size={16} stroke={1.8} />
 			</button>
 		{/if}
 	</span>
@@ -288,5 +304,13 @@ let {
 
 .mark.on {
 	color: var(--status-available);
+}
+
+.lang.own {
+	color: var(--accent);
+}
+
+.lang:hover {
+	color: var(--fg);
 }
 </style>

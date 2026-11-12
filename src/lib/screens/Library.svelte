@@ -16,7 +16,18 @@ import {
 	viewToQuery,
 	visible,
 } from "#lib/core/library-view.ts";
-import { prefs } from "#lib/core/prefs.svelte.ts";
+import {
+	audioLanguages,
+	type Choice,
+	defaultChoice,
+	loadChoices,
+	saveChoices,
+	subtitleLanguages,
+} from "#lib/core/playback/choice.ts";
+import { languageLabel } from "#lib/core/playback/names.ts";
+import type { Tracks } from "#lib/core/playback/port.ts";
+import { isAnime, language } from "#lib/core/playback/rules.ts";
+import { myLanguage, prefs } from "#lib/core/prefs.svelte.ts";
 import { toast } from "#lib/core/toast.svelte.ts";
 import type { Kind, Title } from "#lib/core/types.ts";
 import { m as i18n } from "#lib/paraglide/messages.js";
@@ -25,6 +36,7 @@ import Chip from "#lib/ui/Chip.svelte";
 import { dismiss } from "#lib/ui/dismiss.ts";
 import EmptyState from "#lib/ui/EmptyState.svelte";
 import FilterMenu from "#lib/ui/FilterMenu.svelte";
+import LanguagePopover from "#lib/ui/LanguagePopover.svelte";
 import Icon from "#lib/ui/Icon.svelte";
 import { goto } from "#lib/ui/nav.ts";
 import PosterCard from "#lib/ui/PosterCard.svelte";
@@ -32,7 +44,7 @@ import { presence } from "#lib/ui/presence.svelte.ts";
 import SegmentedControl from "#lib/ui/SegmentedControl.svelte";
 import SortMenu from "#lib/ui/SortMenu.svelte";
 import TitleRow from "#lib/ui/TitleRow.svelte";
-import { artwork, home, library, setWatched, title, watchState } from "#platform";
+import { artwork, home, library, playbackPort, setWatched, title, watchState } from "#platform";
 import { page } from "$app/state";
 import { onMount, untrack } from "svelte";
 
@@ -118,6 +130,108 @@ function playLabel(t: Title) {
 		: i18n.library_play_title({ title: t.title });
 }
 
+const POPOVER_W = 280;
+const POPOVER_H = 420;
+const BAR = 64;
+let box = $state<HTMLElement>();
+let choices = $state(loadChoices());
+type Open = { t: Title; tracks: Tracks | null; draft: Choice; x: number; y: number; up: boolean };
+let lang = $state<Open | null>(null);
+const popover = presence(() => lang !== null, 190);
+let lastLang = $state.raw<Open | null>(null);
+$effect(() => {
+	if (lang) lastLang = lang;
+});
+const shownLang = $derived(lang ?? lastLang);
+
+const languageNamed = (name: string, from: { language: string }[]) => {
+	const hit = from.find((x) => language(x.language) === name);
+	return hit ? languageLabel(hit.language) : name;
+};
+const subsShort = (c: Choice) =>
+	c.subs === "off"
+		? i18n.detail_subs_none()
+		: c.subs === "forced"
+			? i18n.detail_subs_forced()
+			: i18n.detail_subs_language({ language: c.subs });
+const langLabel = (t: Title) => {
+	const own = choices[`movies:${t.id}`];
+	return own
+		? i18n.detail_lang_label({ audio: own.audio, subs: subsShort(own) })
+		: i18n.detail_lang_title();
+};
+
+async function openLang(t: Title, el: HTMLElement) {
+	if (lang?.t.id === t.id) {
+		lang = null;
+		return;
+	}
+	let tracks: Tracks | null = null;
+	try {
+		const media = (await title(kind, t.id)).media_files?.[0]?.id;
+		if (media) tracks = await playbackPort.mediaTracks(media);
+	} catch {
+		// The popover then says the tracks are not ready.
+	}
+	if (!box || !el.isConnected) return;
+	const draft =
+		choices[`movies:${t.id}`] ??
+		(tracks
+			? defaultChoice(tracks.audio, {
+					audioLang: prefs.audioLang,
+					anime: isAnime(t.genres ?? []),
+					animeRule: prefs.animeRule,
+					subsMode: prefs.subsMode,
+					myLanguage: myLanguage(),
+				})
+			: { audio: "", subs: "forced" });
+	const b = box.getBoundingClientRect();
+	const r = el.getBoundingClientRect();
+	const host = el.closest(".content")?.getBoundingClientRect();
+	const bottom = host?.bottom ?? window.innerHeight;
+	const top = (host?.top ?? 0) + BAR + 8;
+	const up = r.bottom + POPOVER_H > bottom && r.top - POPOVER_H >= top;
+	let y = up ? r.top - b.top - 6 : r.bottom - b.top + 6;
+	// No room below nor above: slide it up beside the card, clear of the app bar.
+	if (!up && r.bottom + POPOVER_H > bottom)
+		y = Math.max(top - b.top, Math.min(y, bottom - b.top - 8 - POPOVER_H));
+	lang = {
+		t,
+		tracks,
+		draft: { ...draft },
+		x: Math.max(12, Math.min(box.offsetWidth - POPOVER_W - 12, r.right - b.left - POPOVER_W + 8)),
+		y,
+		up,
+	};
+}
+
+function applyLang() {
+	if (!lang) return;
+	choices = { ...choices, [`movies:${lang.t.id}`]: lang.draft };
+	saveChoices(choices);
+	lang = null;
+}
+
+$effect(() => {
+	if (!lang) return;
+	const onPress = (e: PointerEvent) => {
+		const el = e.target as Element | null;
+		if (el?.closest('[role="dialog"]') || el?.closest("[data-lang-trigger]")) return;
+		lang = null;
+	};
+	const onKey = (e: KeyboardEvent) => {
+		if (e.key !== "Escape") return;
+		e.stopPropagation();
+		lang = null;
+	};
+	document.addEventListener("pointerdown", onPress, true);
+	window.addEventListener("keydown", onKey, true);
+	return () => {
+		document.removeEventListener("pointerdown", onPress, true);
+		window.removeEventListener("keydown", onKey, true);
+	};
+});
+
 async function toggleMark(t: Title) {
 	const was = watchedTitle(t, kind, lib.watch);
 	try {
@@ -170,7 +284,7 @@ const heads: { label: () => string; sort?: Sort; end?: boolean }[] = [
 ];
 </script>
 
-<div class="library" style:--cols={LIST_COLS}>
+<div class="library" style:--cols={LIST_COLS} bind:this={box}>
 	{#if lib.error !== null}
 		<div class="state">
 			<EmptyState icon="film" title={i18n.home_error_title()} text={lib.error}>
@@ -284,6 +398,13 @@ const heads: { label: () => string; sort?: Sort; end?: boolean }[] = [
 									: i18n.library_mark_watched({ title: t.title }),
 								onclick: () => toggleMark(t),
 							}}
+							lang={kind === "movies"
+								? {
+										own: !!choices[`movies:${t.id}`],
+										label: langLabel(t),
+										onclick: (el) => openLang(t, el),
+									}
+								: undefined}
 							onplay={() => play(t)}
 							onclick={() => open(t)}
 						/>
@@ -334,6 +455,39 @@ const heads: { label: () => string; sort?: Sort; end?: boolean }[] = [
 				</EmptyState>
 			{/if}
 		</div>
+	{/if}
+	{#if popover.mounted && shownLang}
+		{@const audio = audioLanguages(shownLang.tracks?.audio ?? [])}
+		<LanguagePopover
+			heading={shownLang.t.title}
+			title={i18n.detail_lang_title()}
+			audioLabel={i18n.player_audio()}
+			subsLabel={i18n.player_subtitles()}
+			audio={audio.map((name) => ({
+				value: name,
+				label: languageNamed(name, shownLang.tracks?.audio ?? []),
+			}))}
+			subs={[
+				{ value: "off", label: i18n.player_subtitles_off() },
+				{ value: "forced", label: i18n.detail_forced_only() },
+				...subtitleLanguages(shownLang.tracks?.subtitles ?? []).map((name) => ({
+					value: name,
+					label: languageNamed(name, shownLang.tracks?.subtitles ?? []),
+				})),
+			]}
+			draft={shownLang.draft}
+			hint=""
+			applyLabel={i18n.detail_apply()}
+			unavailable={audio.length ? undefined : i18n.detail_lang_unavailable()}
+			x={shownLang.x}
+			y={shownLang.y}
+			up={shownLang.up}
+			shown={popover.shown && lang !== null}
+			onpick={(patch) => {
+				if (lang) lang.draft = { ...lang.draft, ...patch };
+			}}
+			onapply={applyLang}
+		/>
 	{/if}
 </div>
 

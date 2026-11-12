@@ -5,6 +5,7 @@ import Icon from "#lib/ui/Icon.svelte";
 type Option = { value: string; label: string };
 
 let {
+	heading,
 	title,
 	audioLabel,
 	subsLabel,
@@ -21,6 +22,8 @@ let {
 	onpick,
 	onapply,
 }: {
+	/** Library's form: the title named on top, audio as a list, no hint beside Apply. */
+	heading?: string;
 	title: string;
 	audioLabel: string;
 	subsLabel: string;
@@ -46,21 +49,44 @@ let {
 	aria-label={title}
 	class:shown
 	class:up
+	class:wide={!!heading}
 	style:left="{x}px"
 	style:top="{y}px"
 >
+	{#if heading}
+		<span class="heading">{heading}</span>
+	{/if}
 	{#if unavailable}
 		<p class="none">{unavailable}</p>
 	{:else}
 		<div class="group">
-			<div class="cap">{audioLabel}</div>
-			<div class="audio" role="radiogroup" aria-label={audioLabel}>
-				{#each audio as o (o.value)}
-					<Chip pressed={draft.audio === o.value} onclick={() => onpick({ audio: o.value })}>
-						{o.label}
-					</Chip>
-				{/each}
-			</div>
+			<div class="cap" class:pad={!!heading}>{audioLabel}</div>
+			{#if heading}
+				<div class="subs">
+					{#each audio as o (o.value)}
+						<label class="sub">
+							<input
+								type="radio"
+								name="audio"
+								value={o.value}
+								checked={draft.audio === o.value}
+								onchange={() => onpick({ audio: o.value })}
+							>
+							<span class="check" class:on={draft.audio === o.value}
+								><Icon name="tick" size={14} stroke={2.5} /></span
+							>{o.label}
+						</label>
+					{/each}
+				</div>
+			{:else}
+				<div class="audio" role="radiogroup" aria-label={audioLabel}>
+					{#each audio as o (o.value)}
+						<Chip pressed={draft.audio === o.value} onclick={() => onpick({ audio: o.value })}>
+							{o.label}
+						</Chip>
+					{/each}
+				</div>
+			{/if}
 		</div>
 		<div class="group tight">
 			<div class="cap pad">{subsLabel}</div>
@@ -83,7 +109,9 @@ let {
 		</div>
 	{/if}
 	<div class="foot">
-		<span class="hint">{hint}</span>
+		{#if !heading}
+			<span class="hint">{hint}</span>
+		{/if}
 		<button type="button" class="apply" disabled={!!unavailable} onclick={onapply}>
 			{applyLabel}
 		</button>
@@ -129,6 +157,51 @@ let {
 
 .pop.up.shown {
 	transform: translateY(-100%) scale(1);
+}
+
+.pop.wide {
+	width: 280px;
+	padding: 14px;
+	gap: 14px;
+	border-radius: 14px;
+}
+
+.heading {
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.wide .group {
+	gap: 2px;
+}
+
+.wide .cap {
+	padding: 0 8px 4px;
+	font-size: 10.5px;
+}
+
+.wide .subs {
+	max-height: 170px;
+}
+
+.wide .sub {
+	height: 34px;
+	gap: 10px;
+	padding: 0 8px;
+	border-radius: 8px;
+}
+
+.wide .foot {
+	justify-content: flex-end;
+	padding: 0;
+	border-top: 0;
+}
+
+.wide .apply {
+	height: 34px;
+	padding: 0 16px;
+	border-radius: 9px;
 }
 
 .group {

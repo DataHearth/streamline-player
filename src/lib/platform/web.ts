@@ -273,7 +273,9 @@ export const deviceInfo = (): Promise<DeviceInfo> =>
 	Promise.resolve({
 		name: browserDeviceName(navigator.userAgent),
 		model: "",
-		platform: "Web browser",
+		platform: ["Web", browserDeviceName(navigator.userAgent).split(" on ")[1]]
+			.filter((part) => part && part !== "unknown OS")
+			.join(" · "),
 		player: "Shaka",
 		display: {
 			name: "",
