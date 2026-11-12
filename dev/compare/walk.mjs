@@ -46,6 +46,9 @@ const wait = async (ms) => {
 const goto = app.goto.bind(app);
 app.goto = async (...a) => {
   const r = await goto(...a);
+  // A fixed pause alone reads a half-loaded page when the load is slow. The TV target keeps only the pause:
+  // its player page never goes idle.
+  if (target !== "tv") await app.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
   await app.waitForTimeout(2500);
   return r;
 };

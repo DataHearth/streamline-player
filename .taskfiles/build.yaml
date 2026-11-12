@@ -32,6 +32,8 @@ tasks:
     cmds:
       - pnpm build
       - node dev/web-build-check.ts
+      # Marks build/ as the web target for `task check`; a native build empties build/ and so drops it.
+      - touch build/.web-target
 
   android:
     desc: Build the Android APK and AAB (phones and Android TV)

@@ -173,9 +173,16 @@ $effect(() => {
 
 $effect(() => {
 	if (onboarding || account.me) return;
+	// A fetch still in flight at sign-out must not put the old account back for the next person.
+	let stale = false;
 	me()
-		.then((v) => setMe(v))
+		.then((v) => {
+			if (!stale) setMe(v);
+		})
 		.catch(() => {});
+	return () => {
+		stale = true;
+	};
 });
 
 onMount(() => {

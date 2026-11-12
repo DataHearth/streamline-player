@@ -31,16 +31,16 @@ for s in $scenarios; do
   mapfile -t flags < <(node -e "import('./dev/compare/scenarios/$s.mjs').then((m) => process.stdout.write((m.mockArgs ?? []).join('\n')))")
   for engine in webkit firefox chromium; do
     python3 dev/mock-streamline.py --listen 127.0.0.1:8081 --secret dev-secret-0123456789abcdef --now 1794225600 \
-      --art "$tmp/art" --clip "$tmp/h.mkv" "${flags[@]}" >"$tmp/mock-web-$engine.log" 2>&1 &
+      --art "$tmp/art" --clip "$tmp/h.mkv" "${flags[@]}" >"$tmp/mock-web-$s-$engine.log" 2>&1 &
     mock=$!
     report=$tmp/contract-web-$s-$engine.jsonl
     rm -f "$report"
     node dev/contract/proxy.ts --listen 127.0.0.1:8098 --upstream http://127.0.0.1:8081 \
-      --spec docs/contract/player.openapi.yaml --report "$report" >"$tmp/proxy-web-$engine.log" 2>&1 &
+      --spec docs/contract/player.openapi.yaml --report "$report" >"$tmp/proxy-web-$s-$engine.log" 2>&1 &
     proxy=$!
     bridge=
     if [ "$scenario_target" = desktop ]; then
-      python3 dev/compare/bridge.py >"$tmp/bridge-web-$engine.log" 2>&1 &
+      python3 dev/compare/bridge.py >"$tmp/bridge-web-$s-$engine.log" 2>&1 &
       bridge=$!
     fi
     sleep 2

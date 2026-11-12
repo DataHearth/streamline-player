@@ -29,5 +29,5 @@ tasks:
       - node dev/contract/auth-flow-check.ts
       - node dev/contract/browse-check.ts
       - cmd: node dev/web-build-check.ts
-        # Only a web build in build/ is checked; `task build:web` makes one.
-        if: test -f build/index.html
+        # Only a web build in build/ is checked; `task build:web` makes one and marks it. A native build lands in build/ too.
+        if: test -f build/.web-target
