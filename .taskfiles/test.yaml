@@ -16,6 +16,7 @@ tasks:
     cmds:
       - node dev/account-check.ts
       - node dev/auto-check.ts
+      - node dev/approve-check.ts
       - node dev/auth-check.ts
       - node dev/browse-check.ts
       - node dev/detail-check.ts

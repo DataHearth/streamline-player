@@ -42,7 +42,9 @@ const help = presence(() => helpOpen, 240);
 
 const route = $derived(page.route.id ?? "");
 const kind = $derived(page.params.kind);
-const onboarding = $derived(route === "/welcome" || route.startsWith("/signin"));
+const onboarding = $derived(
+	route === "/welcome" || route === "/pair" || route.startsWith("/signin"),
+);
 const inPlayer = $derived(route.startsWith("/player"));
 const showBar = $derived(!onboarding && !inPlayer);
 const narrow = $derived(web && width < MIN_WIDTH);
